@@ -33,11 +33,11 @@ class ZertzBoard:
     # For mapping number of rings to board width
     MARBLE_TO_LAYER = {'w': 1, 'g': 2, 'b': 3}
     LAYER_TO_MARBLE = dict((v, k) for k, v in MARBLE_TO_LAYER.items())
-    HEX_NUMBERS = [(1, 1), (7, 3), (19, 5), (37, 7), (61, 9), (91, 11), (127, 13)]
+    HEX_NUMBERS = [(1, 1), (7, 3), (19, 5), (37, 7), (48, 8), (61, 9), (91, 11), (127, 13)]
     #              (down), (left ), (u / l ), ( up ), (right), (d /r)
     DIRECTIONS = [(1, 0), (0, -1), (-1, -1), (-1, 0), (0, 1), (1, 1)]
 
-    def __init__(self, rings=37, marbles=None, t=1, clone=None):
+    def __init__(self, rings=37, marbles=None, t=1, clone=None, layout=None):
         # Return a Board object to store the board state
         #   - State is a matrix with dimensions L x H x W, H = W = Board width, L = Layers:
         #     - (# of marble types + 1) x (time history) binary to record previous board positions
@@ -51,16 +51,22 @@ class ZertzBoard:
             self.CAPTURE_LAYER = clone.CAPTURE_LAYER
             self.MARBLE_TO_SUPPLY = copy.copy(clone.MARBLE_TO_SUPPLY)
             self.state = np.copy(clone.state)
+            self.layout = np.copy(clone.layout)
         else:
             # Determine width of board from the number of rings
-            self.rings = rings
-            self.width = 0
-            for total, width in self.HEX_NUMBERS:
-                # Currently limited to only boards that are perfect hexagons
-                # TODO: implement for uneven number of rings
-                if total == self.rings:
-                    self.width = width
-            assert self.width != 0
+            if layout is None:
+                self.rings = rings
+                self.width = 0
+                for total, width in self.HEX_NUMBERS:
+                    # Currently limited to only boards that are perfect hexagons
+                    # TODO: implement for uneven number of rings
+                    if total == self.rings:
+                        self.width = width
+                assert self.width != 0
+            else:
+                self.layout = layout
+                self.rings = np.count_nonzero(layout)
+                self.width = layout.shape[0]
 
             # Calculate the number of layers
             # 4 * t layers for all pieces going back t steps, 9 for supply, 1 for capture, 1 for player
@@ -93,11 +99,14 @@ class ZertzBoard:
 
             # Place rings
             # TODO: implement for uneven number of rings
-            middle = self.width // 2
-            for i in range(self.width):
-                lb = max(0, i - middle)
-                ub = min(self.width, middle + i + 1)
-                self.state[0, lb:ub, i] = 1
+            if self.layout is None:
+                middle = self.width // 2
+                for i in range(self.width):
+                    lb = max(0, i - middle)
+                    ub = min(self.width, middle + i + 1)
+                    self.state[0, lb:ub, i] = 1
+            else:
+                self.state[0, self.layout == True] = 1
 
             # Set the number of each type of marble available in the supply
             #   default: 6x white, 8x gray, 10x black
@@ -199,8 +208,9 @@ class ZertzBoard:
         # Modify the most recent 4 layers of the state based on the action
         if action_type == 'PUT':
             self.take_placement_action(action)
+            return None
         elif action_type == 'CAP':
-            self.take_capture_action(action)
+            return self.take_capture_action(action)
 
     def take_placement_action(self, action):
         # Placement actions have dimension (3 x w^2 x w^2 + 1)
@@ -317,6 +327,7 @@ class ZertzBoard:
         # Update current player if there are no forced chain captures
         if np.sum(self.state[self.CAPTURE_LAYER]) == 0:
             self._next_player()
+        return captured_type
 
     def get_valid_moves(self):
         # Return two matrices that can be used to filter the placement and capture action policy

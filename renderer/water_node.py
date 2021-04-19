@@ -1,4 +1,4 @@
-from pandac.PandaModules import CardMaker, Texture, TextureStage, Plane, \
+from panda3d.core import CardMaker, Texture, TextureStage, Plane, \
     PlaneNode, TransparencyAttrib, CullFaceAttrib, RenderState, ShaderAttrib
 
 

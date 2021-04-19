@@ -9,7 +9,8 @@ class _BaseModel(ABC):
         self.model = renderer.loader.loadModel(model_name)
         self.model.reparentTo(renderer.render)
         self.model.setColor(color)
-        self.model.setScale(0.3)
+        # self.model.setScale(0.3)
+        self.model.setScale(0.305)
 
     def _set_pos(self, coord):
         self.model.setPos(coord)

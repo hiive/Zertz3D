@@ -8,7 +8,7 @@ from .zertz_board import ZertzBoard
 # Class interface inspired by https://github.com/suragnair/alpha-zero-general
 
 class ZertzGame:
-    def __init__(self, rings=37, marbles=None, win_con=None, t=1, clone=None, clone_state=None):
+    def __init__(self, rings=37, marbles=None, win_con=None, t=1, layout = None, clone=None, clone_state=None):
         if clone is not None:
             # Creates an instance of ZertzGame with settings copied from clone and updated to 
             # have the same board state as clone_state
@@ -18,6 +18,7 @@ class ZertzGame:
             self.win_con = copy.copy(clone.win_con)
             self.board = ZertzBoard(clone=clone.board)
             self.board.state = np.copy(clone_state)
+            self.layout = np.copy(clone.layout)
             assert clone.board.state.shape[0] == clone_state.shape[0]
         else:
             # The size of the game board
@@ -25,7 +26,8 @@ class ZertzGame:
             self.initial_rings = rings
             self.t = t
             self.marbles = marbles
-            self.board = ZertzBoard(self.initial_rings, self.marbles, self.t)
+            self.layout = layout
+            self.board = ZertzBoard(self.initial_rings, self.marbles, self.t, layout=self.layout)
 
             # The win conditions (amount of each marble needed)
             #   default:
@@ -235,6 +237,7 @@ class ZertzGame:
     def action_to_str(self, action_type, action):
         # Translate an action tuple and type to a human readable string representation
         action_str = action_type + ' '
+        action_dict = {}
         if action_type == 'PUT':
             marble_type, put, rem = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
@@ -250,6 +253,12 @@ class ZertzGame:
 
             action_str = "{} {} {} {}".format(
                 action_type, marble_type, put_str, rem_str).rstrip()
+            action_dict = {
+                'action': action_type,
+                'marble': marble_type,
+                'dst': put_str,
+                'remove': rem_str
+            }
 
         elif action_type == 'CAP':
             direction, y, x = action
@@ -266,8 +275,14 @@ class ZertzGame:
 
             action_str = "{} {} {} {} {}".format(
                 action_type, src_marble, src_str, cap_marble, dst_str)
-
-        return action_str
+            action_dict = {
+                'action': action_type,
+                'marble': src_marble,
+                'src': src_str,
+                'dst': dst_str,
+                'capture': cap_marble
+            }
+        return action_str, action_dict
 
     def print_state(self):
         # Print the board state and supplies to the console
@@ -283,3 +298,6 @@ class ZertzGame:
         print("Marble supply:")
         print(self.board.state[-10:-1, 0, 0])
         print("---------------")
+
+    def take_action(self, action_type, action):
+        return self.board.take_action(action, action_type)
