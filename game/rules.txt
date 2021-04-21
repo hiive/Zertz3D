@@ -169,3 +169,85 @@ This variant concerns the original “Basic Game”. It is a short, very aggress
 It is played on a board with 37 rings, and with one marble less per color.
 So, you only need 5 white marbles, 7 grey marbles and 9 black marbles. Now you must either capture only 2 marbles of
 each color, or 3 whites, or 4 greys, or 5 blacks to win the game.
+
+
+---
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'C4', 'remove': 'C1'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'G1', 'remove': 'C7'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'A2', 'remove': 'E1'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'H4', 'remove': 'F6'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'G3', 'remove': 'E7'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'A5', 'remove': 'F1'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'D4', 'remove': 'A3'}
+Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'D4', 'dst': 'B4', 'capture': 'b', 'cap': 'C4'}
+Player 1: {'action': 'PUT', 'marble': 'g', 'dst': 'G4', 'remove': 'E6'}
+Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'H4', 'dst': 'F4', 'capture': 'g', 'cap': 'G4'}
+Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'F4', 'dst': 'H2', 'capture': 'w', 'cap': 'G3'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'G5', 'remove': 'A1'}
+Player 2: {'action': 'PUT', 'marble': 'w', 'dst': 'H3', 'remove': 'H4'}
+Player 1: {'action': 'CAP', 'marble': 'w', 'src': 'H3', 'dst': 'H1', 'capture': 'b', 'cap': 'H2'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'G2', 'remove': 'D8'}
+Player 1: {'action': 'CAP', 'marble': 'w', 'src': 'H1', 'dst': 'F3', 'capture': 'g', 'cap': 'G2'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'D6', 'remove': 'E2'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'H1', 'remove': 'D1'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'A4', 'remove': 'F2'}
+Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'A4', 'dst': 'C4', 'capture': 'b', 'cap': 'B4'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'D3', 'remove': 'D7'}
+Player 1: {'action': 'PUT', 'marble': 'g', 'dst': 'A4', 'remove': 'H2'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'C2', 'remove': 'E3'}
+Player 1: {'action': 'CAP', 'marble': 'b', 'src': 'D3', 'dst': 'B1', 'capture': 'g', 'cap': 'C2'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'D2', 'remove': 'H3'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'B6', 'remove': 'C6'}
+Player 2: {'action': 'PUT', 'marble': 'w', 'dst': 'D3', 'remove': 'G4'}
+Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'D2', 'dst': 'D4', 'capture': 'w', 'cap': 'D3'}
+Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'D4', 'dst': 'B4', 'capture': 'g', 'cap': 'C4'}
+Player 2: {'action': 'CAP', 'marble': 'g', 'src': 'A4', 'dst': 'C4', 'capture': 'g', 'cap': 'B4'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'D4', 'remove': 'D3'}
+Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'D4', 'dst': 'B4', 'capture': 'g', 'cap': 'C4'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'A4', 'remove': 'G3'}
+Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'A4', 'dst': 'C4', 'capture': 'b', 'cap': 'B4'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'D4', 'remove': 'F5'}
+Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'D4', 'dst': 'B4', 'capture': 'b', 'cap': 'C4'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'B3', 'remove': 'D2'}
+Player 2: {'action': 'CAP', 'marble': 'w', 'src': 'A2', 'dst': 'C4', 'capture': 'b', 'cap': 'B3'}
+Player 2: {'action': 'CAP', 'marble': 'w', 'src': 'C4', 'dst': 'A4', 'capture': 'b', 'cap': 'B4'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'C2', 'remove': 'F4'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'B4', 'remove': 'D4'}
+Player 1: {'action': 'CAP', 'marble': 'w', 'src': 'A4', 'dst': 'C4', 'capture': 'b', 'cap': 'B4'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'A4', 'remove': 'C3'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'G2', 'remove': 'A2'}
+Player 2: {'action': 'CAP', 'marble': 'w', 'src': 'G2', 'dst': 'E4', 'capture': 'w', 'cap': 'F3'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'C5', 'remove': 'B3'}
+Player 2: {'action': 'CAP', 'marble': 'g', 'src': 'D6', 'dst': 'B4', 'capture': 'b', 'cap': 'C5'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'E5', 'remove': 'F3'}
+Traceback (most recent call last):
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\main.py", line 51, in update_game
+    result = self.game.take_action(ax, ay)
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\game\zertz_game.py", line 304, in take_action
+    return self.board.take_action(action, action_type)
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\game\zertz_board.py", line 214, in take_action
+    self.take_placement_action(action)
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\game\zertz_board.py", line 243, in take_placement_action
+    assert self.state[supply_layer, 0, 0] >= 1
+AssertionError
+:task(error): Exception occurred in PythonTask update_game
+Traceback (most recent call last):
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\main.py", line 71, in <module>
+    game.run()
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\main.py", line 32, in run
+    self.renderer.run()
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\venv\lib\site-packages\direct\showbase\ShowBase.py", line 3325, in run
+    self.taskMgr.run()
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\venv\lib\site-packages\direct\task\Task.py", line 546, in run
+    self.step()
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\venv\lib\site-packages\direct\task\Task.py", line 500, in step
+    self.mgr.poll()
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\main.py", line 51, in update_game
+    result = self.game.take_action(ax, ay)
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\game\zertz_game.py", line 304, in take_action
+    return self.board.take_action(action, action_type)
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\game\zertz_board.py", line 214, in take_action
+    self.take_placement_action(action)
+  File "C:\Users\aroll\Documents\GitHub\Zertz3D\game\zertz_board.py", line 243, in take_placement_action
+    assert self.state[supply_layer, 0, 0] >= 1
+AssertionError
