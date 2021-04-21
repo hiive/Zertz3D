@@ -37,7 +37,7 @@ class ZertzBoard:
     #              (down), (left ), (u / l ), ( up ), (right), (d /r)
     DIRECTIONS = [(1, 0), (0, -1), (-1, -1), (-1, 0), (0, 1), (1, 1)]
 
-    def __init__(self, rings=37, marbles=None, t=1, clone=None, layout=None):
+    def __init__(self, rings=37, marbles=None, t=1, clone=None, board_layout=None):
         # Return a Board object to store the board state
         #   - State is a matrix with dimensions L x H x W, H = W = Board width, L = Layers:
         #     - (# of marble types + 1) x (time history) binary to record previous board positions
@@ -51,10 +51,12 @@ class ZertzBoard:
             self.CAPTURE_LAYER = clone.CAPTURE_LAYER
             self.MARBLE_TO_SUPPLY = copy.copy(clone.MARBLE_TO_SUPPLY)
             self.state = np.copy(clone.state)
-            self.layout = np.copy(clone.layout)
+            self.letter_layout = np.copy(clone.letter_layout)
+            self.flattened_letters = np.copy(clone.flattened_letters)
+            self.board_layout = np.copy(clone.board_layout)
         else:
             # Determine width of board from the number of rings
-            if layout is None:
+            if board_layout is None:
                 self.rings = rings
                 self.width = 0
                 for total, width in self.HEX_NUMBERS:
@@ -64,9 +66,11 @@ class ZertzBoard:
                         self.width = width
                 assert self.width != 0
             else:
-                self.layout = layout
-                self.rings = np.count_nonzero(layout)
-                self.width = layout.shape[0]
+                self.letter_layout = board_layout
+                self.flattened_letters = np.reshape(board_layout, (board_layout.size,))
+                self.board_layout = self.letter_layout != ''
+                self.rings = np.count_nonzero(board_layout)
+                self.width = board_layout.shape[0]
 
             # Calculate the number of layers
             # 4 * t layers for all pieces going back t steps, 9 for supply, 1 for capture, 1 for player
@@ -99,14 +103,14 @@ class ZertzBoard:
 
             # Place rings
             # TODO: implement for uneven number of rings
-            if self.layout is None:
+            if self.board_layout is None:
                 middle = self.width // 2
                 for i in range(self.width):
                     lb = max(0, i - middle)
                     ub = min(self.width, middle + i + 1)
                     self.state[0, lb:ub, i] = 1
             else:
-                self.state[0, self.layout == True] = 1
+                self.state[0, self.board_layout == True] = 1
 
             # Set the number of each type of marble available in the supply
             #   default: 6x white, 8x gray, 10x black
@@ -562,12 +566,16 @@ class ZertzBoard:
         # Given an index (y, x) return a string like 'A1' based on the board shape
         y, x = index
 
+        if self.flattened_letters is not None:
+            ix = y * self.width + x
+            return self.flattened_letters[ix]
+
         # Calculate letter
         letter = chr(x + 65)  # chr(65) == 'A'
 
         # Calculate number
         mid = self.width // 2
         offset = max(mid - x, 0)
-        number = str(self.width - (y + offset))
 
+        number = str(self.width - (y + offset))
         return letter + number

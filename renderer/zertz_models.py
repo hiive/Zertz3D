@@ -6,15 +6,45 @@ import numpy as np
 
 class _BaseModel(ABC):
     def __init__(self, renderer, model_name, color=(1.0, 1.0, 1.0, 1.0)):
-        self.model = renderer.loader.loadModel(model_name)
-        self.model.reparentTo(renderer.render)
-        self.model.setColor(color)
-        # self.model.setScale(0.3)
-        self.model.setScale(0.305)
+        self.renderer = renderer
+        self.model_name = model_name
+        self.color = color
+        self.pos_coords = None
+        self.saved_coords = None
+        self.model = None
+        self.add()
 
     def _set_pos(self, coord):
-        self.model.setPos(coord)
+        self.pos_coords = coord
+        self.model.setPos(self.pos_coords)
         pass
+
+    def get_pos(self):
+        return self.pos_coords
+
+    def remove(self):
+        if self.model is not None:
+            self.model.removeNode()
+            self.model = None
+
+    def add(self):
+        if self.model is not None:
+            return
+        # self.model.reparentTo(None)
+        self.model = self.renderer.loader.loadModel(self.model_name)
+        self.model.setColor(self.color)
+        # self.model.setScale(0.3)
+        self.model.setScale(0.305)
+        self.model.reparentTo(self.renderer.render)
+
+    def show(self):
+        if self.saved_coords is not None:
+            self._set_pos(self.saved_coords)
+
+    def hide(self):
+        hide_coords = (-10000000.0, -10000000.0, -10000000.0)
+        self.saved_coords = self.pos_coords
+        self._set_pos(hide_coords)
 
 
 class SkyBox(_BaseModel):
@@ -35,12 +65,23 @@ class SkyBox(_BaseModel):
         self.model.setLight(a_node)
 
 
+def make_marble(renderer, color):
+    if color == 'w':
+        return WhiteBallModel(renderer)
+    elif color == 'b':
+        return BlackBallModel(renderer)
+    elif color == 'g':
+        return GrayBallModel(renderer)
+    return None
+
+
 class _BallBase(_BaseModel):
     def __init__(self, renderer, color):
         model_name = "models/ball_lo.bam"
         super().__init__(renderer, model_name, color)
         # self.model.flattenStrong()
         self._set_random_hpr()
+        self.z_offset = 0.25
 
     def _set_random_hpr(self):
         rot = np.random.uniform(low=0, high=360, size=(3,))
@@ -50,9 +91,16 @@ class _BallBase(_BaseModel):
 
     def set_pos(self, coord, do_random_rotation=True):
         x, y, z = coord
-        self._set_pos((x, y, z + 0.25))
+        self._set_pos((x, y, z + self.z_offset))
         if do_random_rotation:
             self._set_random_hpr()
+
+    def get_pos(self):
+        x, y, z = self.pos_coords
+        return x, y, z - self.z_offset
+
+    def set_scale(self, scale):
+        self.model.setScale(scale)
 
 
 class BlackBallModel(_BallBase):

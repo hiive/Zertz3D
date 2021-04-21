@@ -8,7 +8,7 @@ from .zertz_board import ZertzBoard
 # Class interface inspired by https://github.com/suragnair/alpha-zero-general
 
 class ZertzGame:
-    def __init__(self, rings=37, marbles=None, win_con=None, t=1, layout = None, clone=None, clone_state=None):
+    def __init__(self, rings=37, marbles=None, win_con=None, t=1, board_layout=None, clone=None, clone_state=None):
         if clone is not None:
             # Creates an instance of ZertzGame with settings copied from clone and updated to 
             # have the same board state as clone_state
@@ -18,7 +18,7 @@ class ZertzGame:
             self.win_con = copy.copy(clone.win_con)
             self.board = ZertzBoard(clone=clone.board)
             self.board.state = np.copy(clone_state)
-            self.layout = np.copy(clone.layout)
+            self.board_layout = np.copy(clone.board_layout)
             assert clone.board.state.shape[0] == clone_state.shape[0]
         else:
             # The size of the game board
@@ -26,8 +26,9 @@ class ZertzGame:
             self.initial_rings = rings
             self.t = t
             self.marbles = marbles
-            self.layout = layout
-            self.board = ZertzBoard(self.initial_rings, self.marbles, self.t, layout=self.layout)
+            self.board_layout = board_layout
+
+            self.board = ZertzBoard(self.initial_rings, self.marbles, self.t, board_layout=self.board_layout)
 
             # The win conditions (amount of each marble needed)
             #   default:
@@ -250,7 +251,6 @@ class ZertzGame:
             else:
                 rem_index = rem // self.board.width, rem % self.board.width
                 rem_str = self.board.index_to_str(rem_index)
-
             action_str = "{} {} {} {}".format(
                 action_type, marble_type, put_str, rem_str).rstrip()
             action_dict = {
@@ -269,7 +269,7 @@ class ZertzGame:
             dy, dx = self.board.DIRECTIONS[direction]
             cap = (y + dy, x + dx)
             cap_marble = self.board.get_marble_type_at(cap)
-
+            cap_str = self.board.index_to_str(cap)
             dst = self.board.get_jump_destination(src, cap)
             dst_str = self.board.index_to_str(dst)
 
@@ -280,7 +280,8 @@ class ZertzGame:
                 'marble': src_marble,
                 'src': src_str,
                 'dst': dst_str,
-                'capture': cap_marble
+                'capture': cap_marble,
+                'cap': cap_str
             }
         return action_str, action_dict
 

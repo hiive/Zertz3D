@@ -3,10 +3,12 @@ import sys
 import numpy as np
 import simplepbr
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import AmbientLight, PointLight, Spotlight, PerspectiveLens, LVector4, BitMask32, DirectionalLight
+
+from panda3d.core import AmbientLight, PointLight, Spotlight, PerspectiveLens, LVector4, BitMask32, DirectionalLight, \
+    WindowProperties
 
 from renderer.water_node import WaterNode
-from renderer.zertz_models import BasePiece, BlackBallModel, GrayBallModel, WhiteBallModel, SkyBox
+from renderer.zertz_models import BasePiece, BlackBallModel, GrayBallModel, WhiteBallModel, SkyBox, make_marble
 
 
 def _mul_tuple(a, f):
@@ -33,26 +35,40 @@ def _neg_tuple(a):
 
 class ZertzRenderer(ShowBase):
 
-    def __init__(self):
+    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10):
         super().__init__()
 
+        props = WindowProperties()
+        props.setSize(1364, 768)
+
+        self.win.requestProperties(props)
+
         self.pos_to_base = {}
+        self.pos_to_marble = {}
+        self.removed_bases = []
         self.pos_to_coords = {}
         self.pos_array = None
 
         self.x_base_size = 0.8
         self.y_base_size = 0.7
+        self.pool_marble_scale = 0.25
+        self.board_marble_scale = 0.35
 
         self.number_offset = (self.x_base_size / 2, self.y_base_size, 0)  # (0.4, 0.7)
-        self.letter_offset = (self.x_base_size / 2, -self.y_base_size, 0)   # (0.4,  -0.7)
+        self.letter_offset = (self.x_base_size / 2, -self.y_base_size, 0)  # (0.4,  -0.7)
 
         self.letters = "ABCDEFGH"
 
-        self.pool_offset_scale = 1.5
-        self.pool1_member_offset = (-0.6, 0, 0)
-        self.pool2_member_offset = (0.6, 0, 0)
+        self.player_pool_offset_scale = 1.5
+        self.player1_pool_member_offset = (-0.6, 0, 0)
+        self.player2_pool_member_offset = (0.6, 0, 0)
 
-        self.pipeline = simplepbr.init(enable_shadows=False)
+        self.player_pools = {
+            1: self._make_marble_dict(),
+            2: self._make_marble_dict()
+        }
+
+        self.pipeline = simplepbr.init(enable_shadows=True)
         self.pipeline.use_330 = True
 
         self.accept('escape', sys.exit)  # Escape quits
@@ -61,7 +77,7 @@ class ZertzRenderer(ShowBase):
         self.camera.setPosHpr(0, -10, 8, 0, -40, 0)  # Set the camera
 
         # self.camera.setPosHpr(0, 0, 16, 0, 270, 0)  # Set the camera
-        self.setupLights()  # Setup default lighting
+        self.setup_lights()  # Setup default lighting
 
         sb = SkyBox(self)
 
@@ -72,9 +88,51 @@ class ZertzRenderer(ShowBase):
 
         self._build_base()
 
+        self.marble_pool = None
+        self.marbles_in_play = None
+        self.white_marbles = white_marbles
+        self.black_marbles = black_marbles
+        self.grey_marbles = grey_marbles
+        self._build_marble_pool()
+
         self._build_players_marble_pool()
 
-        self._ball_placement_test()
+        self.task = self.taskMgr.add(self.update, 'zertzUpdate', sort=50)
+
+        # self._ball_placement_test()
+
+    def update(self, task):
+        # for m in self.marble_pool:
+        #    m.model.setR(10*task.time)
+        return task.cont
+
+    def _build_color_pool(self, color, pool_count, y, z=0):
+        x_off = self.pool_marble_scale * 2.0
+        xx = (self.x_base_size/2.0 - (x_off * pool_count))/2.0
+        for k in range(pool_count):
+            mb = make_marble(self, color)
+            mb.set_scale(self.pool_marble_scale)
+            mb.set_pos((xx, y, z))
+            self.marble_pool[color].append(mb)
+            xx += x_off
+
+    def _make_marble_dict(self):
+        return {'w': [], 'b': [], 'g': []}
+
+    def _build_marble_pool(self):
+        if self.marble_pool is not None:
+            for _, marbles in self.marble_pool.items():
+                for marble in marbles:
+                    marble.removeNode()
+        self.marble_pool = self._make_marble_dict()
+        self.marbles_in_play = self._make_marble_dict()
+
+        x, y, z = 0, 5.25, 0
+        self._build_color_pool('b', self.black_marbles, y)
+        y -= self.y_base_size
+        self._build_color_pool('g', self.grey_marbles, y)
+        y -= self.y_base_size
+        self._build_color_pool('w', self.white_marbles, y)
 
     def _setup_water(self):
         if self.wb is not None:
@@ -86,7 +144,7 @@ class ZertzRenderer(ShowBase):
         self.wb = WaterNode(self, -10, -4.5, 10, 8, 0,
                             # anim: vx, vy, scale, skip
                             anim=LVector4(0.0245, -0.0122, 1.5, 1),
-                            distort=LVector4(0.2, 0.05, 0.8, 0.2)) #(0, 0, .5, 0))
+                            distort=LVector4(0.2, 0.05, 0.8, 0.2))  # (0, 0, .5, 0))
 
     def _ball_placement_test(self):
         gb = GrayBallModel(self)
@@ -114,9 +172,9 @@ class ZertzRenderer(ShowBase):
         b4 = self.pos_to_coords['B4']
         d7 = self.pos_to_coords['E7']
         d6 = self.pos_to_coords['E6']
-        d_ul = _mul_tuple(_sub_tuple(a4, b4), self.pool_offset_scale)
+        d_ul = _mul_tuple(_sub_tuple(a4, b4), self.player_pool_offset_scale)
         p_ul = _add_tuple(a4, d_ul)
-        d_ur = _mul_tuple(_sub_tuple(d7, d6), self.pool_offset_scale)
+        d_ur = _mul_tuple(_sub_tuple(d7, d6), self.player_pool_offset_scale)
         p_ur = _add_tuple(d7, d_ur)
         for i in range(5):
             p1x = f'P1_{i + 1}'
@@ -138,17 +196,17 @@ class ZertzRenderer(ShowBase):
             p2x = f'P2_{i + 1}'
 
             bb1 = BlackBallModel(self)
-            pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0)), self.pool1_member_offset)
+            pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0)), self.player1_pool_member_offset)
             x, y, z = pp1
             pp1 = (x, y, z + 0.25)
             bb1.set_pos(pp1)
 
             bb2 = BlackBallModel(self)
-            pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0)), self.pool2_member_offset)
+            pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0)), self.player2_pool_member_offset)
             x, y, z = pp2
             pp2 = (x, y, z + 0.25)
             bb2.set_pos(pp2)
-        self.marble_pool = []
+
         # for i in range(3):
         #    self.marble_pool.append()
 
@@ -206,7 +264,7 @@ class ZertzRenderer(ShowBase):
 
         self.pos_array = np.array(pos_array)
 
-    def setupLights(self):
+    def setup_lights(self):
         # point light
         p_light = DirectionalLight("p_light")
         p_node = self.render.attachNewNode(p_light)
@@ -247,3 +305,68 @@ class ZertzRenderer(ShowBase):
         a_node.hide(BitMask32(1))
 
         self.render.setLight(a_node)
+
+    def show_action(self, player, action_dict):
+        # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}
+        # Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'G2', 'dst': 'E2', 'capture': 'b'}
+        print(f'Player {player.n}: {action_dict}')
+
+        action = action_dict['action']
+        action_marble_color = action_dict['marble']
+        dst = action_dict['dst']
+        dst_coords = self.pos_to_coords[dst]
+        if action == 'PUT':
+            # remove piece
+            base_piece_id = action_dict['remove']
+            if base_piece_id != '':
+                base_piece = self.pos_to_base[base_piece_id]
+                base_piece.hide()
+                self.removed_bases.append(base_piece)
+            # add marble from pool
+            pool = self.marble_pool[action_marble_color]
+            if len(pool) == 0:
+                pool = self.player_pools[player.n][action_marble_color]
+            put_marble = pool.pop()
+            mip = self.marbles_in_play[action_marble_color]
+            if put_marble not in [p for p, _ in mip]:
+                original_pos = put_marble.get_pos()
+                mip.append((put_marble, original_pos))
+
+            put_marble.set_pos(dst_coords)
+            put_marble.set_scale(self.board_marble_scale)
+            self.pos_to_marble[dst] = put_marble
+
+        elif action == 'CAP':
+            src = action_dict['src']
+            src_coords = self.pos_to_coords[src]
+            cap = action_dict['cap']
+            cap_coords = self.pos_to_coords[cap]
+            captured_marble_color = action_dict['capture']
+            action_marble = self.pos_to_marble.pop(src)
+            captured_marble = self.pos_to_marble.pop(cap)
+            self.pos_to_marble[dst] = action_marble
+            action_marble.set_pos(dst_coords)
+            captured_marble.hide()
+            self.player_pools[player.n][captured_marble_color].append(captured_marble)
+        pass
+
+    def reset_board(self):
+        for b in self.removed_bases:
+            b.show()
+        self.removed_bases.clear()
+
+        for color, marbles in self.marbles_in_play.items():
+            for marble, pos in marbles:
+                self.marble_pool[color].append(marble)
+                marble.set_scale(self.pool_marble_scale)
+                marble.set_pos(pos)
+
+        """        
+        for _, marble_sets in self.player_pools.items():
+            for color, marbles in self.marble_sets.items():
+                for marble, pos in marbles:
+                    self.marble_pool[color].append(marble)
+                    marble.set_pos(pos)
+                    marble.set_scale(self.pool_marble_scale)
+        """
+        pass
