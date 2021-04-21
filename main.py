@@ -26,7 +26,7 @@ class ZertzGameController:
         self.game = None
         self._reset_board()
 
-        self.task = self.renderer.taskMgr.doMethodLater(0.01, self.update_game, 'update_game', sort=49)
+        self.task = self.renderer.taskMgr.doMethodLater(0.05, self.update_game, 'update_game', sort=49)
 
     def run(self):
         self.renderer.run()

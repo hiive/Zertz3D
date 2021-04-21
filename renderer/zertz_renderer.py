@@ -63,10 +63,8 @@ class ZertzRenderer(ShowBase):
         self.player1_pool_member_offset = (-0.6, 0, 0)
         self.player2_pool_member_offset = (0.6, 0, 0)
 
-        self.player_pools = {
-            1: self._make_marble_dict(),
-            2: self._make_marble_dict()
-        }
+        self.player_pools = None
+        self.player_pool_coords = None
 
         self.pipeline = simplepbr.init(enable_shadows=True)
         self.pipeline.use_330 = True
@@ -166,6 +164,14 @@ class ZertzRenderer(ShowBase):
         white_ball.set_pos(self.pos_to_coords['D4'])
 
     def _build_players_marble_pool(self):
+        self.player_pools = {
+            1: self._make_marble_dict(),
+            2: self._make_marble_dict()
+        }
+        self.player_pool_coords = {
+            1: [],
+            2: []
+        }
         # 3 marbles of each color, or 4 white
         # marbles, or 5 grey marbles, or 6 black marbles wins the game.
         a4 = self.pos_to_coords['A4']
@@ -176,39 +182,27 @@ class ZertzRenderer(ShowBase):
         p_ul = _add_tuple(a4, d_ul)
         d_ur = _mul_tuple(_sub_tuple(d7, d6), self.player_pool_offset_scale)
         p_ur = _add_tuple(d7, d_ur)
-        for i in range(5):
-            p1x = f'P1_{i + 1}'
-            p2x = f'P2_{i + 1}'
-
-            bb1 = WhiteBallModel(self)
+        for i in range(6):
             pp1 = _add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0))
             x, y, z = pp1
             pp1 = (x, y, z + 0.25)
-            bb1.set_pos(pp1)
+            self.player_pool_coords[1].append(pp1)
 
-            bb2 = WhiteBallModel(self)
             pp2 = _add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0))
             x, y, z = pp2
             pp2 = (x, y, z + 0.25)
-            bb2.set_pos(pp2)
-        for i in range(4):
-            p1x = f'P1_{i + 1}'
-            p2x = f'P2_{i + 1}'
+            self.player_pool_coords[2].append(pp2)
 
-            bb1 = BlackBallModel(self)
+        for i in range(6):
             pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0)), self.player1_pool_member_offset)
             x, y, z = pp1
             pp1 = (x, y, z + 0.25)
-            bb1.set_pos(pp1)
+            self.player_pool_coords[1].append(pp1)
 
-            bb2 = BlackBallModel(self)
             pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0)), self.player2_pool_member_offset)
             x, y, z = pp2
             pp2 = (x, y, z + 0.25)
-            bb2.set_pos(pp2)
-
-        # for i in range(3):
-        #    self.marble_pool.append()
+            self.player_pool_coords[2].append(pp2)
 
     def _init_pos_coords(self):
         self.pos_to_base.clear()
@@ -326,6 +320,9 @@ class ZertzRenderer(ShowBase):
             pool = self.marble_pool[action_marble_color]
             if len(pool) == 0:
                 pool = self.player_pools[player.n][action_marble_color]
+            if len(pool) == 0:
+                print('THIS IS A BUG!!!')
+                return
             put_marble = pool.pop()
             mip = self.marbles_in_play[action_marble_color]
             if put_marble not in [p for p, _ in mip]:
@@ -347,13 +344,23 @@ class ZertzRenderer(ShowBase):
             self.pos_to_marble[dst] = action_marble
             action_marble.set_pos(dst_coords)
             captured_marble.hide()
-            self.player_pools[player.n][captured_marble_color].append(captured_marble)
+            capture_pool = self.player_pools[player.n][captured_marble_color]
+            capture_pool_length = sum([len(k) for k in self.player_pools[player.n].values()])
+            capture_pool.append(captured_marble)
+            # print(capture_pool_length, self.player_pools[player.n])
+            if capture_pool_length >= len(self.player_pool_coords[player.n]):
+                print('THIS IS A BUG')
+                capture_pool_length = len(self.player_pool_coords[player.n]) - 1
+            pos = self.player_pool_coords[player.n][capture_pool_length]
+            captured_marble.set_pos(pos)
         pass
 
     def reset_board(self):
         for b in self.removed_bases:
             b.show()
         self.removed_bases.clear()
+
+        self._build_players_marble_pool()
 
         for color, marbles in self.marbles_in_play.items():
             for marble, pos in marbles:
