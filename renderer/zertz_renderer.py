@@ -151,9 +151,16 @@ class ZertzRenderer(ShowBase):
             jump = True
             if dst is None:
                 dx, dy, dz = src
-                dx = -7.5 if dx < 0 else 7.5
-                zy = 1.5
-                dst = (dx, dy*zy, 0)
+                adx = -1 if dx < 0 else 1
+                ady = -1 if dy < 0 else 1
+
+                dx = max(10, abs(dx) * 10) * adx
+                dy = max(4, abs(dy) * 4) * ady
+
+                # dx = -7.5 if dx < 0 else 7.5
+
+                fz = 1.5
+                dst = (dx, dy, dz*fz)
                 #anim_factor = anim_factor
                 jump = False
                 # entity.hide()
