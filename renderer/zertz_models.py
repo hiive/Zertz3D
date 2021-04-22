@@ -22,6 +22,9 @@ class _BaseModel(ABC):
     def get_pos(self):
         return self.pos_coords
 
+    def get_scale(self):
+        return self.model.getScale()
+
     def remove(self):
         if self.model is not None:
             self.model.removeNode()

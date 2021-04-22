@@ -26,7 +26,8 @@ class ZertzGameController:
         self.game = None
         self._reset_board()
 
-        self.task = self.renderer.taskMgr.doMethodLater(0.05, self.update_game, 'update_game', sort=49)
+        move_time = 1.0
+        self.task = self.renderer.taskMgr.doMethodLater(move_time, self.update_game, 'update_game', sort=49)
 
     def run(self):
         self.renderer.run()
@@ -47,7 +48,7 @@ class ZertzGameController:
         ax, ay = player.get_action()
 
         action_str, action_dict = self.game.action_to_str(ax, ay)
-        self.renderer.show_action(player, action_dict)
+        self.renderer.show_action(player, action_dict, task.delay_time)
         result = self.game.take_action(ax, ay)
         if result is not None:
             player.add_capture(result)
