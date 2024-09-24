@@ -1,7 +1,7 @@
 import math
 import sys
 
-from queue import SimpleQueue
+from queue import SimpleQueue, Empty
 
 import numpy as np
 import simplepbr
@@ -39,6 +39,7 @@ def _neg_tuple(a):
 class ZertzRenderer(ShowBase):
 
     def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10):
+        #todo this needs to take number of rings.
         super().__init__()
 
         props = WindowProperties()
@@ -63,6 +64,7 @@ class ZertzRenderer(ShowBase):
         self.number_offset = (self.x_base_size / 2, self.y_base_size, 0)  # (0.4, 0.7)
         self.letter_offset = (self.x_base_size / 2, -self.y_base_size, 0)  # (0.4,  -0.7)
 
+        #todo this needs to be adjusted for number of rings.
         self.letters = "ABCDEFGH"
 
         self.player_pool_offset_scale = 1.5
@@ -72,7 +74,8 @@ class ZertzRenderer(ShowBase):
         self.player_pools = None
         self.player_pool_coords = None
 
-        self.pipeline = simplepbr.init(enable_shadows=True)
+        self.pipeline = simplepbr.init()
+        self.pipeline.enable_shadows = True
         self.pipeline.use_330 = True
 
         self.accept('escape', sys.exit)  # Escape quits
@@ -114,17 +117,19 @@ class ZertzRenderer(ShowBase):
 
         to_put_back = []
         while not self.animation_queue.empty():
-            anim_info = self.animation_queue.get()
-            # print(anim_info)
-            entity, src, dst, scale, duration, defer = anim_info
-            #if entity in self.current_animations:
-                # if it's already being animated, put it back in queue
-                # to_put_back.append(anim_info)
-                #pass
-            #else:
-            self.current_animations[entity] = (src, dst, entity.get_scale(), scale, duration, task.time,
-                                               task.time + defer)
-            pass
+            try:
+                anim_info = self.animation_queue.get_nowait()
+                # print(anim_info)
+                entity, src, dst, scale, duration, defer = anim_info
+                #if entity in self.current_animations:
+                    # if it's already being animated, put it back in queue
+                    # to_put_back.append(anim_info)
+                    #pass
+                #else:
+                self.current_animations[entity] = (src, dst, entity.get_scale(), scale, duration, task.time,
+                                                   task.time + defer)
+            except Empty:
+                pass
 
         for anim_info in to_put_back:
             self.animation_queue.put(anim_info)
@@ -257,6 +262,7 @@ class ZertzRenderer(ShowBase):
         }
         # 3 marbles of each color, or 4 white
         # marbles, or 5 grey marbles, or 6 black marbles wins the game.
+        # TODO this is kind of a hacky way of positioning the marble pool, I think.
         a4 = self.pos_to_coords['A4']
         b4 = self.pos_to_coords['B4']
         d7 = self.pos_to_coords['E7']

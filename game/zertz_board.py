@@ -7,7 +7,8 @@ class ZertzBoard:
     # The zertz board is a hexagon and looks like this:
     #   A 2D array where each location is a ring
     #   Each ring is adjacent to the rings below, left, above/left, above, right, and down/right
-    # 
+    #
+    # 37-ring board
     #  A4 B5 C6 D7
     #  A3 B4 C5 D6 E6
     #  A2 B3 C4 D5 E5 F5
@@ -16,6 +17,28 @@ class ZertzBoard:
     #        C1 D2 E2 F2 G2
     #           D1 E1 F1 G1
     #
+    # 48-ring board
+    #  A5 B6 C7 D8
+    #  A4 B5 C6 D7 E7
+    #  A3 B4 C5 D6 E6 F6
+    #  A2 B3 C4 D5 E5 F5 G5
+    #  A1 B2 C3 D4 E4 F4 G4 H4
+    #     B1 C2 D3 E3 F3 G3 H3
+    #        C1 D2 E2 F2 G2 H2
+    #           D1 E1 F1 G1 H1
+    #
+    # 61-ring board
+    #
+    #  A5 B6 C7 D8 E8
+    #  A4 B5 C6 D7 E7 F7
+    #  A3 B4 C5 D6 E6 F6 G6
+    #  A2 B3 C4 D5 E5 F5 G5 H4
+    #  A1 B2 C3 D4 E4 F4 G4 H4 J4
+    #     B1 C2 D3 E3 F3 G3 H3 J3
+    #        C1 D2 E2 F2 G2 H2 J2
+    #           D1 E1 F1 G1 H1 J1
+    #              E0 F0 G0 H0 J0
+
     # A placement action is a tuple in the form:
     #   ((placement, marble_type, ring), (remove, ring))
     #   i.e. (('PUT', 'b', 'E6'), ('REM', 'A2'))
