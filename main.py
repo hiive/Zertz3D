@@ -2,6 +2,11 @@
 
 # Press ⌃R to execute it or replace it with your code.
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import random
+import time
+
+from panda3d.core import loadPrcFileData
+
 from game.zertz_game import ZertzGame
 from game.zertz_player import RandomZertzPlayer
 from renderer.zertz_renderer import ZertzRenderer
@@ -10,7 +15,7 @@ import numpy as np
 
 class ZertzGameController:
 
-    def __init__(self, rings=48):
+    def __init__(self, rings=37):
         self.rings = rings
         self.marbles = {'w': 6, 'g': 8, 'b': 10}
         # the first player to obtain either 3 marbles of each color, or 4 white
@@ -26,7 +31,7 @@ class ZertzGameController:
         self.game = None
         self._reset_board()
 
-        move_time = 1.0
+        move_time = 0.666
         self.task = self.renderer.taskMgr.doMethodLater(move_time, self.update_game, 'update_game', sort=49)
 
     def run(self):
@@ -34,6 +39,12 @@ class ZertzGameController:
 
     def _reset_board(self):
         # Setup
+        print("** New game **")
+        t = int(time.time())
+        # t = 1619318796
+        t = 1726887625
+        print(f"-- Current Seed {t}")
+
         self.game = ZertzGame(self.rings, self.marbles, self.win_condition, self.t,
                               board_layout=self.board_layout)
         # game.print_state()
@@ -41,6 +52,9 @@ class ZertzGameController:
 
         self.player1 = RandomZertzPlayer(self.game, 1)
         self.player2 = RandomZertzPlayer(self.game, 2)
+
+        np.random.seed(t)
+        random.seed(t)
 
     def update_game(self, task):
         p_ix = self.game.get_cur_player_value()
@@ -68,7 +82,8 @@ class ZertzGameController:
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    game = ZertzGameController()
+    loadPrcFileData("", "gl-version 3 2")
+    game = ZertzGameController(rings=37)
     game.run()
 
     # # game.print_state()
