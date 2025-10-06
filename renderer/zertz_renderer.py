@@ -227,7 +227,8 @@ class ZertzRenderer(ShowBase):
 
         # distort: offset, strength, refraction factor (0 = perfect mirror, 1 = total refraction), refractivity
         # l_texcoord1.xy = vtx_texcoord0.xy * k_wateranim.z + k_wateranim.xy * k_time.x
-        self.wb = WaterNode(self, -10, -4.5, 10, 8, 0,
+        # Make water plane larger to cover the entire visible area
+        self.wb = WaterNode(self, -15, -10, 15, 10, 0,
                             # anim: vx, vy, scale, skip
                             anim=LVector4(0.0245, -0.0122, 1.5, 1),
                             distort=LVector4(0.2, 0.05, 0.8, 0.2))  # (0, 0, .5, 0))

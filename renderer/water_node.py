@@ -1,5 +1,5 @@
 from panda3d.core import CardMaker, Texture, Plane, PlaneNode, TransparencyAttrib, \
-    CullFaceAttrib, RenderState, Shader, TextureStage
+    CullFaceAttrib, RenderState, Shader, TextureStage, BitMask32
 from panda3d.core import Vec4
 from direct.showbase.ShowBase import ShowBase
 
@@ -12,10 +12,18 @@ class WaterNode:
         #   1 = total refraction), refractivity
         self.renderer = renderer
 
-        # Create a texture buffer for reflection
-        self.buffer = renderer.win.makeTextureBuffer('waterBuffer', 1024, 1024)
-        self.buffer.setClearColor((0, 0, 0, 1))  # Clear to opaque black
+        # Create a texture buffer for reflection matching screen aspect ratio
+        screen_x = renderer.win.getXSize()
+        screen_y = renderer.win.getYSize()
+        self.buffer = renderer.win.makeTextureBuffer('waterBuffer', screen_x, screen_y)
+        self.buffer.setClearColor((0.5, 0.7, 1.0, 1))  # Clear to sky blue for debugging
         # self.buffer.setSort(1)  # Ensure it renders after the main scene
+
+        # CRITICAL: Enable simplepbr for this buffer so objects render correctly
+        # The buffer needs to inherit the shader generator from the main window
+        from panda3d.core import GraphicsOutput
+        self.buffer.setOneShot(False)
+        self.buffer.setActive(True)
 
         # Create a camera for rendering reflection
         self.water_cam_np = renderer.makeCamera(self.buffer)
@@ -28,6 +36,10 @@ class WaterNode:
         reflection_lens = self.renderer.camLens.makeCopy()
         cam.setLens(reflection_lens)
 
+        # Set camera mask to render all normal objects
+        # BitMask32.bit(0) is the default rendering mask
+        cam.setCameraMask(BitMask32.bit(0))
+
         cam.setInitialState(RenderState.make(CullFaceAttrib.makeReverse()))
         cam.setTagStateKey('Clipped')
 
@@ -36,55 +48,46 @@ class WaterNode:
         maker.setFrame(x1, x2, y1, y2)
 
         self.waterNP = renderer.render.attachNewNode(maker.generate())
-        self.waterNP.setPosHpr((0, 0, z), (0, -90, 0))
-        # self.waterNP.setTransparency(TransparencyAttrib.MAlpha)
+        self.waterNP.setPos(0, 0, z - 0.1)  # Position slightly below z=0 to render behind board
+        self.waterNP.setTransparency(TransparencyAttrib.MAlpha)
+
+        # Disable depth write so water doesn't block objects in front
+        self.waterNP.setDepthWrite(True)
 
         # Load and set the GLSL shader
         shader = Shader.load(Shader.SL_GLSL, vertex="shaders/water.vert.glsl", fragment="shaders/water.frag.glsl")
         if not shader:
             raise RuntimeError("Failed to load GLSL shader.")
 
+        # CRITICAL: Disable shader auto-generation FIRST, then set custom shader
+        self.waterNP.setShaderAuto(False)
+        self.waterNP.setShader(shader, 1)  # Priority 1 to override any other shaders
 
-        # DEBUG
-        # self.waterNP = self.renderer.loader.loadModel('models/box')
-        self.waterNP.reparentTo(self.renderer.render)
-
-        #
-        self.waterNP.setPos(0, 0, z)  # Set the correct z-position
-        self.waterNP.setHpr(0, 0, 0)  # No rotation
-        # self.waterNP.setScale(10, 10, 1)  # Increase size if necessary
-        #
-        # self.waterNP.clearShader()
-        # self.waterNP.setColor(0, 1, 0, 1)  # Solid green color
-        # self.waterNP.clearTransparency()
-
-
-        # Set camera position
-       #  self.renderer.cam.setPos(0, -20, 10)
-        # self.renderer.cam.lookAt(0, 0, 0)
-
-        # END DEBUG
-
-
-        self.waterNP.setShader(shader)
         # Set shader inputs
         self.waterNP.setShaderInput('k_wateranim', anim)
         self.waterNP.setShaderInput('k_waterdistort', distort)
         self.waterNP.setShaderInput('k_time', 0.0)  # Initialize time to 0
 
-        # Get model-view matrix (from model to camera space)
+        # Pass screen size to shader
+        from panda3d.core import LVector2f
+        screen_size = LVector2f(renderer.win.getXSize(), renderer.win.getYSize())
+        self.waterNP.setShaderInput('k_screen_size', screen_size)
+
+        # Get model-view matrix (from model to camera space) for main camera
         mat_modelview = self.waterNP.getMat(self.renderer.render)
 
-        # Get projection matrix from the camera's lens
+        # Get projection matrix from the main camera's lens
         mat_projection = self.renderer.camLens.getProjectionMat()
 
-        # Compute model-view-projection matrix
+        # Compute model-view-projection matrix for main camera
         mat_modelproj = mat_projection * mat_modelview
 
-        # Set shader inputs
-        self.waterNP.setShaderInput('mat_modelview', mat_modelview)
-        self.waterNP.setShaderInput('mat_projection', mat_projection)
-        self.waterNP.setShaderInput('mat_modelproj', mat_modelproj)
+        # Get the model matrix (water surface to world transform)
+        model_matrix = self.waterNP.getMat(self.renderer.render)
+
+        # Set shader inputs (k_reflection_viewproj will be updated in the update task)
+        self.waterNP.setShaderInput('k_reflection_viewproj', mat_modelproj)  # Initialize, will be updated
+        self.waterNP.setShaderInput('p3d_ModelMatrix', model_matrix)  # Pass model matrix to shader
 
         # Define the reflection plane
         # self.waterPlane = Plane((0, 0, z + 1), (0, 0, z))  # Reflection plane
@@ -163,6 +166,23 @@ class WaterNode:
         # reflection_cam_mat = reflection_mat * main_cam_mat
         reflection_cam_mat = main_cam_mat * reflection_mat
         self.water_cam_np.setMat(reflection_cam_mat)  # Update matrix of the reflection camera
+
+        # Calculate the reflection camera's view-projection matrix for texture sampling
+        # This needs to transform vertices from world space to reflection camera's clip space
+
+        # Get the reflection camera's view matrix (world to camera space)
+        reflection_view_mat = self.water_cam_np.getMat(self.renderer.render)
+        reflection_view_mat.invertInPlace()
+
+        # Get projection matrix from the reflection camera's lens
+        reflection_proj_mat = self.water_cam_np.node().getLens().getProjectionMat()
+
+        # Compute the complete matrix: projection * view
+        # This transforms from world space to reflection camera's clip space
+        mat_reflection_proj = reflection_proj_mat * reflection_view_mat
+
+        # Update shader input with the reflection camera's projection matrix
+        self.waterNP.setShaderInput('k_reflection_viewproj', mat_reflection_proj)
 
         # Debugging: Print camera positions
         main_cam_pos = main_cam_np.getPos(self.renderer.render)
