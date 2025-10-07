@@ -38,8 +38,7 @@ def _neg_tuple(a):
 
 class ZertzRenderer(ShowBase):
 
-    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10):
-        #todo this needs to take number of rings.
+    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37):
         super().__init__()
 
         props = WindowProperties()
@@ -60,16 +59,26 @@ class ZertzRenderer(ShowBase):
         self.y_base_size = 0.7
         self.pool_marble_scale = 0.25
         self.board_marble_scale = 0.35
+        self.captured_marble_scale = 0.9 * self.board_marble_scale
 
         self.number_offset = (self.x_base_size / 2, self.y_base_size, 0)  # (0.4, 0.7)
         self.letter_offset = (self.x_base_size / 2, -self.y_base_size, 0)  # (0.4,  -0.7)
 
-        #todo this needs to be adjusted for number of rings.
-        self.letters = "ABCDEFGH"
+        # Configure letters based on board size (number of rings)
+        # 37 rings: ABCDEFG (7 letters)
+        # 48 rings: ABCDEFGH (8 letters)
+        # 61 rings: ABCDEFGHJ (9 letters, skipping I)
+        if rings == 37:
+            self.letters = "ABCDEFG"
+        elif rings == 48:
+            self.letters = "ABCDEFGH"
+        elif rings == 61:
+            self.letters = "ABCDEFGHJ"
+        else:
+            raise ValueError(f"Unsupported board size: {rings} rings. Supported sizes are 37, 48, and 61.")
 
-        self.player_pool_offset_scale = 1.5
-        self.player1_pool_member_offset = (-0.6, 0, 0)
-        self.player2_pool_member_offset = (0.6, 0, 0)
+        self.player_pool_offset_scale = 0.8
+        self.player_pool_member_offset = (0.6, 0, 0)
 
         self.player_pools = None
         self.player_pool_coords = None
@@ -81,7 +90,9 @@ class ZertzRenderer(ShowBase):
         self.accept('escape', sys.exit)  # Escape quits
         self.accept('aspectRatioChanged', self._setup_water)
         self.disableMouse()  # Disable mouse camera control
-        self.camera.setPosHpr(0, -10, 8, 0, -40, 0)  # Set the camera
+
+        # Store rings for later use in camera setup after board is built
+        self.rings = rings
 
         # self.camera.setPosHpr(0, 0, 16, 0, 270, 0)  # Set the camera
         self.setup_lights()  # Setup default lighting
@@ -103,6 +114,9 @@ class ZertzRenderer(ShowBase):
         self._build_marble_pool()
 
         self._build_players_marble_pool()
+
+        # Setup camera after board is built so we can center on it
+        self._setup_camera()
 
         self.task = self.taskMgr.add(self.update, 'zertzUpdate', sort=50)
 
@@ -220,6 +234,44 @@ class ZertzRenderer(ShowBase):
         y -= self.y_base_size
         self._build_color_pool('w', self.white_marbles, y)
 
+    def _setup_camera(self):
+        """Setup camera position and orientation based on board size."""
+        # Find the center position of the board
+        center_pos = "D4"
+        if self.rings == 48:
+            center_pos="D5"
+        elif self.rings == 61:
+            center_pos="E5"
+
+        # center_pos = f"{center_letter}{center_row}"
+
+        # Get the actual 3D coordinates of the center position
+        if center_pos in self.pos_to_coords:
+            center_x, center_y, center_z = self.pos_to_coords[center_pos]
+        else:
+            # Fallback to origin if we can't find the center
+            center_x, center_y, center_z = 0, 0, 0
+
+        # Adjust camera distance and height based on board size
+        cam_dist = 10  # Distance from board (Y axis)
+        cam_height = 8  # Height above board (Z axis)
+        if self.rings == 48:
+            cam_dist = 10
+            cam_height = 10
+        elif self.rings == 61:
+            cam_dist = 11
+            cam_height = 10
+
+        # Position camera to look at the board center
+        # Camera is positioned behind (negative Y) and above (positive Z) the center point
+        cam_x = center_x
+        cam_y = center_y - cam_dist
+        cam_z = center_z + cam_height
+
+        self.camera.setPos(cam_x, cam_y, cam_z)
+        # Point camera at the board center
+        self.camera.lookAt(center_x, center_y, center_z)
+
     def _setup_water(self):
         if self.wb is not None:
             self.wb.remove()
@@ -261,38 +313,94 @@ class ZertzRenderer(ShowBase):
             1: [],
             2: []
         }
-        # 3 marbles of each color, or 4 white
-        # marbles, or 5 grey marbles, or 6 black marbles wins the game.
-        # TODO this is kind of a hacky way of positioning the marble pool, I think.
-        a4 = self.pos_to_coords['A4']
-        b4 = self.pos_to_coords['B4']
-        d7 = self.pos_to_coords['E7']
-        d6 = self.pos_to_coords['E6']
-        d_ul = _mul_tuple(_sub_tuple(a4, b4), self.player_pool_offset_scale)
-        p_ul = _add_tuple(a4, d_ul)
-        d_ur = _mul_tuple(_sub_tuple(d7, d6), self.player_pool_offset_scale)
-        p_ur = _add_tuple(d7, d_ur)
-        for i in range(6):
-            pp1 = _add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0))
-            x, y, z = pp1
-            pp1 = (x, y, z + 0.25)
-            self.player_pool_coords[1].append(pp1)
 
-            pp2 = _add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0))
-            x, y, z = pp2
-            pp2 = (x, y, z + 0.25)
-            self.player_pool_coords[2].append(pp2)
+        # Find corner positions dynamically based on board size
+        # Top-left corner: first letter, highest number in that column
+        # Top-right corner: last letter, highest number in that column
+        first_letter = self.letters[0]
+        last_letter = self.letters[-1]
 
-        for i in range(6):
-            pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0)), self.player1_pool_member_offset)
-            x, y, z = pp1
-            pp1 = (x, y, z + 0.25)
-            self.player_pool_coords[1].append(pp1)
+        # Find the highest row for each corner
+        top_left_positions = [pos for pos in self.pos_to_coords.keys() if pos.startswith(first_letter)]
+        top_right_positions = [pos for pos in self.pos_to_coords.keys() if pos.startswith(last_letter)]
 
-            pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0)), self.player2_pool_member_offset)
-            x, y, z = pp2
-            pp2 = (x, y, z + 0.25)
-            self.player_pool_coords[2].append(pp2)
+        # Get positions with max number (top of board)
+        # Rightmost non-empty value in the first row
+        first_row = self.pos_array[0]
+        top_right = first_row[first_row != ''][-1]
+
+        # First value in the first row
+        top_left = first_row[0]
+
+        print(f"DEBUG: top_left, top_right", top_left, top_right)
+        # Get adjacent positions to calculate board direction vectors
+        # Find a neighbor position to determine the board's edge direction
+        second_letter = self.letters[1]
+        second_from_top_left = [pos for pos in self.pos_to_coords.keys()
+                                if pos.startswith(second_letter) and int(pos[1:]) == int(top_left[1:])]
+
+        second_last_letter = self.letters[-2]
+        second_from_top_right = [pos for pos in self.pos_to_coords.keys()
+                                 if pos.startswith(second_last_letter) and int(pos[1:]) == int(top_right[1:])]
+
+        # Rightmost non-empty value in the second row
+        second_row = self.pos_array[1]
+        second_from_top_right = second_row[second_row != ''][-2]
+
+        # first value in second row
+        second_from_top_left = second_row[1]
+
+        print(f"DEBUG: second_from_top_left, second_from_top_right", second_from_top_left, second_from_top_right)
+        # Get coordinates
+        tl_coord = self.pos_to_coords[top_left]
+        tr_coord = self.pos_to_coords[top_right]
+
+        # Use adjacent positions if they exist, otherwise use same row one position down
+        if second_from_top_left:
+            tl_adj = self.pos_to_coords[second_from_top_left]
+        else:
+            # Fallback: use position one row down in same column
+            adj_pos = f"{first_letter}{int(top_left[1:])-1}"
+            tl_adj = self.pos_to_coords.get(adj_pos, tl_coord)
+
+        if second_from_top_right:
+            tr_adj = self.pos_to_coords[second_from_top_right]
+        else:
+            adj_pos = f"{last_letter}{int(top_right[1:])-1}"
+            tr_adj = self.pos_to_coords.get(adj_pos, tr_coord)
+
+        # Calculate direction vectors from corner to adjacent position
+        d_ul = _mul_tuple(_sub_tuple(tl_coord, tl_adj), self.player_pool_offset_scale)
+        p_ul = _add_tuple(tl_coord, d_ul)
+
+        # For player 2 (right side), we want the pool closer and further from camera
+        # Use a smaller offset and add extra Y offset to move away from camera
+        d_ur = _mul_tuple(_sub_tuple(tr_coord, tr_adj), self.player_pool_offset_scale)
+        p_ur = _add_tuple(tr_coord, d_ur)
+
+        # Create 12 positions per player (6 + 6 with offset)
+        # for i in range(6):
+        #     pp1 = _add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0))
+        #     x, y, z = pp1
+        #     pp1 = (x, y, z + 0.25)
+        #     self.player_pool_coords[1].append(pp1)
+        #
+        #     pp2 = _add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0))
+        #     x, y, z = pp2
+        #     pp2 = (x, y, z + 0.25)
+        #     self.player_pool_coords[2].append(pp2)
+
+        for r in range(2):
+            for i in range(6):
+                pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0)), _mul_tuple(_neg_tuple(self.player_pool_member_offset), r+1))
+                x, y, z = pp1
+                pp1 = (x, y, z + 0.25)
+                self.player_pool_coords[1].append(pp1)
+
+                pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0)), _mul_tuple(self.player_pool_member_offset, r+1))
+                x, y, z = pp2
+                pp2 = (x, y, z + 0.25)
+                self.player_pool_coords[2].append(pp2)
 
     def _init_pos_coords(self):
         self.pos_to_base.clear()
@@ -460,9 +568,10 @@ class ZertzRenderer(ShowBase):
             player_pool_coords = self.player_pool_coords[player.n][capture_pool_length]
             if action_duration == 0:
                 captured_marble.set_pos(player_pool_coords)
+                captured_marble.set_scale(self.captured_marble_scale)
             else:
                 self.animation_queue.put((captured_marble, cap_coords, player_pool_coords,
-                                          self.board_marble_scale, action_duration, action_duration))
+                                          self.captured_marble_scale, action_duration, action_duration))
 
     def reset_board(self):
         for b, pos in self.removed_bases:
