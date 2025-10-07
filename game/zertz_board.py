@@ -57,7 +57,6 @@ class ZertzBoard:
     MARBLE_TO_LAYER = {'w': 1, 'g': 2, 'b': 3}
     LAYER_TO_MARBLE = dict((v, k) for k, v in MARBLE_TO_LAYER.items())
     HEX_NUMBERS = [(1, 1), (7, 3), (19, 5), (37, 7), (48, 8), (61, 9), (91, 11), (127, 13)]
-    #              (down), (left ), (u / l ), ( up ), (right), (d /r)
     DIRECTIONS = [(1, 0), (0, -1), (-1, -1), (-1, 0), (0, 1), (1, 1)]
 
     def __init__(self, rings=37, marbles=None, t=1, clone=None, board_layout=None):
@@ -232,7 +231,6 @@ class ZertzBoard:
         # Push back the previous t states and copy the most recent state to the top 4 layers
         self.state[0: 4 * self.t] = np.concatenate([self.state[0:4], self.state[0: 4 * (self.t - 1)]], axis=0)
 
-        # Modify the most recent 4 layers of the state based on the action
         if action_type == 'PUT':
             self.take_placement_action(action)
             return None
@@ -390,7 +388,7 @@ class ZertzBoard:
         # the player must use a captured marble.
         supply_start = self.MARBLE_TO_SUPPLY['w']
         if np.all(self.state[supply_start: supply_start + 3, 0, 0] == 0):
-            if self.state[14, 0, 0] == 0:
+            if self.get_cur_player() == 0:
                 supply_start += 3
             else:
                 supply_start += 6
@@ -571,6 +569,18 @@ class ZertzBoard:
 
     def str_to_index(self, index_str):
         # Given a string like 'A1' return an index (y, x) based on the board shape
+
+        # If using custom board layout, search for the coordinate in the layout
+        if self.flattened_letters is not None:
+            try:
+                flat_index = np.where(self.flattened_letters == index_str)[0][0]
+                y = flat_index // self.width
+                x = flat_index % self.width
+                return y, x
+            except IndexError:
+                raise ValueError(f"Coordinate '{index_str}' not found in board layout")
+
+        # Otherwise calculate using standard hexagon formula
         letter, number = index_str
 
         # Calculate x
@@ -589,8 +599,19 @@ class ZertzBoard:
         # Given an index (y, x) return a string like 'A1' based on the board shape
         y, x = index
 
+        # Check if this ring position still exists on the board
+        if not self._is_inbounds(index):
+            raise IndexError(f"Position ({y}, {x}) is out of bounds")
+
+        # If the ring has been removed from the board, return empty string
+        if self.state[0, y, x] == 0:
+            return ''
+
         if self.flattened_letters is not None:
             ix = y * self.width + x
+            # Bounds check for custom board layouts
+            if ix >= len(self.flattened_letters):
+                raise IndexError(f"Position ({y}, {x}) -> index {ix} is out of bounds for board with {len(self.flattened_letters)} positions")
             return self.flattened_letters[ix]
 
         # Calculate letter

@@ -392,12 +392,12 @@ class ZertzRenderer(ShowBase):
 
         for r in range(2):
             for i in range(6):
-                pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0)), _mul_tuple(_neg_tuple(self.player_pool_member_offset), r+1))
+                pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 1.5)), _mul_tuple(_neg_tuple(self.player_pool_member_offset), r+1))
                 x, y, z = pp1
                 pp1 = (x, y, z + 0.25)
                 self.player_pool_coords[1].append(pp1)
 
-                pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0)), _mul_tuple(self.player_pool_member_offset, r+1))
+                pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 1.5)), _mul_tuple(self.player_pool_member_offset, r+1))
                 x, y, z = pp2
                 pp2 = (x, y, z + 0.25)
                 self.player_pool_coords[2].append(pp2)

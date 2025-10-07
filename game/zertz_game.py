@@ -138,6 +138,23 @@ class ZertzGame:
         # If board has every ring covered with a marble then the last player who played is winner
         if np.all(np.sum(self.board.state[:4], axis=0) != 1):
             return True
+
+        # Check if current player has no marbles available (pool + captured = 0 for all types)
+        # If so, the opponent wins
+        supply_start = self.board.MARBLE_TO_SUPPLY['w']
+        pool_marbles = self.board.state[supply_start: supply_start + 3, 0, 0]
+
+        # Get current player's captured marbles
+        if self.board.get_cur_player() == 0:
+            player_captured_start = supply_start + 3
+        else:
+            player_captured_start = supply_start + 6
+        captured_marbles = self.board.state[player_captured_start: player_captured_start + 3, 0, 0]
+
+        # If player has no marbles in pool or captured, they lose
+        if np.all(pool_marbles + captured_marbles == 0):
+            return True
+
         return False
 
     def get_game_ended(self, cur_state=None):
@@ -256,8 +273,8 @@ class ZertzGame:
             action_dict = {
                 'action': action_type,
                 'marble': marble_type,
-                'dst': put_str,
-                'remove': rem_str
+                'dst': str(put_str),
+                'remove': str(rem_str)
             }
 
         elif action_type == 'CAP':
@@ -278,10 +295,10 @@ class ZertzGame:
             action_dict = {
                 'action': action_type,
                 'marble': src_marble,
-                'src': src_str,
-                'dst': dst_str,
+                'src': str(src_str),
+                'dst': str(dst_str),
                 'capture': cap_marble,
-                'cap': cap_str
+                'cap': str(cap_str)
             }
         return action_str, action_dict
 

@@ -1,0 +1,31 @@
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'C1', 'remove': 'E1'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'G3', 'remove': 'A4'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'B2', 'remove': 'J4'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'G2', 'remove': 'A5'}
+Player 1: {'action': 'CAP', 'marble': 'b', 'src': 'G3', 'dst': 'G1', 'capture': 'g', 'cap': 'G2'}
+Player 2: {'action': 'PUT', 'marble': 'w', 'dst': 'E2', 'remove': 'D8'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'F8', 'remove': 'D1'}
+Player 2: {'action': 'PUT', 'marble': 'w', 'dst': 'F1', 'remove': 'C7'}
+Player 1: {'action': 'CAP', 'marble': 'w', 'src': 'F1', 'dst': 'D2', 'capture': 'w', 'cap': 'E2'}
+Player 2: {'action': 'CAP', 'marble': 'w', 'src': 'C1', 'dst': 'E3', 'capture': 'w', 'cap': 'D2'}
+Player 1: {'action': 'PUT', 'marble': 'g', 'dst': 'D7', 'remove': 'B1'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'J1', 'remove': 'B5'}
+Player 1: {'action': 'PUT', 'marble': 'g', 'dst': 'E5', 'remove': 'E9'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'F5', 'remove': 'J3'}
+Player 1: {'action': 'CAP', 'marble': 'b', 'src': 'F5', 'dst': 'D4', 'capture': 'g', 'cap': 'E5'}
+Player 2: {'action': 'PUT', 'marble': 'w', 'dst': 'G4', 'remove': 'F1'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'B3', 'remove': 'E8'}
+Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'B2', 'dst': 'B4', 'capture': 'w', 'cap': 'B3'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'F2', 'remove': 'C1'}
+Player 2: {'action': 'CAP', 'marble': 'w', 'src': 'F2', 'dst': 'D3', 'capture': 'w', 'cap': 'E3'}
+Player 2: {'action': 'CAP', 'marble': 'w', 'src': 'D3', 'dst': 'D5', 'capture': 'b', 'cap': 'D4'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'D2', 'remove': 'G7'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'C2', 'remove': 'B6'}
+Player 1: {'action': 'CAP', 'marble': 'b', 'src': 'C2', 'dst': 'E2', 'capture': 'b', 'cap': 'D2'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'F3', 'remove': 'H4'}
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'H1', 'remove': 'A1'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'F7', 'remove': 'J2'}
+Player 1: {'action': 'CAP', 'marble': 'b', 'src': 'F8', 'dst': 'F6', 'capture': 'g', 'cap': 'F7'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'F8', 'remove': 'J5'}
+Player 1: {'action': 'PUT', 'marble': 'g', 'dst': 'G5', 'remove': 'C6'}
+Player 2: {'action': 'CAP', 'marble': 'g', 'src': 'G5', 'dst': 'G3', 'capture': 'w', 'cap': 'G4'}

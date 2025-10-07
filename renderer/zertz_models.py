@@ -1,4 +1,5 @@
 from abc import ABC
+import random
 
 from panda3d.core import TextureAttrib, AmbientLight, BitMask32
 import numpy as np
@@ -83,14 +84,19 @@ class _BallBase(_BaseModel):
         model_name = "models/ball_lo.bam"
         super().__init__(renderer, model_name, color)
         # self.model.flattenStrong()
+        # Each marble gets its own unseeded RNG for visual randomness
+        # This keeps marble rotations independent from game logic RNG
+        self.rng = random.Random()
         self._set_random_hpr()
         self.z_offset = 0.25
 
     def _set_random_hpr(self):
-        rot = np.random.uniform(low=0, high=360, size=(3,))
-        self.model.setH(rot[0])
-        self.model.setP(rot[1])
-        self.model.setR(rot[2])
+        h = self.rng.uniform(0, 360)
+        p = self.rng.uniform(0, 360)
+        r = self.rng.uniform(0, 360)
+        self.model.setH(h)
+        self.model.setP(p)
+        self.model.setR(r)
 
     def set_pos(self, coord, do_random_rotation=True):
         x, y, z = coord
