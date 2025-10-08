@@ -674,6 +674,46 @@ class ZertzBoard:
         # Universal formula that works for both odd and even widths
         return (self.width - 1) - y, (self.width - 1) - x
 
+    # ========================================================================
+    # Hexagonal Coordinate System (TODO: Implementation in progress)
+    # ========================================================================
+    # The following methods are stubs for future hexagonal transformations
+    # that support 60°, 120°, 240°, and 300° rotations for true hex symmetry.
+    # Currently commented out pending completion.
+    # ========================================================================
+
+    # def _build_hex_transformation_table(self, degrees):
+    #     """
+    #     Build a lookup table for hexagonal rotation by specified degrees.
+    #
+    #     This uses an empirical approach based on the physical hexagonal layout.
+    #     For 37-ring and 61-ring boards with 6-fold rotational symmetry.
+    #
+    #     Args:
+    #         degrees: Rotation angle (60, 120, 180, 240, or 300)
+    #
+    #     Returns:
+    #         dict: Mapping from (y, x) → (new_y, new_x) for the rotation
+    #     """
+    #     if self.letter_layout is None:
+    #         raise NotImplementedError("Hex transformations only supported for boards with letter_layout")
+    #
+    #     # Get all valid positions
+    #     valid_positions = self.letter_layout[self.letter_layout != '']
+    #
+    #     table = {}
+    #
+    #     # Find center position
+    #     center_y, center_x = self.width // 2, self.width // 2
+    #
+    #     for pos_str in valid_positions:
+    #         y, x = self.str_to_index(pos_str)
+    #
+    #         # TODO: Implement proper hexagonal rotation
+    #         table[(y, x)] = (y, x)
+    #
+    #     return table
+
     def mirror_action(self, action_type, translated):
         if action_type == 'CAP':
             # swap capture direction axes
@@ -800,3 +840,315 @@ class ZertzBoard:
 
         number = str(self.width - (y + offset))
         return letter + number
+
+    # =========================  AXIAL COORDINATES  =========================
+
+    def _build_axial_maps(self):
+        """Map valid (y,x) <-> centered axial (q, r) where neighbors match DIRECTIONS.
+
+        Uses the standard pointy-top hex axial coordinate system:
+          q = x - center
+          r = y - x
+
+        For all boards, the center is calculated as the geometric center in Cartesian space.
+
+        For D3 symmetry boards (48-ring), we use tripled coordinates to maintain integer
+        arithmetic for 120° rotations since the geometric center falls between rings.
+
+        For D6 symmetry boards (37/61-ring), we use regular coordinates since the
+        geometric center coincides with the central ring.
+        """
+        if hasattr(self, "_axial_ready") and self._axial_ready:
+            return
+        assert self.board_layout is not None, "board_layout must be built first"
+
+        yx_to_ax = {}
+        ax_to_yx = {}
+
+        # Only map existing rings
+        ys, xs = np.where(self.board_layout)
+
+        # Standard pointy-top hex conversion (same for all board sizes)
+        c = self.width // 2
+        size = 1.0
+        sqrt3 = np.sqrt(3)
+
+        # First pass: convert all positions to axial, then to Cartesian
+        positions = []
+        for y, x in zip(ys, xs):
+            # yx to axial (standard formula)
+            q = x - c
+            r = y - x
+
+            # axial to Cartesian (pointy-top)
+            xc = size * sqrt3 * (q + r / 2.0)
+            yc = size * 1.5 * r
+
+            positions.append((y, x, q, r, xc, yc))
+
+        # Calculate geometric center in Cartesian space
+        xc_center = sum(p[4] for p in positions) / len(positions)
+        yc_center = sum(p[5] for p in positions) / len(positions)
+
+        # Convert geometric center back to axial
+        q_center = (sqrt3 / 3.0) * xc_center - (1.0 / 3.0) * yc_center
+        r_center = (2.0 / 3.0) * yc_center
+
+        # Second pass: center all coordinates
+        if self.rings == self.MEDIUM_BOARD_48:
+            # D3 symmetry: triple coordinates for integer arithmetic
+            for y, x, q, r, xc, yc in positions:
+                q_centered = q - q_center
+                r_centered = r - r_center
+
+                q3 = round(3 * q_centered)
+                r3 = round(3 * r_centered)
+
+                yx_to_ax[(y, x)] = (q3, r3)
+                ax_to_yx[(q3, r3)] = (y, x)
+
+            self._coord_scale = 3  # Using tripled coords
+        else:
+            # D6 symmetry: use regular coordinates
+            for y, x, q, r, xc, yc in positions:
+                q_centered = round(q - q_center)
+                r_centered = round(r - r_center)
+
+                yx_to_ax[(y, x)] = (q_centered, r_centered)
+                ax_to_yx[(q_centered, r_centered)] = (y, x)
+
+            self._coord_scale = 1  # Regular coords
+
+        self._yx_to_ax = yx_to_ax
+        self._ax_to_yx = ax_to_yx
+        self._axial_ready = True
+
+    @staticmethod
+    def _ax_rot60(q, r, k=1):
+        """Rotate (q,r) by k * 60° counterclockwise in axial coords.
+
+        Works for both regular and doubled coordinates (for even-width boards).
+        """
+        k %= 6
+        for _ in range(k):
+            q, r = -r, q + r   # 60° CCW
+        return q, r
+
+    @staticmethod
+    def _ax_mirror_q_axis(q, r):
+        """Reflect (q,r) across the q-axis (cube: swap y and z)."""
+        # In cube coords (x=q, z=r, y=-q-r), mirror over q-axis => (x, z, y)
+        return q, -q - r
+
+    def _transform_state_hex(self, state, rot60_k=0, mirror=False, mirror_first=False):
+        """Apply rotation and/or mirror to the whole SPATIAL state.
+
+        Args:
+            state: Board state to transform
+            rot60_k: Number of 60° rotations (0-5 for D6, 0,2,4 for D3)
+            mirror: Whether to apply mirror transformation
+            mirror_first: If True, mirror then rotate. If False, rotate then mirror.
+        """
+        self._build_axial_maps()
+        out = np.zeros_like(state)
+        for (y, x), (q, r) in self._yx_to_ax.items():
+            if mirror_first:
+                # Mirror first, then rotate (for R{k}M transforms)
+                if mirror:
+                    q2, r2 = self._ax_mirror_q_axis(q, r)
+                else:
+                    q2, r2 = q, r
+                q2, r2 = self._ax_rot60(q2, r2, rot60_k)
+            else:
+                # Rotate first, then mirror (for MR{k} transforms)
+                q2, r2 = self._ax_rot60(q, r, rot60_k)
+                if mirror:
+                    q2, r2 = self._ax_mirror_q_axis(q2, r2)
+            dst = self._ax_to_yx.get((q2, r2))
+            if dst is not None:
+                y2, x2 = dst
+                out[:, y2, x2] = state[:, y, x]
+        return out
+
+    # ======================  D6 / D3 SYMMETRY ENUMERATION  =================
+
+    def _get_all_symmetry_transforms(self):
+        """Return (name, fn) pairs for all valid symmetries of this board.
+
+        Returns all 12 (D6) or 6 (D3) transformations:
+        - R{k}: Pure rotations
+        - MR{k}: Rotate then mirror
+        - R{k}M: Mirror then rotate
+        """
+        if self.rings in (self.SMALL_BOARD_37, self.LARGE_BOARD_61):
+            # full hex (D6): 6 rotations + 12 mirror combinations
+            rot_steps = [0, 1, 2, 3, 4, 5]  # multiples of 60°
+        else:
+            # alternating 4/5 sides (48): D3 subset
+            rot_steps = [0, 2, 4]           # 0°, 120°, 240°
+
+        ops = []
+        # Pure rotations
+        for k in rot_steps:
+            ops.append((f"R{60*k}", lambda s, kk=k: self._transform_state_hex(s, rot60_k=kk, mirror=False)))
+        # Rotate then mirror (MR{k})
+        for k in rot_steps:
+            ops.append((f"MR{60*k}", lambda s, kk=k: self._transform_state_hex(s, rot60_k=kk, mirror=True, mirror_first=False)))
+        # Mirror then rotate (R{k}M)
+        for k in rot_steps:
+            ops.append((f"R{60*k}M", lambda s, kk=k: self._transform_state_hex(s, rot60_k=kk, mirror=True, mirror_first=True)))
+        return ops
+
+    def _canonical_key(self, state):
+        """Lexicographic key over valid cells only (rings+marbles now)."""
+        masked = (state[self.BOARD_LAYERS] * self.board_layout).astype(np.uint8)
+        return masked.tobytes()
+
+    def canonicalize_state(self):
+        """
+        Return (canonical_state, transform_name, inverse_name).
+        - transform_name is the symmetry that was applied to reach canonical.
+        - inverse_name is what to apply to map policy logits back to original.
+        """
+        best_name = "R0"
+        best_state = np.copy(self.state)
+        best_key = self._canonical_key(best_state)
+
+        for name, fn in self._get_all_symmetry_transforms():
+            s2 = fn(self.state)
+            key = self._canonical_key(s2)
+            if key < best_key:
+                best_key, best_state, best_name = key, s2, name
+
+        inv = self._get_inverse_transform(best_name)
+
+        return best_state, best_name, inv
+
+    # ======================  ACTION / MASK TRANSFORMERS  ===================
+    def _get_inverse_transform(self, transform_name):
+        """
+        Get the inverse of a symmetry transform.
+
+        For hex boards with D6 symmetry (37, 61 rings): 18 total (6 rot + 6 MR + 6 RM)
+        For boards with D3 symmetry (48 rings): 9 total (3 rot + 3 MR + 3 RM)
+
+        Inverse relationships:
+        - R(k)⁻¹ = R(-k mod 360°)
+        - MR(k)⁻¹ = R(-k mod 360°)M  (rotate-then-mirror inverts to mirror-then-rotate)
+        - R(k)M⁻¹ = MR(-k mod 360°)  (mirror-then-rotate inverts to rotate-then-mirror)
+
+        Args:
+            transform_name: String like "R60", "MR120", "R240M", etc.
+
+        Returns:
+            String naming the inverse transform
+        """
+        if transform_name.endswith("M") and not transform_name.startswith("MR"):
+            # R{k}M (mirror-then-rotate): inverse is MR{-k} (rotate-then-mirror)
+            # Extract angle from name (e.g., "R120M" -> 120)
+            angle = int(transform_name[1:-1])  # Strip "R" and "M"
+            # Inverse angle in full circle
+            inv_angle = (360 - angle) % 360
+            return f"MR{inv_angle}"
+
+        elif transform_name.startswith("MR"):
+            # MR{k} (rotate-then-mirror): inverse is R{-k}M (mirror-then-rotate)
+            # Extract angle from name (e.g., "MR120" -> 120)
+            angle = int(transform_name[2:])
+            # Inverse angle in full circle
+            inv_angle = (360 - angle) % 360
+            return f"R{inv_angle}M"
+
+        elif transform_name.startswith("R"):
+            # Pure rotation: inverse is opposite rotation
+            angle = int(transform_name[1:])
+            # Inverse angle in full circle
+            inv_angle = (360 - angle) % 360
+            return f"R{inv_angle}"
+
+        else:
+            raise ValueError(f"Unknown transform name format: {transform_name}")
+
+    def _dir_index_map(self, rot60_k=0, mirror=False):
+        """
+        Map capture direction indices (0..5) under the same symmetry used for state.
+        We transform a direction vector v=(dy,dx) via axial:
+           (dq,dr) = (dx, dy-dx)
+           rotate/mirror in axial
+           back to (dy',dx') with: dx' = dq, dy' = dr + dq
+        """
+        # Original direction vectors in your order:
+        dirs = self.DIRECTIONS
+
+        def xform_vec(dy, dx):
+            dq, dr = dx, (dy - dx)
+            dq, dr = self._ax_rot60(dq, dr, rot60_k)
+            if mirror:
+                dq, dr = self._ax_mirror_q_axis(dq, dr)
+            dx2 = dq
+            dy2 = dr + dq
+            return (dy2, dx2)
+
+        idx_map = {}
+        for i, v in enumerate(dirs):
+            vv = xform_vec(*v)
+            j = next(k for k, u in enumerate(dirs) if u == vv)
+            idx_map[i] = j
+        return idx_map
+
+    def transform_capture_mask(self, cap_mask, rot60_k=0, mirror=False):
+        """
+        cap_mask shape: (6, H, W). Returns transformed mask matching state xform.
+        """
+        self._build_axial_maps()
+        out = np.zeros_like(cap_mask)
+        dmap = self._dir_index_map(rot60_k, mirror)
+
+        for (y, x), (q, r) in self._yx_to_ax.items():
+            q2, r2 = self._ax_rot60(q, r, rot60_k)
+            if mirror:
+                q2, r2 = self._ax_mirror_q_axis(q2, r2)
+            dst = self._ax_to_yx.get((q2, r2))
+            if dst is None:
+                continue
+            y2, x2 = dst
+            for d in range(6):
+                out[dmap[d], y2, x2] = cap_mask[d, y, x]
+        return out
+
+    def transform_put_mask(self, put_mask, rot60_k=0, mirror=False):
+        """
+        put_mask shape: (3, W*W, W*W+1). Applies same symmetry to (put, rem) indices.
+        """
+        self._build_axial_maps()
+        out = np.zeros_like(put_mask)
+
+        # Build flat-index permutation for valid cells
+        flat_map = {}  # src_flat -> dst_flat
+        for (y, x), (q, r) in self._yx_to_ax.items():
+            q2, r2 = self._ax_rot60(q, r, rot60_k)
+            if mirror:
+                q2, r2 = self._ax_mirror_q_axis(q2, r2)
+            dst = self._ax_to_yx.get((q2, r2))
+            if dst is None:
+                continue
+            y2, x2 = dst
+            flat_map[y * self.width + x] = y2 * self.width + x2
+
+        M, P, R = put_mask.shape
+        last = R - 1  # "no ring removed" slot stays put
+
+        for m in range(M):
+            for p in range(P):
+                p2 = flat_map.get(p)
+                if p2 is None:
+                    continue
+                # all concrete removals
+                for r in range(R - 1):
+                    r2 = flat_map.get(r)
+                    if r2 is not None:
+                        out[m, p2, r2] = put_mask[m, p, r]
+                # "no remove" column
+                out[m, p2, last] = put_mask[m, p, last]
+
+        return out
