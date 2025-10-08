@@ -18,7 +18,7 @@ import numpy as np
 
 class ZertzGameController:
 
-    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False):
+    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False):
         self.rings = rings
         self.marbles = {'w': 6, 'g': 8, 'b': 10}
         # the first player to obtain either 3 marbles of each color, or 4 white
@@ -36,6 +36,7 @@ class ZertzGameController:
         self.log_to_file = log_to_file
         self.log_file = None
         self.log_filename = None
+        self.headless = headless
 
         # Set random seed before any random operations
         # This ensures reproducibility for game moves (not used in replay mode)
@@ -49,16 +50,20 @@ class ZertzGameController:
         if self.replay_mode:
             self.replay_actions = self._load_replay(replay_file)
 
-        # Create renderer with detected board size
-        self.renderer = ZertzRenderer(rings=self.rings)
+        # Create renderer with detected board size (only if not headless)
+        self.renderer = None if headless else ZertzRenderer(rings=self.rings)
 
         self._reset_board()
 
-        move_time = 0.666
-        self.task = self.renderer.taskMgr.doMethodLater(move_time, self.update_game, 'update_game', sort=49)
+        # Setup game loop
+        if not headless:
+            move_time = 0.666
+            self.task = self.renderer.taskMgr.doMethodLater(move_time, self.update_game, 'update_game', sort=49)
 
     def _detect_board_size(self, all_actions):
         """Detect board size by finding the maximum letter coordinate used."""
+        from game.zertz_board import ZertzBoard
+
         max_letter = 'A'
 
         for action in all_actions:
@@ -77,12 +82,12 @@ class ZertzGameController:
         #   A-H (8 letters) = 48 rings
         #   A-J (9 letters, skipping I) = 61 rings
         if max_letter <= 'G':
-            return 37
+            return ZertzBoard.SMALL_BOARD_37
         elif max_letter <= 'H':
-            return 48
+            return ZertzBoard.MEDIUM_BOARD_48
         else:
             # J or beyond = 61 ring board
-            return 61
+            return ZertzBoard.LARGE_BOARD_61
 
     def _load_replay(self, replay_file):
         """Load replay actions from a text file and detect board size."""
@@ -170,7 +175,27 @@ class ZertzGameController:
             self.log_file.flush()
 
     def run(self):
-        self.renderer.run()
+        if self.headless:
+            self._run_headless()
+        else:
+            self.renderer.run()
+
+    def _run_headless(self):
+        """Run game loop without renderer."""
+        # Create a simple task object for compatibility with update_game
+        class SimpleTask:
+            def __init__(self):
+                self.delay_time = 0
+                self.done = False
+                self.again = True
+
+        task = SimpleTask()
+
+        # Run game until it's done
+        while not task.done:
+            result = self.update_game(task)
+            if result == task.done:
+                task.done = True
 
     def _reset_board(self):
         # Setup
@@ -187,7 +212,8 @@ class ZertzGameController:
 
         self.game = ZertzGame(self.rings, self.marbles, self.win_condition, self.t)
         # game.print_state()
-        self.renderer.reset_board()
+        if self.renderer is not None:
+            self.renderer.reset_board()
 
         if self.replay_mode:
             print("-- Replay Mode --")
@@ -237,7 +263,14 @@ class ZertzGameController:
         # Log the action
         self._log_action(player.n, action_dict)
 
-        self.renderer.show_action(player, action_dict, task.delay_time)
+        # Print action in headless mode
+        if self.headless:
+            print(f'Player {player.n}: {action_dict}')
+
+        # Show action in renderer if available
+        if self.renderer is not None:
+            self.renderer.show_action(player, action_dict, task.delay_time)
+
         result = self.game.take_action(ax, ay)
 
         # Handle result - could be captured marble type (CAP) or isolated removals list (PUT) or None
@@ -248,8 +281,9 @@ class ZertzGameController:
                     if removal['marble'] is not None:
                         # Ring with marble - capture it
                         player.add_capture(removal['marble'])
-                    # Animate the isolated ring/marble removal
-                    self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
+                    # Animate the isolated ring/marble removal (if renderer exists)
+                    if self.renderer is not None:
+                        self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
             else:
                 # Normal capture from CAP action
                 player.add_capture(result)
@@ -280,11 +314,12 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, help='Random seed for reproducible games (ignored if --replay is used)')
     parser.add_argument('--log', action='store_true', help='Log game actions to zertzlog_<seed>.txt (ignored if --replay is used)')
     parser.add_argument('--partial', action='store_true', help='Continue with random play after replay ends (only with --replay)')
+    parser.add_argument('--headless', action='store_true', help='Run without 3D renderer')
     args = parser.parse_args()
 
     loadPrcFileData("", "gl-version 3 2")
     game = ZertzGameController(rings=args.rings, replay_file=args.replay, seed=args.seed,
-                                log_to_file=args.log, partial_replay=args.partial)
+                                log_to_file=args.log, partial_replay=args.partial, headless=args.headless)
     game.run()
 
     # # game.print_state()
