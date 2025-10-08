@@ -1,0 +1,33 @@
+# Zertz3D Improvement Suggestions
+
+## ZertzRenderer Improvements
+
+  1. Replace tuple helper functions with numpy (lines 17-36)
+    - Use numpy arrays instead of _mul_tuple, _add_tuple, _sub_tuple, _neg_tuple for cleaner vector math
+  2. Extract magic numbers to constants (lines 58-65, 230-235)
+    - Define marble scales, offsets, pool positions as class constants at the top
+  3. Simplify board size configuration (lines 67-78)
+    - Use a dictionary mapping: BOARD_CONFIGS = {37: "ABCDEFG", 48: "ABCDEFGH", 61: "ABCDEFGHJ"}
+  4. Remove commented code (lines 97, 123, 298-299, 481-489, 628-636)
+    - Clean up debug/test code
+  5. Extract camera setup constants (lines 237-271)
+    - Use dictionary for board-specific camera parameters instead of if/elif chains
+  6. Improve animation queue handling (lines 132-149)
+    - The to_put_back list is populated but never used effectively - this logic appears incomplete
+  7. Bug warning messages (lines 563, 600)
+    - Replace print statements with proper logging or exception handling
+  8. Debug print statements (lines 333, 351, 453)
+    - Remove or convert to proper logging
+    
+ ## ZertzBoard Improvements
+ 
+  1. Remove debugging imports (lines 321-322)
+    - Remove pdb.set_trace() import and usage in production code
+  2. Improve state layer documentation (lines 97-115)
+    - Create an Enum or dataclass to manage layer indices instead of calculating them
+  3. Extract board layout logic (lines 128-136)
+    - Create separate method _initialize_board_layout() for clarity
+  4. Simplify symmetry operations (lines 474-501)
+    - Methods accept state=None but always copy - could simplify the interface
+  5. Action translation methods are complex (lines 503-572)
+    - mirror_action and rotate_action have nested loops and could benefit from helper methods
