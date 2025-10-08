@@ -59,6 +59,11 @@ class ZertzBoard:
     HEX_NUMBERS = [(1, 1), (7, 3), (19, 5), (37, 7), (48, 8), (61, 9), (91, 11), (127, 13)]
     DIRECTIONS = [(1, 0), (0, -1), (-1, -1), (-1, 0), (0, 1), (1, 1)]
 
+    # Player constants
+    PLAYER_1 = 0
+    PLAYER_2 = 1
+    NUM_PLAYERS = 2
+
     def __init__(self, rings=37, marbles=None, t=1, clone=None, board_layout=None):
         # Return a Board object to store the board state
         #   - State is a matrix with dimensions L x H x W, H = W = Board width, L = Layers:
@@ -208,13 +213,13 @@ class ZertzBoard:
         return self.state[self.t * 4 + 10, 0, 0]
 
     def _next_player(self):
-        self.state[self.t * 4 + 10] = (self.state[self.t * 4 + 10] + 1) % 2
+        self.state[self.t * 4 + 10] = (self.state[self.t * 4 + 10] + 1) % self.NUM_PLAYERS
 
     def _get_cur_player_supply_layer(self, marble_type):
         # Return the layer index for the captured marble type and the current player
         # Input: captured_type = 'w', 'g', or 'b'
         supply_layer = self.MARBLE_TO_SUPPLY[marble_type]
-        if self.get_cur_player() == 0:
+        if self.get_cur_player() == self.PLAYER_1:
             supply_layer += 3
         else:
             supply_layer += 6
@@ -232,8 +237,7 @@ class ZertzBoard:
         self.state[0: 4 * self.t] = np.concatenate([self.state[0:4], self.state[0: 4 * (self.t - 1)]], axis=0)
 
         if action_type == 'PUT':
-            self.take_placement_action(action)
-            return None
+            return self.take_placement_action(action)
         elif action_type == 'CAP':
             return self.take_capture_action(action)
 
@@ -250,7 +254,8 @@ class ZertzBoard:
 
         # Place the marble on the board
         y, x = put_index
-        assert np.sum(self.state[:4, y, x]) == 1
+        if np.sum(self.state[:4, y, x]) != 1:
+            raise ValueError(f"Invalid placement: position ({y}, {x}) is not an empty ring")
         put_layer = self.MARBLE_TO_LAYER[marble_type]
         self.state[put_layer][put_index] = 1
 
@@ -264,43 +269,48 @@ class ZertzBoard:
             assert self.state[supply_layer, 0, 0] >= 1
             self.state[supply_layer] -= 1
 
+        # Track isolated regions that are removed (both rings and marbles)
+        isolated_removals = []
+
         # Remove the ring from the board
         if rem_index is not None:
             self.state[0][rem_index] = 0
-            # Check if it is possbile for the board to have been separated into regions. This is only 
-            # possible if two of the empty neighbors are opposites.
-            opposite_empty = False
-            for neighbor in self.get_neighbors(rem_index)[:3]:
-                opposite = self.get_jump_destination(neighbor, rem_index)
-                if ((not self._is_inbounds(neighbor) or self.state[0][neighbor] == 0)
-                        and (not self._is_inbounds(opposite) or self.state[0][opposite] == 0)):
-                    opposite_empty = True
-                    break
-            if opposite_empty:
-                # Get list of regions
-                regions = self._get_regions()
-                # If the board has been separated into multiple regions then check if any are captured
-                if len(regions) > 1:
-                    for region in regions:
-                        captured = True
-                        # A region is captured if every ring in the region is occupied by a marble
-                        for y, x in region:
-                            if np.sum(self.state[1:4, y, x]) == 0:
-                                captured = False
-                                break
-                        if captured:
-                            # Remove all rings in the captured region and give the marbles to the player
-                            for index in region:
-                                y, x = index
-                                if np.sum(self.state[1:4, y, x]) == 1:
-                                    captured_type = self.get_marble_type_at(index)
-                                supply_layer = self._get_cur_player_supply_layer(captured_type)
-                                self.state[supply_layer] += 1
-                                # Set the ring and marble layers all to 0
-                                self.state[0:4, y, x] = 0
+            # Check if the board has been separated into multiple regions
+            regions = self._get_regions()
+            if len(regions) > 1:
+                # Find the largest region (this is the main board that stays)
+                largest_region = max(regions, key=len)
+
+                # Remove all smaller isolated regions
+                for region in regions:
+                    if region is largest_region:
+                        continue
+
+                    # Remove all rings in the isolated region and capture any marbles to the current player
+                    for index in region:
+                        y, x = index
+                        pos_str = self.index_to_str(index)
+
+                        # Check if there's a marble on this ring
+                        has_marble = np.sum(self.state[1:4, y, x]) == 1
+                        if has_marble:
+                            captured_type = self.get_marble_type_at(index)
+                            supply_layer = self._get_cur_player_supply_layer(captured_type)
+                            self.state[supply_layer] += 1
+                            # Record ring removal with marble capture
+                            isolated_removals.append({'pos': pos_str, 'marble': captured_type})
+                        else:
+                            # Record ring removal without marble
+                            isolated_removals.append({'pos': pos_str, 'marble': None})
+
+                        # Set the ring and marble layers all to 0
+                        self.state[0:4, y, x] = 0
 
         # Update current player
         self._next_player()
+
+        # Return isolated removals if any occurred
+        return isolated_removals if isolated_removals else None
 
     def take_capture_action(self, action):
         # Capture actions have dimension (6 x w x w)
@@ -313,10 +323,6 @@ class ZertzBoard:
         dst_index = self.get_jump_destination(src_index, cap_index)
         y, x = cap_index
 
-        if np.sum(self.state[1:4, y, x]) != 1:
-            import pdb
-            pdb.set_trace()
-
         # Reset the capture layer
         self.state[self.CAPTURE_LAYER] = 0
 
@@ -326,11 +332,8 @@ class ZertzBoard:
         self.state[marble_layer][dst_index] = 1
 
         # Give the captured marble to the current player and remove it from the board
-        #        y, x = cap_index
-        #
-        #        if np.sum(self.state[1:4, y, x]) != 1:
-        #            import pdb; pdb.set_trace()
-        assert np.sum(self.state[1:4, y, x]) == 1
+        if np.sum(self.state[1:4, y, x]) != 1:
+            raise ValueError(f"Invalid capture: no marble at position ({y}, {x})")
         captured_type = self.get_marble_type_at(cap_index)
         supply_layer = self._get_cur_player_supply_layer(captured_type)
         self.state[supply_layer] += 1
@@ -388,7 +391,7 @@ class ZertzBoard:
         # the player must use a captured marble.
         supply_start = self.MARBLE_TO_SUPPLY['w']
         if np.all(self.state[supply_start: supply_start + 3, 0, 0] == 0):
-            if self.get_cur_player() == 0:
+            if self.get_cur_player() == self.PLAYER_1:
                 supply_start += 3
             else:
                 supply_start += 6

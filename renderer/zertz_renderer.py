@@ -97,7 +97,7 @@ class ZertzRenderer(ShowBase):
         # self.camera.setPosHpr(0, 0, 16, 0, 270, 0)  # Set the camera
         self.setup_lights()  # Setup default lighting
 
-        sb = SkyBox(self)
+        self.sb = SkyBox(self)
 
         self.wb = None
         self._setup_water()
@@ -236,14 +236,12 @@ class ZertzRenderer(ShowBase):
 
     def _setup_camera(self):
         """Setup camera position and orientation based on board size."""
-        # Find the center position of the board
+        # Set the center position of the board
         center_pos = "D4"
         if self.rings == 48:
             center_pos="D5"
         elif self.rings == 61:
             center_pos="E5"
-
-        # center_pos = f"{center_letter}{center_row}"
 
         # Get the actual 3D coordinates of the center position
         if center_pos in self.pos_to_coords:
@@ -497,6 +495,42 @@ class ZertzRenderer(ShowBase):
         a_node.hide(BitMask32(1))
 
         self.render.setLight(a_node)
+
+    def show_isolated_removal(self, player, pos, marble_color, action_duration=0):
+        """Animate removal of an isolated ring (with or without marble)."""
+        action_duration *= 0.45
+
+        # Remove the ring base piece
+        if pos in self.pos_to_base:
+            base_piece = self.pos_to_base[pos]
+            base_pos = base_piece.get_pos()
+            if action_duration == 0:
+                base_piece.hide()
+            else:
+                self.animation_queue.put((base_piece, base_pos, None, None, action_duration, action_duration))
+            self.removed_bases.append((base_piece, base_pos))
+
+        # If there's a marble, remove it and add to player's captured pool
+        if marble_color is not None and pos in self.pos_to_marble:
+            captured_marble = self.pos_to_marble.pop(pos)
+            src_coords = captured_marble.get_pos()
+
+            # Add to player's captured pool
+            capture_pool = self.player_pools[player.n][marble_color]
+            capture_pool_length = sum([len(k) for k in self.player_pools[player.n].values()])
+            capture_pool.append(captured_marble)
+
+            if capture_pool_length >= len(self.player_pool_coords[player.n]):
+                capture_pool_length = len(self.player_pool_coords[player.n]) - 1
+
+            player_pool_coords = self.player_pool_coords[player.n][capture_pool_length]
+
+            if action_duration == 0:
+                captured_marble.set_pos(player_pool_coords)
+                captured_marble.set_scale(self.captured_marble_scale)
+            else:
+                self.animation_queue.put((captured_marble, src_coords, player_pool_coords,
+                                          self.captured_marble_scale, action_duration, action_duration))
 
     def show_action(self, player, action_dict, action_duration=0):
         # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}

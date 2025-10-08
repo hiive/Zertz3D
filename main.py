@@ -3,9 +3,10 @@
 # Press ⌃R to execute it or replace it with your code.
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
 import random
-import time
 import argparse
 import ast
+import time
+import hashlib
 
 from panda3d.core import loadPrcFileData
 
@@ -17,7 +18,7 @@ import numpy as np
 
 class ZertzGameController:
 
-    def __init__(self, rings=37, replay_file=None):
+    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False):
         self.rings = rings
         self.marbles = {'w': 6, 'g': 8, 'b': 10}
         # the first player to obtain either 3 marbles of each color, or 4 white
@@ -29,23 +30,20 @@ class ZertzGameController:
         self.player2 = None
         self.game = None
         self.replay_mode = replay_file is not None
+        self.partial_replay = partial_replay
         self.replay_actions = None
+        self.current_seed = None
+        self.log_to_file = log_to_file
+        self.log_file = None
+        self.log_filename = None
 
         # Set random seed before any random operations
-        # This ensures reproducibility for marble rotations and game moves
+        # This ensures reproducibility for game moves (not used in replay mode)
         if not self.replay_mode:
-            # t = int(time.time())
-            # t = 1619318796
-            t = 1726887625
-            print(f"-- Setting Seed: {t}")
-            np.random.seed(t)
-            random.seed(t)
-            # Test that seed is working
-            test_val = np.random.randint(1000)
-            print(f"-- Seed test value (should always be 11): {test_val}")
-            # Reset seed after test
-            np.random.seed(t)
-            random.seed(t)
+            if seed is None:
+                seed = int(time.time())
+            self.current_seed = seed
+            self._apply_seed(seed)
 
         # Load replay first to detect board size
         if self.replay_mode:
@@ -104,7 +102,7 @@ class ZertzGameController:
         with open(replay_file, 'r') as f:
             for line in f:
                 line = line.strip()
-                if not line:
+                if not line or line.startswith('#'):
                     continue
 
                 # Parse line format: "Player N: {'action': 'PUT', ...}"
@@ -128,12 +126,72 @@ class ZertzGameController:
         print(f"Loaded {len(player2_actions)} actions for Player 2")
         return player1_actions, player2_actions
 
+    def _apply_seed(self, seed):
+        """Apply a seed to both random number generators and print it."""
+        print(f"-- Setting Seed: {seed}")
+        np.random.seed(seed)
+        random.seed(seed)
+
+    def _generate_next_seed(self):
+        """Generate the next seed deterministically from the current seed using hash."""
+        # Hash the current seed to get a new one
+        hash_obj = hashlib.sha256(str(self.current_seed).encode())
+        # Take first 8 bytes and convert to integer
+        new_seed = int.from_bytes(hash_obj.digest()[:8], byteorder='big')
+        # Keep it in a reasonable range (32-bit unsigned int)
+        new_seed = new_seed % (2**32)
+        return new_seed
+
+    def _open_log_file(self):
+        """Open a new log file for the current game."""
+        if self.log_to_file and not self.replay_mode:
+            self.log_filename = f"zertzlog_{self.current_seed}.txt"
+            self.log_file = open(self.log_filename, 'w')
+            self.log_file.write(f"# Seed: {self.current_seed}\n")
+            self.log_file.write(f"# Rings: {self.rings}\n")
+            self.log_file.write(f"#\n")
+            print(f"Logging game to: {self.log_filename}")
+
+    def _close_log_file(self):
+        """Close the current log file and append final game state."""
+        if self.log_file is not None:
+            # Append final game state as comments
+            self.log_file.write(f"#\n")
+            self.log_file.write(f"# Final game state:\n")
+            self.log_file.write(f"# ---------------\n")
+            self.log_file.write(f"# Board state:\n")
+            board_state = self.game.board.state[0] + self.game.board.state[1] + self.game.board.state[2] * 2 + self.game.board.state[3] * 3
+            for row in board_state:
+                self.log_file.write(f"# {row}\n")
+            self.log_file.write(f"# ---------------\n")
+            self.log_file.write(f"# Marble supply:\n")
+            self.log_file.write(f"# {self.game.board.state[-10:-1, 0, 0]}\n")
+            self.log_file.write(f"# ---------------\n")
+            self.log_file.close()
+            self.log_file = None
+            print(f"Game log saved to: {self.log_filename}")
+
+    def _log_action(self, player_num, action_dict):
+        """Log an action to the file if logging is enabled."""
+        if self.log_file is not None:
+            self.log_file.write(f"Player {player_num}: {action_dict}\n")
+            self.log_file.flush()
+
     def run(self):
         self.renderer.run()
 
     def _reset_board(self):
         # Setup
         print("** New game **")
+
+        # Close previous log file if it exists
+        if self.log_file is not None:
+            self._close_log_file()
+
+        # Generate new seed for non-replay games (only after the first game)
+        if not self.replay_mode and self.current_seed is not None and self.game is not None:
+            self.current_seed = self._generate_next_seed()
+            self._apply_seed(self.current_seed)
 
         self.game = ZertzGame(self.rings, self.marbles, self.win_condition, self.t,
                               board_layout=self.board_layout)
@@ -148,6 +206,8 @@ class ZertzGameController:
         else:
             self.player1 = RandomZertzPlayer(self.game, 1)
             self.player2 = RandomZertzPlayer(self.game, 2)
+            # Open log file for new game
+            self._open_log_file()
 
     def update_game(self, task):
         p_ix = self.game.get_cur_player_value()
@@ -158,9 +218,23 @@ class ZertzGameController:
         except ValueError as e:
             print(f"Error getting action: {e}")
             if self.replay_mode:
-                print("Replay finished")
-                return task.done
-            raise
+                if self.partial_replay:
+                    print("Replay finished - continuing with random play")
+                    # Switch to random players
+                    self.player1 = RandomZertzPlayer(self.game, 1)
+                    self.player2 = RandomZertzPlayer(self.game, 2)
+                    # Copy captured marbles from replay players
+                    self.player1.captured = player.captured if player.n == 1 else self.player1.captured
+                    self.player2.captured = player.captured if player.n == 2 else self.player2.captured
+                    self.replay_mode = False
+                    # Get new action from random player
+                    player = self.player1 if p_ix == 1 else self.player2
+                    ax, ay = player.get_action()
+                else:
+                    print("Replay finished")
+                    return task.done
+            else:
+                raise
 
         try:
             _, action_dict = self.game.action_to_str(ax, ay)
@@ -169,10 +243,25 @@ class ZertzGameController:
             print(f"Action type: {ax}, Action: {ay}")
             raise
 
+        # Log the action
+        self._log_action(player.n, action_dict)
+
         self.renderer.show_action(player, action_dict, task.delay_time)
         result = self.game.take_action(ax, ay)
+
+        # Handle result - could be captured marble type (CAP) or isolated removals list (PUT) or None
         if result is not None:
-            player.add_capture(result)
+            if isinstance(result, list):
+                # Isolated region removals from PUT action
+                for removal in result:
+                    if removal['marble'] is not None:
+                        # Ring with marble - capture it
+                        player.add_capture(removal['marble'])
+                    # Animate the isolated ring/marble removal
+                    self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
+            else:
+                # Normal capture from CAP action
+                player.add_capture(result)
 
         game_over = self.game.get_game_ended()
         if game_over:
@@ -196,11 +285,15 @@ class ZertzGameController:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Zertz 3D Game')
     parser.add_argument('--replay', type=str, help='Path to replay file (board size auto-detected)')
-    parser.add_argument('--rings', type=int, default=37, help='Number of rings on the board (default: 61, ignored if --replay is used)')
+    parser.add_argument('--rings', type=int, default=37, help='Number of rings on the board (default: 37, ignored if --replay is used)')
+    parser.add_argument('--seed', type=int, help='Random seed for reproducible games (ignored if --replay is used)')
+    parser.add_argument('--log', action='store_true', help='Log game actions to zertzlog_<seed>.txt (ignored if --replay is used)')
+    parser.add_argument('--partial', action='store_true', help='Continue with random play after replay ends (only with --replay)')
     args = parser.parse_args()
 
     loadPrcFileData("", "gl-version 3 2")
-    game = ZertzGameController(rings=args.rings, replay_file=args.replay)
+    game = ZertzGameController(rings=args.rings, replay_file=args.replay, seed=args.seed,
+                                log_to_file=args.log, partial_replay=args.partial)
     game.run()
 
     # # game.print_state()
