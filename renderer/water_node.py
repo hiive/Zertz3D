@@ -1,7 +1,5 @@
 from panda3d.core import CardMaker, Texture, Plane, PlaneNode, TransparencyAttrib, \
-    CullFaceAttrib, RenderState, Shader, TextureStage, BitMask32
-from panda3d.core import Vec4
-from direct.showbase.ShowBase import ShowBase
+    CullFaceAttrib, RenderState, Shader, BitMask32
 
 
 class WaterNode:
@@ -21,7 +19,6 @@ class WaterNode:
 
         # CRITICAL: Enable simplepbr for this buffer so objects render correctly
         # The buffer needs to inherit the shader generator from the main window
-        from panda3d.core import GraphicsOutput
         self.buffer.setOneShot(False)
         self.buffer.setActive(True)
 

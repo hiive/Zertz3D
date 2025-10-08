@@ -588,8 +588,8 @@ class TestSpiralMirror:
 
         # At least one should be a valid mirror
         assert len(valid_mirrors) > 0, \
-            f"No candidate produces a valid mirror transformation. " \
-            f"All candidates either aren't involutive or match a rotation."
+            "No candidate produces a valid mirror transformation. " \
+            "All candidates either aren't involutive or match a rotation."
 
         # The current implementation should be checked
         current_result = results['current']
@@ -816,7 +816,7 @@ class TestCanonicalTransform:
                 failures.append(f"{transform_name} with inverse {inverse_name} doesn't recover original")
 
         if failures:
-            pytest.fail(f"Inverse calculation failures:\n" + "\n".join(failures))
+            pytest.fail("Inverse calculation failures:\n" + "\n".join(failures))
 
     def test_inverse_transform_correctness(self, small_board):
         """Applying transform then inverse should return to original."""
@@ -932,7 +932,7 @@ class TestBoardSizeSymmetries:
                 missing_inverses.append(f"{transform_name} -> {inverse_name}")
 
         assert len(missing_inverses) == 0, \
-            f"Missing inverses in transform dictionary:\n" + "\n".join(missing_inverses)
+            "Missing inverses in transform dictionary:\n" + "\n".join(missing_inverses)
 
     @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
     def test_all_transforms_are_involutive(self, request, board_fixture):
@@ -970,7 +970,7 @@ class TestBoardSizeSymmetries:
                     failures.append(f"{transform_name} -> {inverse_name}")
 
         assert len(failures) == 0, \
-            f"These transform/inverse pairs failed to recover original:\n" + "\n".join(failures)
+            "These transform/inverse pairs failed to recover original:\n" + "\n".join(failures)
 
     def test_48_ring_asymmetric_pattern_has_six_symmetries(self, medium_board):
         """48-ring board with D3 symmetry should have 6 unique states for asymmetric pattern."""

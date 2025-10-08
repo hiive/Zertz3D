@@ -1,6 +1,5 @@
 """Test that game state includes all necessary information for ML."""
 
-import pytest
 import numpy as np
 import sys
 from pathlib import Path

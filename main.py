@@ -146,24 +146,24 @@ class ZertzGameController:
             self.log_file = open(self.log_filename, 'w')
             self.log_file.write(f"# Seed: {self.current_seed}\n")
             self.log_file.write(f"# Rings: {self.rings}\n")
-            self.log_file.write(f"#\n")
+            self.log_file.write("#\n")
             print(f"Logging game to: {self.log_filename}")
 
     def _close_log_file(self):
         """Close the current log file and append final game state."""
         if self.log_file is not None:
             # Append final game state as comments
-            self.log_file.write(f"#\n")
-            self.log_file.write(f"# Final game state:\n")
-            self.log_file.write(f"# ---------------\n")
-            self.log_file.write(f"# Board state:\n")
+            self.log_file.write("#\n")
+            self.log_file.write("# Final game state:\n")
+            self.log_file.write("# ---------------\n")
+            self.log_file.write("# Board state:\n")
             board_state = self.game.board.state[0] + self.game.board.state[1] + self.game.board.state[2] * 2 + self.game.board.state[3] * 3
             for row in board_state:
                 self.log_file.write(f"# {row}\n")
-            self.log_file.write(f"# ---------------\n")
-            self.log_file.write(f"# Marble supply:\n")
+            self.log_file.write("# ---------------\n")
+            self.log_file.write("# Marble supply:\n")
             self.log_file.write(f"# {self.game.board.state[-10:-1, 0, 0]}\n")
-            self.log_file.write(f"# ---------------\n")
+            self.log_file.write("# ---------------\n")
             self.log_file.close()
             self.log_file = None
             print(f"Game log saved to: {self.log_filename}")
