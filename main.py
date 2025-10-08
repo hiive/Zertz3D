@@ -51,7 +51,6 @@ class ZertzGameController:
 
         # Create renderer with detected board size
         self.renderer = ZertzRenderer(rings=self.rings)
-        self.board_layout = np.copy(self.renderer.pos_array)
 
         self._reset_board()
 
@@ -59,9 +58,8 @@ class ZertzGameController:
         self.task = self.renderer.taskMgr.doMethodLater(move_time, self.update_game, 'update_game', sort=49)
 
     def _detect_board_size(self, all_actions):
-        """Detect board size by finding the maximum ring coordinate used."""
+        """Detect board size by finding the maximum letter coordinate used."""
         max_letter = 'A'
-        max_number = 1
 
         for action in all_actions:
             # Check all position fields that might contain ring coordinates
@@ -70,26 +68,20 @@ class ZertzGameController:
                     pos = str(action[key])
                     if len(pos) >= 2:
                         letter = pos[0].upper()
-                        try:
-                            number = int(pos[1:])
-                            if letter > max_letter:
-                                max_letter = letter
-                            if number > max_number:
-                                max_number = number
-                        except ValueError:
-                            continue
+                        if letter > max_letter:
+                            max_letter = letter
 
-        # Calculate board size from max coordinates
-        # For hexagonal boards: A-G (width 7) = 37 rings, A-H (width 8) = 48 rings, A-J (width 9) = 61 rings
-        max_x = ord(max_letter) - ord('A')
-        width = max(max_x, max_number) + 1
-
-        # Map width to standard board sizes
-        if width <= 7:
+        # Detect board size from max letter (number of columns)
+        # For hexagonal boards:
+        #   A-G (7 letters) = 37 rings
+        #   A-H (8 letters) = 48 rings
+        #   A-J (9 letters, skipping I) = 61 rings
+        if max_letter <= 'G':
             return 37
-        elif width <= 8:
+        elif max_letter <= 'H':
             return 48
         else:
+            # J or beyond = 61 ring board
             return 61
 
     def _load_replay(self, replay_file):
@@ -193,8 +185,7 @@ class ZertzGameController:
             self.current_seed = self._generate_next_seed()
             self._apply_seed(self.current_seed)
 
-        self.game = ZertzGame(self.rings, self.marbles, self.win_condition, self.t,
-                              board_layout=self.board_layout)
+        self.game = ZertzGame(self.rings, self.marbles, self.win_condition, self.t)
         # game.print_state()
         self.renderer.reset_board()
 

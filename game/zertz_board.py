@@ -90,6 +90,77 @@ class ZertzBoard:
     MARBLE_LAYERS = slice(1, 4)     # White, gray, black marble layers
     BOARD_LAYERS = slice(0, 4)      # Rings + all marbles
 
+
+    @staticmethod
+    def generate_standard_board_layout(rings):
+        """
+        Generate board layout for standard ring configurations (37, 48, 61).
+
+        This is the canonical board layout algorithm, ported from the renderer.
+        Returns a 2D numpy array of position strings (e.g., "A1", "B2", etc.).
+        Empty positions are represented as empty strings.
+
+        Args:
+            rings: Number of rings (must be 37, 48, or 61)
+
+        Returns:
+            2D numpy array of strings with shape (width, width)
+
+        Raises:
+            ValueError: If rings is not a supported standard size
+        """
+        # Map rings to letter sets
+        if rings == 37:
+            letters = "ABCDEFG"
+        elif rings == 48:
+            letters = "ABCDEFGH"
+        elif rings == 61:
+            letters = "ABCDEFGHJ"
+        else:
+            raise ValueError(
+                f"Unsupported standard board size: {rings} rings. "
+                f"Supported sizes are 37, 48, and 61."
+            )
+
+        # Algorithm ported from zertz_renderer.py _build_base() method
+        r_max = len(letters)
+        is_even = r_max % 2 == 0
+
+        # Lambda to calculate how many letters/positions each row uses
+        h_max = lambda xx: r_max - abs(letters.index(letters[xx]) - (r_max // 2))
+
+        # Calculate minimum number for positions
+        r_min = h_max(0)
+        if is_even:
+            r_min += 1
+
+        # Build position array
+        pos_array = []
+        for i in range(r_max):
+            hh = h_max(i)  # Number of letters this row uses
+
+            # Select which letters to use for this row
+            ll = letters[:hh] if i < hh / 2 else letters[-hh:]
+
+            # Calculate number range for this row
+            nn_max = r_max - i
+            nn_min = max(r_min - i, 1)
+
+            # Initialize row with empty strings
+            row = [''] * r_max
+
+            # Fill in positions for this row
+            for k in range(len(ll)):
+                ix = min(k + nn_min, nn_max)
+                lt = ll[k]
+                pa = letters.find(lt)
+                pos = f'{lt}{ix}'
+                row[pa] = pos
+
+            pos_array.append(row)
+
+        return np.array(pos_array)
+
     def __init__(self, rings=37, marbles=None, t=1, clone=None, board_layout=None):
         # Return a Board object to store the board state
         #   - State is a matrix with dimensions L x H x W, H = W = Board width, L = Layers:
@@ -118,15 +189,28 @@ class ZertzBoard:
         else:
             # Determine width of board from the number of rings
             if board_layout is None:
-                self.rings = rings
-                self.width = 0
-                for total, width in self.HEX_NUMBERS:
-                    # Currently limited to only boards that are perfect hexagons
-                    # TODO: implement for uneven number of rings
-                    if total == self.rings:
-                        self.width = width
-                assert self.width != 0
+                # Use generated layout for standard board sizes
+                if rings in [37, 48, 61]:
+                    board_layout = self.generate_standard_board_layout(rings)
+                    self.letter_layout = board_layout
+                    self.flattened_letters = np.reshape(board_layout, (board_layout.size,))
+                    self.board_layout = self.letter_layout != ''
+                    self.rings = np.count_nonzero(board_layout)
+                    self.width = board_layout.shape[0]
+                else:
+                    # Fall back to hexagon formula for non-standard sizes
+                    self.rings = rings
+                    self.width = 0
+                    for total, width in self.HEX_NUMBERS:
+                        if total == self.rings:
+                            self.width = width
+                    if self.width == 0:
+                        raise ValueError(
+                            f"Unsupported board size: {rings} rings. "
+                            f"Use generate_standard_board_layout() for custom layouts."
+                        )
             else:
+                # Custom board layout provided
                 self.letter_layout = board_layout
                 self.flattened_letters = np.reshape(board_layout, (board_layout.size,))
                 self.board_layout = self.letter_layout != ''

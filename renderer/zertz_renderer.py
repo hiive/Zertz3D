@@ -378,16 +378,12 @@ class ZertzRenderer(ShowBase):
 
     def _build_base(self):
         self._init_pos_coords()
-        pos_array = []
 
-        # 0  A4 B5 C6 D7
-        # 1  A3 B4 C5 D6 E6
-        # 2  A2 B3 C4 D5 E5 F5
-        # 3  A1 B2 C3 D4 E4 F4 G4
-        # 4     B1 C2 D3 E3 F3 G3
-        # 5        C1 D2 E2 F2 G2
-        # 6           D1 E1 F1 G1
+        # Get canonical board layout from game logic (single source of truth)
+        from game.zertz_board import ZertzBoard
+        self.pos_array = ZertzBoard.generate_standard_board_layout(self.rings)
 
+        # Calculate 3D positions for rendering
         r_max = len(self.letters)
         is_even = r_max % 2 == 0
         h_max = lambda xx: r_max - abs(self.letters.index(self.letters[xx]) - (r_max // 2))
@@ -396,34 +392,29 @@ class ZertzRenderer(ShowBase):
             r_min += 1
         x_center = -(self.x_base_size / 2) * r_max / 2
         y_center = (self.y_base_size / 2) * r_max / 2
+
+        # Create 3D base pieces for each position in the layout
         for i in range(r_max):
             hh = h_max(i)
             ll = self.letters[:hh] if i < hh / 2 else self.letters[-hh:]
-            nn_max = r_max - i
-            nn_min = max(r_min - i, 1)
             x_row_offset = self.x_base_size / 2 * (h_max(i) - r_min)
             y_row_offset = self.y_base_size * i
-            # print(y_row_offset)
-            # print()
-            pos_array.append([''] * r_max)
+
             for k in range(len(ll)):
-                ix = min(k + nn_min, nn_max)
                 lt = ll[k]
                 pa = self.letters.find(lt)
-                pos = f'{lt}{ix}'
-                # if is_even and lt == self.letters[-1]:
-                #    continue
-                pos_array[i][pa] = pos
-                base_piece = BasePiece(self)
-                x = x_center + (k * self.x_base_size) - x_row_offset
-                y = y_center - y_row_offset
-                coords = (x, y, 0)
-                base_piece.set_pos(coords)
-                self.pos_to_base[pos] = base_piece
-                self.pos_to_coords[pos] = coords
-            print(pos_array[i])
+                pos = self.pos_array[i][pa]
 
-        self.pos_array = np.array(pos_array)
+                if pos != '':  # Only create pieces for non-empty positions
+                    base_piece = BasePiece(self)
+                    x = x_center + (k * self.x_base_size) - x_row_offset
+                    y = y_center - y_row_offset
+                    coords = (x, y, 0)
+                    base_piece.set_pos(coords)
+                    self.pos_to_base[pos] = base_piece
+                    self.pos_to_coords[pos] = coords
+
+            print(self.pos_array[i])
 
     def setup_lights(self):
         # point light
