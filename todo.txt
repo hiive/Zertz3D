@@ -2,8 +2,6 @@
 
 ## ZertzRenderer Improvements
 
-  1. Replace tuple helper functions with numpy (lines 17-36)
-    - Use numpy arrays instead of _mul_tuple, _add_tuple, _sub_tuple, _neg_tuple for cleaner vector math
   2. Extract magic numbers to constants (lines 58-65, 230-235)
     - Define marble scales, offsets, pool positions as class constants at the top
   3. Simplify board size configuration (lines 67-78)

@@ -14,28 +14,6 @@ from renderer.water_node import WaterNode
 from renderer.zertz_models import BasePiece, BlackBallModel, GrayBallModel, WhiteBallModel, SkyBox, make_marble
 
 
-def _mul_tuple(a, f):
-    a1, a2, a3 = a
-    return a1 * f, a2 * f, a3 * f
-
-
-def _add_tuple(a, b):
-    a1, a2, a3 = a
-    b1, b2, b3 = b
-    return a1 + b1, a2 + b2, a3 + b3
-
-
-def _sub_tuple(a, b):
-    a1, a2, a3 = a
-    b1, b2, b3 = b
-    return a1 - b1, a2 - b2, a3 - b3
-
-
-def _neg_tuple(a):
-    a1, a2, a3 = a
-    return -a1, -a2, -a3
-
-
 class ZertzRenderer(ShowBase):
 
     def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37):
@@ -367,38 +345,31 @@ class ZertzRenderer(ShowBase):
             adj_pos = f"{last_letter}{int(top_right[1:])-1}"
             tr_adj = self.pos_to_coords.get(adj_pos, tr_coord)
 
-        # Calculate direction vectors from corner to adjacent position
-        d_ul = _mul_tuple(_sub_tuple(tl_coord, tl_adj), self.player_pool_offset_scale)
-        p_ul = _add_tuple(tl_coord, d_ul)
+        # Calculate direction vectors from corner to adjacent position using numpy arrays
+        tl_coord = np.array(tl_coord)
+        tl_adj = np.array(tl_adj)
+        tr_coord = np.array(tr_coord)
+        tr_adj = np.array(tr_adj)
+        player_pool_member_offset = np.array(self.player_pool_member_offset)
+
+        d_ul = (tl_coord - tl_adj) * self.player_pool_offset_scale
+        p_ul = tl_coord + d_ul
 
         # For player 2 (right side), we want the pool closer and further from camera
         # Use a smaller offset and add extra Y offset to move away from camera
-        d_ur = _mul_tuple(_sub_tuple(tr_coord, tr_adj), self.player_pool_offset_scale)
-        p_ur = _add_tuple(tr_coord, d_ur)
+        d_ur = (tr_coord - tr_adj) * self.player_pool_offset_scale
+        p_ur = tr_coord + d_ur
 
         # Create 12 positions per player (6 + 6 with offset)
-        # for i in range(6):
-        #     pp1 = _add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 2.0))
-        #     x, y, z = pp1
-        #     pp1 = (x, y, z + 0.25)
-        #     self.player_pool_coords[1].append(pp1)
-        #
-        #     pp2 = _add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 2.0))
-        #     x, y, z = pp2
-        #     pp2 = (x, y, z + 0.25)
-        #     self.player_pool_coords[2].append(pp2)
-
         for r in range(2):
             for i in range(6):
-                pp1 = _add_tuple(_add_tuple(p_ul, _mul_tuple(_neg_tuple(d_ur), i / 1.5)), _mul_tuple(_neg_tuple(self.player_pool_member_offset), r+1))
-                x, y, z = pp1
-                pp1 = (x, y, z + 0.25)
-                self.player_pool_coords[1].append(pp1)
+                pp1 = p_ul + (-d_ur * (i / 1.5)) + (-player_pool_member_offset * (r + 1))
+                pp1[2] += 0.25
+                self.player_pool_coords[1].append(tuple(pp1))
 
-                pp2 = _add_tuple(_add_tuple(p_ur, _mul_tuple(_neg_tuple(d_ul), i / 1.5)), _mul_tuple(self.player_pool_member_offset, r+1))
-                x, y, z = pp2
-                pp2 = (x, y, z + 0.25)
-                self.player_pool_coords[2].append(pp2)
+                pp2 = p_ur + (-d_ul * (i / 1.5)) + (player_pool_member_offset * (r + 1))
+                pp2[2] += 0.25
+                self.player_pool_coords[2].append(tuple(pp2))
 
     def _init_pos_coords(self):
         self.pos_to_base.clear()

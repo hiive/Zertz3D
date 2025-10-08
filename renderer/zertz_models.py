@@ -2,8 +2,6 @@ from abc import ABC
 import random
 
 from panda3d.core import TextureAttrib, AmbientLight, BitMask32
-import numpy as np
-
 
 class _BaseModel(ABC):
     def __init__(self, renderer, model_name, color=(1.0, 1.0, 1.0, 1.0)):
@@ -42,24 +40,23 @@ class _BaseModel(ABC):
         self.model.reparentTo(self.renderer.render)
 
     def show(self):
-        if self.saved_coords is not None:
-            self._set_pos(self.saved_coords)
+        if self.model is not None:
+            self.model.show()
 
     def hide(self):
-        hide_coords = (-10000000.0, -10000000.0, -10000000.0)
-        self.saved_coords = self.pos_coords
-        self._set_pos(hide_coords)
+        if self.model is not None:
+            self.model.hide()
 
 
 class SkyBox(_BaseModel):
     def __init__(self, renderer):
         model_name = 'models/skybox.bam'
         super().__init__(renderer, model_name)
-        self.model.setScale(16)
+        self.model.setScale(16)  # Increased from 16 to zoom out
         self.model.setTwoSided(True)
         #self.model.setP(self.model, 8)
         self.model.setH(self.model, 15)
-        self.model.setPos((0, 0, 5.9))
+        self.model.setPos((0, 0, 4.9))
         self.model.setDepthWrite(False)
         self.model.hide(BitMask32(1))
 
