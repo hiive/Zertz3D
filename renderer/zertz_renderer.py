@@ -1,3 +1,4 @@
+import logging
 import math
 import sys
 
@@ -7,14 +8,30 @@ import numpy as np
 import simplepbr
 from direct.showbase.ShowBase import ShowBase
 
-from panda3d.core import AmbientLight, PointLight, Spotlight, PerspectiveLens, LVector4, BitMask32, DirectionalLight, \
-    WindowProperties
+from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties
 
 from renderer.water_node import WaterNode
-from renderer.zertz_models import BasePiece, BlackBallModel, GrayBallModel, WhiteBallModel, SkyBox, make_marble
+from renderer.zertz_models import BasePiece, SkyBox, make_marble
+
+logger = logging.getLogger(__name__)
 
 
 class ZertzRenderer(ShowBase):
+    # Rendering constants
+    BASE_SIZE_X = 0.8
+    BASE_SIZE_Y = 0.7
+    POOL_MARBLE_SCALE = 0.25
+    BOARD_MARBLE_SCALE = 0.35
+    CAPTURED_MARBLE_SCALE_FACTOR = 0.9
+    PLAYER_POOL_OFFSET_SCALE = 0.8
+    PLAYER_POOL_MEMBER_OFFSET_X = 0.6
+
+    # Camera configuration per board size
+    CAMERA_CONFIG = {
+        37: {'center_pos': 'D4', 'cam_dist': 10, 'cam_height': 8},
+        48: {'center_pos': 'D5', 'cam_dist': 10, 'cam_height': 10},
+        61: {'center_pos': 'E5', 'cam_dist': 11, 'cam_height': 10}
+    }
 
     def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37):
         super().__init__()
@@ -33,14 +50,14 @@ class ZertzRenderer(ShowBase):
         self.pos_to_coords = {}
         self.pos_array = None
 
-        self.x_base_size = 0.8
-        self.y_base_size = 0.7
-        self.pool_marble_scale = 0.25
-        self.board_marble_scale = 0.35
-        self.captured_marble_scale = 0.9 * self.board_marble_scale
+        self.x_base_size = self.BASE_SIZE_X
+        self.y_base_size = self.BASE_SIZE_Y
+        self.pool_marble_scale = self.POOL_MARBLE_SCALE
+        self.board_marble_scale = self.BOARD_MARBLE_SCALE
+        self.captured_marble_scale = self.CAPTURED_MARBLE_SCALE_FACTOR * self.board_marble_scale
 
-        self.number_offset = (self.x_base_size / 2, self.y_base_size, 0)  # (0.4, 0.7)
-        self.letter_offset = (self.x_base_size / 2, -self.y_base_size, 0)  # (0.4,  -0.7)
+        self.number_offset = (self.x_base_size / 2, self.y_base_size, 0)
+        self.letter_offset = (self.x_base_size / 2, -self.y_base_size, 0)
 
         # Import board size constants
         from game.zertz_board import ZertzBoard
@@ -58,8 +75,8 @@ class ZertzRenderer(ShowBase):
                 f"Supported sizes are {ZertzBoard.SMALL_BOARD_37}, {ZertzBoard.MEDIUM_BOARD_48}, and {ZertzBoard.LARGE_BOARD_61}."
             )
 
-        self.player_pool_offset_scale = 0.8
-        self.player_pool_member_offset = (0.6, 0, 0)
+        self.player_pool_offset_scale = self.PLAYER_POOL_OFFSET_SCALE
+        self.player_pool_member_offset = (self.PLAYER_POOL_MEMBER_OFFSET_X, 0, 0)
 
         self.player_pools = None
         self.player_pool_coords = None
@@ -101,8 +118,6 @@ class ZertzRenderer(ShowBase):
 
         self.task = self.taskMgr.add(self.update, 'zertzUpdate', sort=50)
 
-        # self._ball_placement_test()
-
     def update(self, task):
         # for m in self.marble_pool:
         #    m.model.setR(10*task.time)
@@ -110,7 +125,7 @@ class ZertzRenderer(ShowBase):
         #
         # self.board_marble_scale, action_duration
 
-        to_put_back = []
+        # to_put_back = []
         while not self.animation_queue.empty():
             try:
                 anim_info = self.animation_queue.get_nowait()
@@ -126,8 +141,8 @@ class ZertzRenderer(ShowBase):
             except Empty:
                 pass
 
-        for anim_info in to_put_back:
-            self.animation_queue.put(anim_info)
+        # for anim_info in to_put_back:
+        #     self.animation_queue.put(anim_info)
 
         to_remove = []
         for entity, anim_data in self.current_animations.items():
@@ -217,14 +232,11 @@ class ZertzRenderer(ShowBase):
 
     def _setup_camera(self):
         """Setup camera position and orientation based on board size."""
-        from game.zertz_board import ZertzBoard
-
-        # Set the center position of the board
-        center_pos = "D4"
-        if self.rings == ZertzBoard.MEDIUM_BOARD_48:
-            center_pos = "D5"
-        elif self.rings == ZertzBoard.LARGE_BOARD_61:
-            center_pos = "E5"
+        # Get camera configuration for this board size
+        config = self.CAMERA_CONFIG.get(self.rings, self.CAMERA_CONFIG[37])
+        center_pos = config['center_pos']
+        cam_dist = config['cam_dist']
+        cam_height = config['cam_height']
 
         # Get the actual 3D coordinates of the center position
         if center_pos in self.pos_to_coords:
@@ -233,16 +245,6 @@ class ZertzRenderer(ShowBase):
             # Fallback to origin if we can't find the center
             center_x, center_y, center_z = 0, 0, 0
 
-        # Adjust camera distance and height based on board size
-        cam_dist = 10  # Distance from board (Y axis)
-        cam_height = 8  # Height above board (Z axis)
-        if self.rings == ZertzBoard.MEDIUM_BOARD_48:
-            cam_dist = 10
-            cam_height = 10
-        elif self.rings == ZertzBoard.LARGE_BOARD_61:
-            cam_dist = 11
-            cam_height = 10
-
         # Position camera to look at the board center
         # Camera is positioned behind (negative Y) and above (positive Z) the center point
         cam_x = center_x
@@ -250,7 +252,6 @@ class ZertzRenderer(ShowBase):
         cam_z = center_z + cam_height
 
         self.camera.setPos(cam_x, cam_y, cam_z)
-        # Point camera at the board center
         self.camera.lookAt(center_x, center_y, center_z)
 
     def _setup_water(self):
@@ -265,25 +266,6 @@ class ZertzRenderer(ShowBase):
                             # anim: vx, vy, scale, skip
                             anim=LVector4(0.0245, -0.0122, 1.5, 1),
                             distort=LVector4(0.2, 0.05, 0.8, 0.2))  # (0, 0, .5, 0))
-
-    def _ball_placement_test(self):
-        gb = GrayBallModel(self)
-        gb.set_pos(self.pos_to_coords['A1'])
-        bb = BlackBallModel(self)
-        bb.set_pos(self.pos_to_coords['E7'])
-        bb = BlackBallModel(self)
-        bb.set_pos(self.pos_to_coords['E6'])
-        wb = WhiteBallModel(self)
-        wb.set_pos(self.pos_to_coords['A4'])
-        wb = WhiteBallModel(self)
-        wb.set_pos(self.pos_to_coords['B4'])
-        # """
-
-        # """
-        gray_ball = GrayBallModel(self)
-        gray_ball.set_pos(self.pos_to_coords['F3'])
-        white_ball = WhiteBallModel(self)
-        white_ball.set_pos(self.pos_to_coords['D4'])
 
     def _build_players_marble_pool(self):
         self.player_pools = {
@@ -313,7 +295,7 @@ class ZertzRenderer(ShowBase):
         # First value in the first row
         top_left = first_row[0]
 
-        print(f"DEBUG: top_left, top_right", top_left, top_right)
+        logger.debug(f"Board: top_left={top_left}, top_right={top_right}")
         # Get adjacent positions to calculate board direction vectors
         # Find a neighbor position to determine the board's edge direction
         second_letter = self.letters[1]
@@ -331,7 +313,7 @@ class ZertzRenderer(ShowBase):
         # first value in second row
         second_from_top_left = second_row[1]
 
-        print(f"DEBUG: second_from_top_left, second_from_top_right", second_from_top_left, second_from_top_right)
+        logger.debug(f"Board: second_from_top_left={second_from_top_left}, second_from_top_right={second_from_top_right}")
         # Get coordinates
         tl_coord = self.pos_to_coords[top_left]
         tr_coord = self.pos_to_coords[top_right]
@@ -419,7 +401,7 @@ class ZertzRenderer(ShowBase):
                     self.pos_to_base[pos] = base_piece
                     self.pos_to_coords[pos] = coords
 
-            print(self.pos_array[i])
+            logger.debug(f"Board row {i}: {self.pos_array[i]}")
 
     def setup_lights(self):
         # point light
@@ -431,29 +413,15 @@ class ZertzRenderer(ShowBase):
         self.render.setLight(p_node)
         p_node.hide(BitMask32(1))
 
-        # spot light 1
+        # light 1
         s_light1 = DirectionalLight('s_light1')
         s_light1.setColor((.75, .75, .75, 1))
-        # lens1 = PerspectiveLens()
-        # lens1.setNearFar(0, 30)
-        # s_light1.setLens(lens1)
-        # # s_light1.setShadowCaster(True, 1024, 1024)
+
         s_node1 = self.render.attachNewNode(s_light1)
         s_node1.setPos(0, 0, 20)
         s_node1.lookAt(0, 0, 0)
         s_node1.hide(BitMask32(1))
         self.render.setLight(s_node1)
-
-        # spot light 2
-        """
-        s_light2 = Spotlight('s_light2')
-        s_light2.setColor((1, 1, 1, 1))
-        s_light2.setLens(PerspectiveLens())
-        s_node2 = self.render.attachNewNode(s_light2)
-        s_node2.setPos(-20, -20, 20)
-        s_node2.lookAt(0, 0, 0)
-        self.render.setLight(s_node2)
-        """
 
         # ambient light
         a_light = AmbientLight("a_light")
@@ -502,8 +470,6 @@ class ZertzRenderer(ShowBase):
     def show_action(self, player, action_dict, action_duration=0):
         # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}
         # Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'G2', 'dst': 'E2', 'capture': 'b'}
-        print(f'Player {player.n}: {action_dict}')
-
         action = action_dict['action']
         action_marble_color = action_dict['marble']
         dst = action_dict['dst']
@@ -527,7 +493,7 @@ class ZertzRenderer(ShowBase):
             if len(pool) == 0:
                 pool = self.player_pools[player.n][action_marble_color]
             if len(pool) == 0:
-                print('THIS IS A BUG!!!')
+                logger.error(f"No marbles available in pool for player {player.n}, color {action_marble_color}")
                 return
             put_marble = pool.pop()
             mip = self.marbles_in_play[action_marble_color]
@@ -564,7 +530,7 @@ class ZertzRenderer(ShowBase):
             capture_pool.append(captured_marble)
             # print(capture_pool_length, self.player_pools[player.n])
             if capture_pool_length >= len(self.player_pool_coords[player.n]):
-                print('THIS IS A BUG')
+                logger.error(f"Capture pool length ({capture_pool_length}) exceeds available coords ({len(self.player_pool_coords[player.n])}) for player {player.n}")
                 capture_pool_length = len(self.player_pool_coords[player.n]) - 1
             player_pool_coords = self.player_pool_coords[player.n][capture_pool_length]
             if action_duration == 0:
@@ -591,13 +557,3 @@ class ZertzRenderer(ShowBase):
             self.animation_queue.get()
 
         self.current_animations = {}
-
-        """        
-        for _, marble_sets in self.player_pools.items():
-            for color, marbles in self.marble_sets.items():
-                for marble, pos in marbles:
-                    self.marble_pool[color].append(marble)
-                    marble.set_pos(pos)
-                    marble.set_scale(self.pool_marble_scale)
-        """
-        pass

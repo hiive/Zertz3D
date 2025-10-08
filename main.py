@@ -263,9 +263,8 @@ class ZertzGameController:
         # Log the action
         self._log_action(player.n, action_dict)
 
-        # Print action in headless mode
-        if self.headless:
-            print(f'Player {player.n}: {action_dict}')
+        # Always print the action (regardless of headless or render mode)
+        print(f'Player {player.n}: {action_dict}')
 
         # Show action in renderer if available
         if self.renderer is not None:
