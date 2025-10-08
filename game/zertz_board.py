@@ -69,7 +69,19 @@ class ZertzBoard:
     PLAYER_2 = 1
     NUM_PLAYERS = 2
 
-    # Global state indices (10-element vector)
+    # ==================================================================================
+    # GLOBAL STATE STRUCTURE (1D vector, length 10)
+    # ==================================================================================
+    # The global_state vector stores marble counts and player turn information.
+    # Unlike the spatial state (3D array), this is a simple 1D array with 10 values.
+    #
+    # Layout:
+    #   [0-2]:  Supply pool - available marbles for placement (white, gray, black)
+    #   [3-5]:  Player 1 captured marbles (white, gray, black)
+    #   [6-8]:  Player 2 captured marbles (white, gray, black)
+    #   [9]:    Current player (0 = Player 1, 1 = Player 2)
+    # ==================================================================================
+
     # Supply indices (0-2)
     SUPPLY_W = 0
     SUPPLY_G = 1
@@ -85,15 +97,40 @@ class ZertzBoard:
     # Current player index (9)
     CUR_PLAYER = 9
 
-    # Global state slices
+    # Global state slices (convenience accessors)
     SUPPLY_SLICE = slice(0, 3)      # All supply marbles (w, g, b)
     P1_CAP_SLICE = slice(3, 6)      # All P1 captured marbles (w, g, b)
     P2_CAP_SLICE = slice(6, 9)      # All P2 captured marbles (w, g, b)
 
+    # ==================================================================================
+    # SPATIAL STATE STRUCTURE (3D array, shape: L x H x W)
+    # ==================================================================================
+    # The spatial state is a 3D numpy array representing the board configuration over time.
+    #
+    # Dimensions:
+    #   L (layers):  Number of layers = 4 * t + 1, where t = time history depth
+    #   H (height):  Board width (e.g., 7 for 37-ring board)
+    #   W (width):   Board width (same as height)
+    #
+    # Layer structure (for t=5, default):
+    #   Layers 0-3:   Current board state (rings, white, gray, black marbles)
+    #   Layers 4-7:   Board state 1 turn ago
+    #   Layers 8-11:  Board state 2 turns ago
+    #   Layers 12-15: Board state 3 turns ago
+    #   Layers 16-19: Board state 4 turns ago
+    #   Layer 20:     Capture flag (marks marble that must be used for capture)
+    #
+    # The first 4 layers (current state) are the most commonly accessed:
+    #   Layer 0: Ring presence (1 = ring exists, 0 = removed)
+    #   Layer 1: White marbles (1 = white marble at position, 0 = none)
+    #   Layer 2: Gray marbles  (1 = gray marble at position, 0 = none)
+    #   Layer 3: Black marbles (1 = black marble at position, 0 = none)
+    # ==================================================================================
+
     # Spatial state layer constants
     RING_LAYER = 0
-    MARBLE_LAYERS = slice(1, 4)     # White, gray, black marble layers
-    BOARD_LAYERS = slice(0, 4)      # Rings + all marbles
+    MARBLE_LAYERS = slice(1, 4)     # White, gray, black marble layers (current state)
+    BOARD_LAYERS = slice(0, 4)      # Rings + all marbles (current state)
 
 
     @staticmethod
@@ -598,19 +635,14 @@ class ZertzBoard:
 
     def _get_rotational_symmetries(self, state=None):
         # Rotate the board 180 degrees
-        if state is None:
-            rotated_state = np.copy(self.state)
-        else:
-            rotated_state = np.copy(state)
-        rotated_state = np.rot90(np.rot90(rotated_state, axes=(1, 2)), axes=(1, 2))
-        return rotated_state
+        # Always copy to ensure immutability of self.state or passed state
+        state_to_rotate = np.copy(state if state is not None else self.state)
+        return np.rot90(np.rot90(state_to_rotate, axes=(1, 2)), axes=(1, 2))
 
     def _get_mirror_symmetries(self, state=None):
         # Flip the board while maintaining adjacency
-        if state is None:
-            mirror_state = np.copy(self.state)
-        else:
-            mirror_state = np.copy(state)
+        # Always copy to ensure immutability of self.state or passed state
+        mirror_state = np.copy(state if state is not None else self.state)
         layers = mirror_state.shape[0]
         for i in range(layers):
             mirror_state[i] = mirror_state[i].T
@@ -624,6 +656,23 @@ class ZertzBoard:
         symmetries.append((1, self._get_rotational_symmetries()))
         symmetries.append((2, self._get_rotational_symmetries(symmetries[0][1])))
         return symmetries
+
+    def _flat_to_2d(self, flat_index):
+        """Convert flat index to 2D board coordinates (y, x)."""
+        return flat_index // self.width, flat_index % self.width
+
+    def _2d_to_flat(self, y, x):
+        """Convert 2D board coordinates to flat index."""
+        return y * self.width + x
+
+    def _mirror_coords(self, y, x):
+        """Mirror coordinates by swapping x and y axes."""
+        return x, y
+
+    def _rotate_coords(self, y, x):
+        """Rotate coordinates 180 degrees around board center."""
+        # Universal formula that works for both odd and even widths
+        return (self.width - 1) - y, (self.width - 1) - x
 
     def mirror_action(self, action_type, translated):
         if action_type == 'CAP':
@@ -642,12 +691,14 @@ class ZertzBoard:
             _, put, rem = translated.shape
             for p in range(put):
                 # Translate the put index
-                put_y, put_x = p // self.width, p % self.width
-                new_p = put_x * self.width + put_y
+                put_y, put_x = self._flat_to_2d(p)
+                new_put_y, new_put_x = self._mirror_coords(put_y, put_x)
+                new_p = self._2d_to_flat(new_put_y, new_put_x)
                 for r in range(rem - 1):
                     # Translate the rem index
-                    rem_y, rem_x = r // self.width, r % self.width
-                    new_r = rem_x * self.width + rem_y
+                    rem_y, rem_x = self._flat_to_2d(r)
+                    new_rem_y, new_rem_x = self._mirror_coords(rem_y, rem_x)
+                    new_r = self._2d_to_flat(new_rem_y, new_rem_x)
                     translated[:, new_p, new_r] = temp[:, p, r]
 
                 # The last rem index is the same
@@ -657,7 +708,6 @@ class ZertzBoard:
 
     def rotate_action(self, action_type, translated):
 
-        mid = self.width // 2  # board width must be odd
         if action_type == 'CAP':
             # swap capture direction axes
             temp = np.copy(translated)
@@ -665,13 +715,13 @@ class ZertzBoard:
             translated[4], translated[1] = temp[1], temp[4]
             translated[5], translated[2] = temp[2], temp[5]
 
-            # rotate location axes
+            # rotate location axes using universal formula
             temp = np.copy(translated)
             _, y, x = temp.shape
             for i in range(y):
-                new_i = mid + (mid - i)
+                new_i = (self.width - 1) - i
                 for j in range(x):
-                    new_j = mid + (mid - j)
+                    new_j = (self.width - 1) - j
                     translated[:, new_i, new_j] = temp[:, i, j]
 
         if action_type == 'PUT':
@@ -679,16 +729,14 @@ class ZertzBoard:
             _, put, rem = translated.shape
             for p in range(put):
                 # Translate the put index
-                put_y, put_x = p // self.width, p % self.width
-                put_y = mid + (mid - put_y)
-                put_x = mid + (mid - put_x)
-                new_p = put_y * self.width + put_x
+                put_y, put_x = self._flat_to_2d(p)
+                new_put_y, new_put_x = self._rotate_coords(put_y, put_x)
+                new_p = self._2d_to_flat(new_put_y, new_put_x)
                 for r in range(rem - 1):
                     # Translate the rem index
-                    rem_y, rem_x = r // self.width, r % self.width
-                    rem_y = mid + (mid - rem_y)
-                    rem_x = mid + (mid - rem_x)
-                    new_r = rem_y * self.width + rem_x
+                    rem_y, rem_x = self._flat_to_2d(r)
+                    new_rem_y, new_rem_x = self._rotate_coords(rem_y, rem_x)
+                    new_r = self._2d_to_flat(new_rem_y, new_rem_x)
                     translated[:, new_p, new_r] = temp[:, p, r]
 
                 # The last rem index is the same

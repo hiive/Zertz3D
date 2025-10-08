@@ -6,20 +6,9 @@
 
 
 ### ZertzBoard
-1. Check for debugging imports
-   - Verify no pdb.set_trace() or similar debug code in production
 
-2. Consider state layer documentation improvements
-   - Current constants are well-defined (RING_LAYER, MARBLE_LAYERS, etc.)
-   - Could add docstrings to explain the layer system more clearly
 
-3. Simplify symmetry operations (optional)
-   - Methods accept state=None but always copy - could simplify the interface
-   - Lines: 599-626
-
-4. Action translation methods (optional)
-   - mirror_action and rotate_action have nested loops and could benefit from helper methods
-   - Lines: 628-697
+1. Work on axial mirroring/rotation.
 
 ## Feature Ideas
 - Add game statistics tracking
