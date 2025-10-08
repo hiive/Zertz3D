@@ -42,18 +42,21 @@ class ZertzRenderer(ShowBase):
         self.number_offset = (self.x_base_size / 2, self.y_base_size, 0)  # (0.4, 0.7)
         self.letter_offset = (self.x_base_size / 2, -self.y_base_size, 0)  # (0.4,  -0.7)
 
+        # Import board size constants
+        from game.zertz_board import ZertzBoard
+
         # Configure letters based on board size (number of rings)
-        # 37 rings: ABCDEFG (7 letters)
-        # 48 rings: ABCDEFGH (8 letters)
-        # 61 rings: ABCDEFGHJ (9 letters, skipping I)
-        if rings == 37:
+        if rings == ZertzBoard.SMALL_BOARD_37:
             self.letters = "ABCDEFG"
-        elif rings == 48:
+        elif rings == ZertzBoard.MEDIUM_BOARD_48:
             self.letters = "ABCDEFGH"
-        elif rings == 61:
+        elif rings == ZertzBoard.LARGE_BOARD_61:
             self.letters = "ABCDEFGHJ"
         else:
-            raise ValueError(f"Unsupported board size: {rings} rings. Supported sizes are 37, 48, and 61.")
+            raise ValueError(
+                f"Unsupported board size: {rings} rings. "
+                f"Supported sizes are {ZertzBoard.SMALL_BOARD_37}, {ZertzBoard.MEDIUM_BOARD_48}, and {ZertzBoard.LARGE_BOARD_61}."
+            )
 
         self.player_pool_offset_scale = 0.8
         self.player_pool_member_offset = (0.6, 0, 0)
@@ -214,12 +217,14 @@ class ZertzRenderer(ShowBase):
 
     def _setup_camera(self):
         """Setup camera position and orientation based on board size."""
+        from game.zertz_board import ZertzBoard
+
         # Set the center position of the board
         center_pos = "D4"
-        if self.rings == 48:
-            center_pos="D5"
-        elif self.rings == 61:
-            center_pos="E5"
+        if self.rings == ZertzBoard.MEDIUM_BOARD_48:
+            center_pos = "D5"
+        elif self.rings == ZertzBoard.LARGE_BOARD_61:
+            center_pos = "E5"
 
         # Get the actual 3D coordinates of the center position
         if center_pos in self.pos_to_coords:
@@ -231,10 +236,10 @@ class ZertzRenderer(ShowBase):
         # Adjust camera distance and height based on board size
         cam_dist = 10  # Distance from board (Y axis)
         cam_height = 8  # Height above board (Z axis)
-        if self.rings == 48:
+        if self.rings == ZertzBoard.MEDIUM_BOARD_48:
             cam_dist = 10
             cam_height = 10
-        elif self.rings == 61:
+        elif self.rings == ZertzBoard.LARGE_BOARD_61:
             cam_dist = 11
             cam_height = 10
 

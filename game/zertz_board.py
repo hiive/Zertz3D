@@ -53,10 +53,16 @@ class ZertzBoard:
     #        or (('CAP', 'g', 'D6'), ('w', 'D4'), ('w', 'B2'))
     #     - this action uses the marble at D6 to capture the marbles at D5 and C3 before ending at B2
     ACTION_VERBS = ['PUT', 'REM', 'CAP']
+
+    # Board size constants
+    SMALL_BOARD_37 = 37
+    MEDIUM_BOARD_48 = 48
+    LARGE_BOARD_61 = 61
+
     # For mapping number of rings to board width
     MARBLE_TO_LAYER = {'w': 1, 'g': 2, 'b': 3}
     LAYER_TO_MARBLE = dict((v, k) for k, v in MARBLE_TO_LAYER.items())
-    HEX_NUMBERS = [(1, 1), (7, 3), (19, 5), (37, 7), (48, 8), (61, 9), (91, 11), (127, 13)]
+    HEX_NUMBERS = [(1, 1), (7, 3), (19, 5), (SMALL_BOARD_37, 7), (MEDIUM_BOARD_48, 8), (LARGE_BOARD_61, 9), (91, 11), (127, 13)]
     DIRECTIONS = [(1, 0), (0, -1), (-1, -1), (-1, 0), (0, 1), (1, 1)]
 
     # Player constants
@@ -94,14 +100,14 @@ class ZertzBoard:
     @staticmethod
     def generate_standard_board_layout(rings):
         """
-        Generate board layout for standard ring configurations (37, 48, 61).
+        Generate board layout for standard ring configurations.
 
         This is the canonical board layout algorithm, ported from the renderer.
         Returns a 2D numpy array of position strings (e.g., "A1", "B2", etc.).
         Empty positions are represented as empty strings.
 
         Args:
-            rings: Number of rings (must be 37, 48, or 61)
+            rings: Number of rings (must be SMALL_BOARD_37, MEDIUM_BOARD_48, or LARGE_BOARD_61)
 
         Returns:
             2D numpy array of strings with shape (width, width)
@@ -110,16 +116,16 @@ class ZertzBoard:
             ValueError: If rings is not a supported standard size
         """
         # Map rings to letter sets
-        if rings == 37:
+        if rings == ZertzBoard.SMALL_BOARD_37:
             letters = "ABCDEFG"
-        elif rings == 48:
+        elif rings == ZertzBoard.MEDIUM_BOARD_48:
             letters = "ABCDEFGH"
-        elif rings == 61:
+        elif rings == ZertzBoard.LARGE_BOARD_61:
             letters = "ABCDEFGHJ"
         else:
             raise ValueError(
                 f"Unsupported standard board size: {rings} rings. "
-                f"Supported sizes are 37, 48, and 61."
+                f"Supported sizes are {ZertzBoard.SMALL_BOARD_37}, {ZertzBoard.MEDIUM_BOARD_48}, and {ZertzBoard.LARGE_BOARD_61}."
             )
 
         # Algorithm ported from zertz_renderer.py _build_base() method
@@ -190,7 +196,7 @@ class ZertzBoard:
             # Determine width of board from the number of rings
             if board_layout is None:
                 # Use generated layout for standard board sizes
-                if rings in [37, 48, 61]:
+                if rings in [self.SMALL_BOARD_37, self.MEDIUM_BOARD_48, self.LARGE_BOARD_61]:
                     board_layout = self.generate_standard_board_layout(rings)
                     self.letter_layout = board_layout
                     self.flattened_letters = np.reshape(board_layout, (board_layout.size,))
