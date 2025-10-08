@@ -204,12 +204,31 @@ class ZertzBoard:
         return np.array(pos_array)
 
     def __init__(self, rings=37, marbles=None, t=1, clone=None, board_layout=None):
-        # Return a Board object to store the board state
-        #   - State is a matrix with dimensions L x H x W, H = W = Board width, L = Layers:
-        #     - (# of marble types + 1) x (time history) binary to record previous board positions
-        #     - 1 layer binary with a 1 at the index of a marble that needs to be used for capture
-        #     - 9 layers, each same value one for each index in the supply
-        #     - 1 layer of the same value for the current player
+        """Initialize a Zèrtz board.
+
+        The board maintains two separate state representations:
+
+        1. SPATIAL STATE (self.state): 3D array (L x H x W)
+           - Rings and marble positions
+           - Time history of previous board states
+           - Capture flag layer
+
+        2. GLOBAL STATE (self.global_state): 1D array (10 elements)
+           - Supply pool counts (white, gray, black)
+           - Player 1 captured counts (white, gray, black)
+           - Player 2 captured counts (white, gray, black)
+           - Current player (0 or 1)
+
+        For ML applications, use ZertzGame.get_current_state() which returns
+        both spatial and global state in a dictionary format for complete observability.
+
+        Args:
+            rings: Number of rings (37, 48, or 61 for standard boards)
+            marbles: Dict with 'w', 'g', 'b' keys for marble counts (default: {w:6, g:8, b:10})
+            t: Time history depth (default: 1)
+            clone: ZertzBoard instance to clone from
+            board_layout: Custom 2D array of position strings (for non-standard boards)
+        """
         # Initialize attributes that may be used before assignment
         self.letter_layout = None
         self.flattened_letters = None
@@ -284,7 +303,6 @@ class ZertzBoard:
             self.global_state = np.zeros(10, dtype=np.uint8)
 
             # Place rings
-            # TODO: implement for uneven number of rings
             if self.board_layout is None:
                 middle = self.width // 2
                 for i in range(self.width):
@@ -419,15 +437,20 @@ class ZertzBoard:
         self.state[put_layer][put_index] = 1
 
         # Remove the marble from the supply or current player's captured marbles
+        # Per official rules: captured marbles can only be used when ENTIRE pool is empty
         supply_idx = self._get_supply_index(marble_type)
         if self.global_state[supply_idx] >= 1:
+            # Marble available in supply - use it
             self.global_state[supply_idx] -= 1
-        else:
-            # If supply is empty then take the marble from those the player has captured
+        elif np.all(self.global_state[self.SUPPLY_SLICE] == 0):
+            # Entire supply pool is empty - can use captured marbles
             captured_idx = self._get_captured_index(marble_type, self.get_cur_player())
             if self.global_state[captured_idx] < 1:
                 raise ValueError(f"No {marble_type} marbles available in supply or captured by player {self.get_cur_player()}")
             self.global_state[captured_idx] -= 1
+        else:
+            # This marble type is empty but pool has other marbles - cannot use captured marbles yet
+            raise ValueError(f"No {marble_type} marbles in supply. Cannot use captured marbles until entire pool is empty.")
 
         # Track isolated regions that are removed (both rings and marbles)
         isolated_removals = []
@@ -441,30 +464,38 @@ class ZertzBoard:
                 # Find the largest region (this is the main board that stays)
                 largest_region = max(regions, key=len)
 
-                # Remove all smaller isolated regions
+                # Process smaller isolated regions according to official rules
                 for region in regions:
                     if region is largest_region:
                         continue
 
-                    # Remove all rings in the isolated region and capture any marbles to the current player
-                    for index in region:
-                        y, x = index
-                        pos_str = self.index_to_str(index)
+                    # Check if this isolated region has ANY vacant rings (rings without marbles)
+                    has_vacant = any(
+                        np.sum(self.state[self.BOARD_LAYERS, y, x]) == 1  # ring only, no marble
+                        for (y, x) in region
+                    )
 
-                        # Check if there's a marble on this ring
-                        has_marble = np.sum(self.state[self.MARBLE_LAYERS, y, x]) == 1
-                        if has_marble:
+                    if has_vacant:
+                        # Region has vacant rings: DO NOT capture or remove
+                        # Per official rules: "marbles in isolated regions are not reusable once disconnected"
+                        # "They stay on the board as inert pieces, unplayable and uncapturable"
+                        # These rings and marbles remain in state but are inaccessible
+                        pass
+                    else:
+                        # All rings in region are occupied: capture all marbles and remove all rings
+                        for index in region:
+                            y, x = index
+                            pos_str = self.index_to_str(index)
+
+                            # All rings must have marbles (verified by has_vacant check)
                             captured_type = self.get_marble_type_at(index)
                             captured_idx = self._get_captured_index(captured_type, self.get_cur_player())
                             self.global_state[captured_idx] += 1
                             # Record ring removal with marble capture
                             isolated_removals.append({'pos': pos_str, 'marble': captured_type})
-                        else:
-                            # Record ring removal without marble
-                            isolated_removals.append({'pos': pos_str, 'marble': None})
 
-                        # Set the ring and marble layers all to 0
-                        self.state[self.BOARD_LAYERS, y, x] = 0
+                            # Set the ring and marble layers all to 0
+                            self.state[self.BOARD_LAYERS, y, x] = 0
 
         # Update current player
         self._next_player()
@@ -603,8 +634,21 @@ class ZertzBoard:
         return moves
 
     def _get_open_rings(self):
-        # Return a list of indices for all of the open rings
-        open_rings = zip(*np.where(np.sum(self.state[self.BOARD_LAYERS], axis=0) == 1))
+        # Return a list of indices for all of the open rings in the main (connected) region
+        # Frozen isolated regions are excluded per official rules
+
+        # Get all vacant rings
+        all_open = list(zip(*np.where(np.sum(self.state[self.BOARD_LAYERS], axis=0) == 1)))
+
+        # Check if there are multiple regions (some might be frozen/isolated)
+        regions = self._get_regions()
+        if len(regions) <= 1:
+            # Single connected region - all open rings are valid
+            return all_open
+
+        # Multiple regions exist - only return rings from the largest (main) region
+        main_region = max(regions, key=len)
+        open_rings = [ring for ring in all_open if ring in main_region]
         return open_rings
 
     def _is_removable(self, index):
@@ -632,6 +676,180 @@ class ZertzBoard:
         # Return a list of indices to rings that can be removed
         removable = [index for index in self._get_open_rings() if self._is_removable(index)]
         return removable
+
+    # =========================  GEOMETRIC RING REMOVAL  =========================
+
+    def _yx_to_cartesian(self, y, x):
+        """Convert board indices (y, x) to Cartesian coordinates.
+
+        Uses standard pointy-top hexagonal grid conversion:
+        - q = x - center
+        - r = y - x
+        - xc = sqrt(3) * (q + r/2)
+        - yc = 1.5 * r
+
+        Returns:
+            tuple: (xc, yc) Cartesian coordinates
+        """
+        c = self.width // 2
+        q = x - c
+        r = y - x
+        sqrt3 = np.sqrt(3)
+        xc = sqrt3 * (q + r / 2.0)
+        yc = 1.5 * r
+        return xc, yc
+
+    def _is_removable_geometric(self, index, ring_radius=None):
+        """Check if a ring can be removed using geometric collision detection.
+
+        Uses actual Cartesian coordinates and perpendicular distance calculations
+        to verify that the ring can be slid out in some direction without colliding
+        with any other rings.
+
+        This method validates that the simple adjacency-based heuristic (_is_removable)
+        is geometrically correct.
+
+        Args:
+            index: (y, x) position of the ring to check
+            ring_radius: Radius of a ring (default √3/2 ≈ 0.866 for unit grid)
+
+        Returns:
+            bool: True if the ring can be removed
+        """
+        if ring_radius is None:
+            ring_radius = np.sqrt(3) / 2.0  # Correct radius for touching rings in unit hex grid
+
+        y, x = index
+
+        # Ring must be empty (no marble on it)
+        if np.sum(self.state[self.BOARD_LAYERS, y, x]) != 1:
+            return False
+
+        # Get Cartesian position of this ring
+        ring_x, ring_y = self._yx_to_cartesian(y, x)
+
+        # Get all neighbor positions
+        neighbors = self.get_neighbors(index)
+
+        # Check each pair of consecutive empty neighbors - each creates a potential slide direction
+        for i in range(len(neighbors)):
+            curr = neighbors[i]
+            next_neighbor = neighbors[(i + 1) % len(neighbors)]
+
+            curr_empty = (not self._is_inbounds(curr) or
+                         self.state[self.RING_LAYER][curr] == 0)
+            next_empty = (not self._is_inbounds(next_neighbor) or
+                         self.state[self.RING_LAYER][next_neighbor] == 0)
+
+            if curr_empty and next_empty:
+                # Found a gap. Calculate the slide direction (angle bisector of the gap)
+                # The gap is between directions i and i+1
+                dy1, dx1 = self.DIRECTIONS[i]
+                dy2, dx2 = self.DIRECTIONS[(i + 1) % len(self.DIRECTIONS)]
+
+                # Convert direction offsets to actual neighbor positions, then to Cartesian vectors
+                neighbor1_pos = (y + dy1, x + dx1)
+                neighbor2_pos = (y + dy2, x + dx2)
+
+                # Get Cartesian positions of where these neighbors would be
+                n1_x, n1_y = self._yx_to_cartesian(*neighbor1_pos)
+                n2_x, n2_y = self._yx_to_cartesian(*neighbor2_pos)
+
+                # Direction vectors from ring to neighbor positions
+                dir1_x, dir1_y = n1_x - ring_x, n1_y - ring_y
+                dir2_x, dir2_y = n2_x - ring_x, n2_y - ring_y
+
+                # Normalize
+                norm1 = np.sqrt(dir1_x**2 + dir1_y**2)
+                norm2 = np.sqrt(dir2_x**2 + dir2_y**2)
+                if norm1 > 0:
+                    dir1_x, dir1_y = dir1_x / norm1, dir1_y / norm1
+                if norm2 > 0:
+                    dir2_x, dir2_y = dir2_x / norm2, dir2_y / norm2
+
+                # Angle bisector (slide direction)
+                slide_dx = dir1_x + dir2_x
+                slide_dy = dir1_y + dir2_y
+                slide_norm = np.sqrt(slide_dx**2 + slide_dy**2)
+
+                if slide_norm > 0:
+                    slide_dx /= slide_norm
+                    slide_dy /= slide_norm
+
+                    # Check if we can slide out in this direction without hitting other rings
+                    if self._can_slide_ring_out(ring_x, ring_y, slide_dx, slide_dy, index, ring_radius):
+                        return True
+
+        return False
+
+    def _can_slide_ring_out(self, ring_x, ring_y, slide_dx, slide_dy, ring_index, ring_radius):
+        """Check if a ring can be slid out in a given direction.
+
+        A ring is removable if it can slide at least one hex spacing (√3) in some
+        direction without colliding with other rings. This represents sliding the
+        ring one full hex-position away, which effectively removes it from play.
+
+        Physics of ring collision:
+        - In unit hex grid (size=1.0), adjacent centers are √3 apart
+        - For touching rings: ring_radius = √3/2 ≈ 0.866
+        - Ring diameter = 2 * ring_radius = √3
+        - Minimum slide distance = √3 (one hex spacing)
+        - Two rings collide if their centers are < √3 apart
+        - For slide path: rings collide if perpendicular distance < diameter (2 * ring_radius)
+
+        Args:
+            ring_x, ring_y: Cartesian position of the ring to slide
+            slide_dx, slide_dy: Normalized direction vector to slide
+            ring_index: (y, x) index of the ring being slid (to exclude from checks)
+            ring_radius: Radius of rings (should be √3/2 for unit grid)
+
+        Returns:
+            bool: True if ring can slide at least √3 distance without collision
+        """
+        # Minimum slide distance: one hex spacing
+        sqrt3 = np.sqrt(3)
+        min_slide_distance = sqrt3
+
+        # For a ring to be slideable, no other ring should be within 2*radius
+        # (diameter) of the slide path AND within the first √3 of travel
+
+        for y in range(self.width):
+            for x in range(self.width):
+                if (y, x) == ring_index:
+                    continue  # Don't check against ourselves
+
+                if (self._is_inbounds((y, x)) and
+                    self.state[self.RING_LAYER, y, x] == 1):
+                    # This ring exists, check if it would block the slide
+                    other_x, other_y = self._yx_to_cartesian(y, x)
+
+                    # Vector from our ring to the other ring
+                    to_other_x = other_x - ring_x
+                    to_other_y = other_y - ring_y
+                    dist_sq = to_other_x**2 + to_other_y**2
+
+                    # Project onto slide direction
+                    projection = to_other_x * slide_dx + to_other_y * slide_dy
+
+                    # Only check rings in front of us AND within one hex spacing
+                    # Rings behind us or beyond the minimum slide distance don't matter
+                    if projection < 0 or projection > min_slide_distance:
+                        continue
+
+                    # Calculate perpendicular distance from the slide path
+                    # perp_dist² = |v|² - proj²
+                    perp_dist_sq = dist_sq - projection**2
+
+                    # If perpendicular distance < 2*radius, rings would collide during slide
+                    # Need at least 2*radius separation (ring diameters)
+                    # Use small tolerance for floating point comparison
+                    tolerance = 1e-6
+                    min_clearance_sq = (2 * ring_radius)**2
+                    if perp_dist_sq < min_clearance_sq - tolerance:
+                        # Would collide during the first √3 of slide
+                        return False
+
+        return True
 
     def _get_rotational_symmetries(self, state=None):
         # Rotate the board 180 degrees
@@ -673,46 +891,6 @@ class ZertzBoard:
         """Rotate coordinates 180 degrees around board center."""
         # Universal formula that works for both odd and even widths
         return (self.width - 1) - y, (self.width - 1) - x
-
-    # ========================================================================
-    # Hexagonal Coordinate System (TODO: Implementation in progress)
-    # ========================================================================
-    # The following methods are stubs for future hexagonal transformations
-    # that support 60°, 120°, 240°, and 300° rotations for true hex symmetry.
-    # Currently commented out pending completion.
-    # ========================================================================
-
-    # def _build_hex_transformation_table(self, degrees):
-    #     """
-    #     Build a lookup table for hexagonal rotation by specified degrees.
-    #
-    #     This uses an empirical approach based on the physical hexagonal layout.
-    #     For 37-ring and 61-ring boards with 6-fold rotational symmetry.
-    #
-    #     Args:
-    #         degrees: Rotation angle (60, 120, 180, 240, or 300)
-    #
-    #     Returns:
-    #         dict: Mapping from (y, x) → (new_y, new_x) for the rotation
-    #     """
-    #     if self.letter_layout is None:
-    #         raise NotImplementedError("Hex transformations only supported for boards with letter_layout")
-    #
-    #     # Get all valid positions
-    #     valid_positions = self.letter_layout[self.letter_layout != '']
-    #
-    #     table = {}
-    #
-    #     # Find center position
-    #     center_y, center_x = self.width // 2, self.width // 2
-    #
-    #     for pos_str in valid_positions:
-    #         y, x = self.str_to_index(pos_str)
-    #
-    #         # TODO: Implement proper hexagonal rotation
-    #         table[(y, x)] = (y, x)
-    #
-    #     return table
 
     def mirror_action(self, action_type, translated):
         if action_type == 'CAP':

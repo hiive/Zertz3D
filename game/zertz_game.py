@@ -59,30 +59,42 @@ class ZertzGame:
         return player_value
 
     def get_current_state(self):
-        # Returns the game state which is a tuple of:
-        #   - 3D matrix of size L x H x W (layers, board height, board width)
-        #   - integer (1 or -1) giving the value of the current player
-        board_state = np.copy(self.board.state)
-        player_value = self.get_cur_player_value()
-        return board_state, player_value
+        """Returns complete observable game state for ML.
+
+        Returns:
+            dict: Complete state with keys:
+                - 'spatial': (L, H, W) ndarray - rings, marbles, history, capture flag
+                - 'global': (10,) ndarray - supply counts, captured counts, current player
+                - 'player': int - 1 for Player 1, -1 for Player 2 (perspective value)
+        """
+        return {
+            'spatial': np.copy(self.board.state),
+            'global': np.copy(self.board.global_state),
+            'player': self.get_cur_player_value()
+        }
 
     def get_next_state(self, action, action_type, cur_state=None):
-        # Input:
-        #   - action which is an index into the action matrix
-        #   - action_type which is 'PUT' for a placement action or 'CAP' for a capture action
-        #   - Optional: cur_state = an arbitrary board state to use instead of the current game state
-        # Returns the game state which is a tuple of:
-        #   - 3D matrix of size L x H x W (layers, board height, board width)
-        #   - integer (1 or -1) giving the value of the current player
+        """Apply action and return resulting game state.
+
+        Args:
+            action: Index into the action space matrix
+            action_type: 'PUT' for placement or 'CAP' for capture
+            cur_state: Optional spatial state array (L, H, W) to use instead of current state
+
+        Returns:
+            dict: Complete state after action (same format as get_current_state())
+                - 'spatial': (L, H, W) ndarray
+                - 'global': (10,) ndarray
+                - 'player': int (1 or -1)
+        """
         if cur_state is None:
             # Use the internal game state to determine the next state
             self.board.take_action(action, action_type)
-            board_state, player_value = self.get_current_state()
+            return self.get_current_state()
         else:
-            # Return the next state for an arbitrary marble supply, board and player
+            # Return the next state for an arbitrary spatial state
             temp_game = ZertzGame(clone=self, clone_state=cur_state)
-            board_state, player_value = temp_game.get_next_state(action, action_type)
-        return board_state, player_value
+            return temp_game.get_next_state(action, action_type)
 
     def get_valid_actions(self, cur_state=None):
         # Returns two filtering matrices that can be used to filter and renormalize the policy
