@@ -64,6 +64,32 @@ class ZertzBoard:
     PLAYER_2 = 1
     NUM_PLAYERS = 2
 
+    # Global state indices (10-element vector)
+    # Supply indices (0-2)
+    SUPPLY_W = 0
+    SUPPLY_G = 1
+    SUPPLY_B = 2
+    # Player 1 captured indices (3-5)
+    P1_CAP_W = 3
+    P1_CAP_G = 4
+    P1_CAP_B = 5
+    # Player 2 captured indices (6-8)
+    P2_CAP_W = 6
+    P2_CAP_G = 7
+    P2_CAP_B = 8
+    # Current player index (9)
+    CUR_PLAYER = 9
+
+    # Global state slices
+    SUPPLY_SLICE = slice(0, 3)      # All supply marbles (w, g, b)
+    P1_CAP_SLICE = slice(3, 6)      # All P1 captured marbles (w, g, b)
+    P2_CAP_SLICE = slice(6, 9)      # All P2 captured marbles (w, g, b)
+
+    # Spatial state layer constants
+    RING_LAYER = 0
+    MARBLE_LAYERS = slice(1, 4)     # White, gray, black marble layers
+    BOARD_LAYERS = slice(0, 4)      # Rings + all marbles
+
     def __init__(self, rings=37, marbles=None, t=1, clone=None, board_layout=None):
         # Return a Board object to store the board state
         #   - State is a matrix with dimensions L x H x W, H = W = Board width, L = Layers:
@@ -71,16 +97,24 @@ class ZertzBoard:
         #     - 1 layer binary with a 1 at the index of a marble that needs to be used for capture
         #     - 9 layers, each same value one for each index in the supply
         #     - 1 layer of the same value for the current player
+        # Initialize attributes that may be used before assignment
+        self.letter_layout = None
+        self.flattened_letters = None
+        self.board_layout = None
+
         if clone is not None:
             self.rings = clone.rings
             self.width = clone.width
             self.t = clone.t
             self.CAPTURE_LAYER = clone.CAPTURE_LAYER
-            self.MARBLE_TO_SUPPLY = copy.copy(clone.MARBLE_TO_SUPPLY)
             self.state = np.copy(clone.state)
-            self.letter_layout = np.copy(clone.letter_layout)
-            self.flattened_letters = np.copy(clone.flattened_letters)
-            self.board_layout = np.copy(clone.board_layout)
+            self.global_state = np.copy(clone.global_state)
+            if hasattr(clone, 'letter_layout') and clone.letter_layout is not None:
+                self.letter_layout = np.copy(clone.letter_layout)
+            if hasattr(clone, 'flattened_letters') and clone.flattened_letters is not None:
+                self.flattened_letters = np.copy(clone.flattened_letters)
+            if hasattr(clone, 'board_layout') and clone.board_layout is not None:
+                self.board_layout = np.copy(clone.board_layout)
         else:
             # Determine width of board from the number of rings
             if board_layout is None:
@@ -99,34 +133,29 @@ class ZertzBoard:
                 self.rings = np.count_nonzero(board_layout)
                 self.width = board_layout.shape[0]
 
-            # Calculate the number of layers
-            # 4 * t layers for all pieces going back t steps, 9 for supply, 1 for capture, 1 for player
-            # Layer:
+            # Calculate the number of layers for SPATIAL state
+            # 4 * t layers for all pieces going back t steps, 1 for capture layer
+            # Spatial Layer:
             #   -          0 = rings (binary)
             #   -          1 = white marbles (binary)
             #   -          2 = gray marbles (binary)
             #   -          3 = black marbles (binary)
             #   -        ...   (t - 1) * 4 more layers for ring and marble state on previous time steps
             #   -      t * 4 = capturing marble (binary)
-            #   -  t * 4 + 1 = supply white marbles ([0, 10])
-            #   -  t * 4 + 2 = supply gray marbles ([0, 10])
-            #   -  t * 4 + 3 = supply black marbles ([0, 10])
-            #   -  t * 4 + 4 = player 1 white marbles ([0, 10])
-            #   -  t * 4 + 5 = player 1 gray marbles ([0, 10])
-            #   -  t * 4 + 6 = player 1 black marbles ([0, 10])
-            #   -  t * 4 + 7 = player 2 white marbles ([0, 10])
-            #   -  t * 4 + 8 = player 2 gray marbles ([0, 10])
-            #   -  t * 4 + 9 = player 2 black marbles ([0, 10])
-            #   - t * 4 + 10 = current player (0 or 1)
             self.t = t
-            layers = 4 * self.t + 11
+            spatial_layers = 4 * self.t + 1
             self.CAPTURE_LAYER = self.t * 4
-            self.MARBLE_TO_SUPPLY = {'w': self.t * 4 + 1,
-                                     'g': self.t * 4 + 2,
-                                     'b': self.t * 4 + 3}
 
-            # Initialize state as 3d array
-            self.state = np.zeros((layers, self.width, self.width), dtype=np.uint8)
+            # Initialize SPATIAL state as 3d array
+            self.state = np.zeros((spatial_layers, self.width, self.width), dtype=np.uint8)
+
+            # Initialize GLOBAL state as 1d array
+            # Global state vector (10 values):
+            #   - 0-2: supply (white, gray, black) [0, 10]
+            #   - 3-5: player 1 captured (white, gray, black) [0, 10]
+            #   - 6-8: player 2 captured (white, gray, black) [0, 10]
+            #   - 9: current player (0 or 1)
+            self.global_state = np.zeros(10, dtype=np.uint8)
 
             # Place rings
             # TODO: implement for uneven number of rings
@@ -135,20 +164,21 @@ class ZertzBoard:
                 for i in range(self.width):
                     lb = max(0, i - middle)
                     ub = min(self.width, middle + i + 1)
-                    self.state[0, lb:ub, i] = 1
+                    self.state[self.RING_LAYER, lb:ub, i] = 1
             else:
-                self.state[0, self.board_layout == True] = 1
+                self.state[self.RING_LAYER, self.board_layout == True] = 1
 
             # Set the number of each type of marble available in the supply
             #   default: 6x white, 8x gray, 10x black
             if marbles is None:
-                self.state[self.MARBLE_TO_SUPPLY['w']] = 6
-                self.state[self.MARBLE_TO_SUPPLY['g']] = 8
-                self.state[self.MARBLE_TO_SUPPLY['b']] = 10
+                self.global_state[self.SUPPLY_SLICE] = [6, 8, 10]  # white, gray, black
             else:
-                self.state[self.MARBLE_TO_SUPPLY['w']] = marbles['w']
-                self.state[self.MARBLE_TO_SUPPLY['g']] = marbles['g']
-                self.state[self.MARBLE_TO_SUPPLY['b']] = marbles['b']
+                self.global_state[self.SUPPLY_W] = marbles['w']
+                self.global_state[self.SUPPLY_G] = marbles['g']
+                self.global_state[self.SUPPLY_B] = marbles['b']
+
+            # Player captured marbles start at 0 (indices 3-8)
+            # Current player starts at 0 (index 9)
 
     @staticmethod
     def get_middle_ring(src, dst):
@@ -189,7 +219,7 @@ class ZertzBoard:
         # Return a list of continuous regions on the board. A region consists of a list of indices.
         # If any index can be reached from any other index then this will return a list of length 1.
         regions = []
-        not_visited = set(zip(*np.where(self.state[0] == 1)))
+        not_visited = set(zip(*np.where(self.state[self.RING_LAYER] == 1)))
         while not_visited:
             # While there are indices that have not been added to a region start a new empty region
             region = []
@@ -203,31 +233,34 @@ class ZertzBoard:
                 for neighbor in self.get_neighbors(index):
                     if (neighbor in not_visited
                             and self._is_inbounds(neighbor)
-                            and self.state[0][neighbor] != 0):
+                            and self.state[self.RING_LAYER][neighbor] != 0):
                         not_visited.remove(neighbor)
                         queue.appendleft(neighbor)
             regions.append(region)
         return regions
 
     def get_cur_player(self):
-        return self.state[self.t * 4 + 10, 0, 0]
+        return int(self.global_state[self.CUR_PLAYER])
 
     def _next_player(self):
-        self.state[self.t * 4 + 10] = (self.state[self.t * 4 + 10] + 1) % self.NUM_PLAYERS
+        self.global_state[self.CUR_PLAYER] = (self.global_state[self.CUR_PLAYER] + 1) % self.NUM_PLAYERS
 
-    def _get_cur_player_supply_layer(self, marble_type):
-        # Return the layer index for the captured marble type and the current player
-        # Input: captured_type = 'w', 'g', or 'b'
-        supply_layer = self.MARBLE_TO_SUPPLY[marble_type]
-        if self.get_cur_player() == self.PLAYER_1:
-            supply_layer += 3
+    def _get_supply_index(self, marble_type):
+        """Get global_state index for marble in supply."""
+        marble_to_supply_idx = {'w': self.SUPPLY_W, 'g': self.SUPPLY_G, 'b': self.SUPPLY_B}
+        return marble_to_supply_idx[marble_type]
+
+    def _get_captured_index(self, marble_type, player):
+        """Get global_state index for captured marble for given player."""
+        if player == self.PLAYER_1:
+            marble_to_cap_idx = {'w': self.P1_CAP_W, 'g': self.P1_CAP_G, 'b': self.P1_CAP_B}
         else:
-            supply_layer += 6
-        return supply_layer
+            marble_to_cap_idx = {'w': self.P2_CAP_W, 'g': self.P2_CAP_G, 'b': self.P2_CAP_B}
+        return marble_to_cap_idx[marble_type]
 
     def get_marble_type_at(self, index):
         y, x = index
-        marble_type = self.LAYER_TO_MARBLE[np.argmax(self.state[1:4, y, x]) + 1]
+        marble_type = self.LAYER_TO_MARBLE[np.argmax(self.state[self.MARBLE_LAYERS, y, x]) + 1]
         return marble_type
 
     def take_action(self, action, action_type):
@@ -254,27 +287,28 @@ class ZertzBoard:
 
         # Place the marble on the board
         y, x = put_index
-        if np.sum(self.state[:4, y, x]) != 1:
+        if np.sum(self.state[self.BOARD_LAYERS, y, x]) != 1:
             raise ValueError(f"Invalid placement: position ({y}, {x}) is not an empty ring")
         put_layer = self.MARBLE_TO_LAYER[marble_type]
         self.state[put_layer][put_index] = 1
 
-        # Remove the marble from the supply
-        supply_layer = self.MARBLE_TO_SUPPLY[marble_type]
-        if self.state[supply_layer, 0, 0] >= 1:
-            self.state[supply_layer] -= 1
+        # Remove the marble from the supply or current player's captured marbles
+        supply_idx = self._get_supply_index(marble_type)
+        if self.global_state[supply_idx] >= 1:
+            self.global_state[supply_idx] -= 1
         else:
             # If supply is empty then take the marble from those the player has captured
-            supply_layer = self._get_cur_player_supply_layer(marble_type)
-            assert self.state[supply_layer, 0, 0] >= 1
-            self.state[supply_layer] -= 1
+            captured_idx = self._get_captured_index(marble_type, self.get_cur_player())
+            if self.global_state[captured_idx] < 1:
+                raise ValueError(f"No {marble_type} marbles available in supply or captured by player {self.get_cur_player()}")
+            self.global_state[captured_idx] -= 1
 
         # Track isolated regions that are removed (both rings and marbles)
         isolated_removals = []
 
         # Remove the ring from the board
         if rem_index is not None:
-            self.state[0][rem_index] = 0
+            self.state[self.RING_LAYER][rem_index] = 0
             # Check if the board has been separated into multiple regions
             regions = self._get_regions()
             if len(regions) > 1:
@@ -292,11 +326,11 @@ class ZertzBoard:
                         pos_str = self.index_to_str(index)
 
                         # Check if there's a marble on this ring
-                        has_marble = np.sum(self.state[1:4, y, x]) == 1
+                        has_marble = np.sum(self.state[self.MARBLE_LAYERS, y, x]) == 1
                         if has_marble:
                             captured_type = self.get_marble_type_at(index)
-                            supply_layer = self._get_cur_player_supply_layer(captured_type)
-                            self.state[supply_layer] += 1
+                            captured_idx = self._get_captured_index(captured_type, self.get_cur_player())
+                            self.global_state[captured_idx] += 1
                             # Record ring removal with marble capture
                             isolated_removals.append({'pos': pos_str, 'marble': captured_type})
                         else:
@@ -304,7 +338,7 @@ class ZertzBoard:
                             isolated_removals.append({'pos': pos_str, 'marble': None})
 
                         # Set the ring and marble layers all to 0
-                        self.state[0:4, y, x] = 0
+                        self.state[self.BOARD_LAYERS, y, x] = 0
 
         # Update current player
         self._next_player()
@@ -332,22 +366,22 @@ class ZertzBoard:
         self.state[marble_layer][dst_index] = 1
 
         # Give the captured marble to the current player and remove it from the board
-        if np.sum(self.state[1:4, y, x]) != 1:
+        if np.sum(self.state[self.MARBLE_LAYERS, y, x]) != 1:
             raise ValueError(f"Invalid capture: no marble at position ({y}, {x})")
         captured_type = self.get_marble_type_at(cap_index)
-        supply_layer = self._get_cur_player_supply_layer(captured_type)
-        self.state[supply_layer] += 1
-        self.state[1:4, y, x] = 0
+        captured_idx = self._get_captured_index(captured_type, self.get_cur_player())
+        self.global_state[captured_idx] += 1
+        self.state[self.MARBLE_LAYERS, y, x] = 0
 
         # Update the capture layer if there is a forced chain capture
         neighbors = self.get_neighbors(dst_index)
         for neighbor in neighbors:
             y, x = neighbor
             # Check each neighbor to see if it has a marble
-            if self._is_inbounds(neighbor) and np.sum(self.state[1:4, y, x]) == 1:
+            if self._is_inbounds(neighbor) and np.sum(self.state[self.MARBLE_LAYERS, y, x]) == 1:
                 next_dst = self.get_jump_destination(dst_index, neighbor)
                 y, x = next_dst
-                if self._is_inbounds(next_dst) and np.sum(self.state[:4, y, x]) == 1:
+                if self._is_inbounds(next_dst) and np.sum(self.state[self.BOARD_LAYERS, y, x]) == 1:
                     # Set the captured layer to 1 at dst_index
                     self.state[self.CAPTURE_LAYER][dst_index] = 1
                     break
@@ -389,15 +423,18 @@ class ZertzBoard:
 
         # Get list of marble types that can be placed. If supply is empty then
         # the player must use a captured marble.
-        supply_start = self.MARBLE_TO_SUPPLY['w']
-        if np.all(self.state[supply_start: supply_start + 3, 0, 0] == 0):
+        supply_counts = self.global_state[self.SUPPLY_SLICE]
+        if np.all(supply_counts == 0):
+            # Use current player's captured marbles
             if self.get_cur_player() == self.PLAYER_1:
-                supply_start += 3
+                marble_counts = self.global_state[self.P1_CAP_SLICE]
             else:
-                supply_start += 6
+                marble_counts = self.global_state[self.P2_CAP_SLICE]
+        else:
+            marble_counts = supply_counts
 
         # Assign 1 to all indices that are valid actions
-        for m, marble_count in enumerate(self.state[supply_start: supply_start + 3, 0, 0]):
+        for m, marble_count in enumerate(marble_counts):
             if marble_count == 0:
                 continue
             for put_index in open_rings:
@@ -422,7 +459,7 @@ class ZertzBoard:
         if np.sum(self.state[self.CAPTURE_LAYER]) == 1:
             occupied_rings = zip(*np.where(self.state[self.CAPTURE_LAYER] == 1))
         else:
-            occupied_rings = zip(*np.where(np.sum(self.state[1:4], axis=0) == 1))
+            occupied_rings = zip(*np.where(np.sum(self.state[self.MARBLE_LAYERS], axis=0) == 1))
 
         # Update matrix with all possible capture directions from each capturing marble
         for src_index in occupied_rings:
@@ -431,24 +468,24 @@ class ZertzBoard:
             for direction, neighbor in enumerate(neighbors):
                 # Check each neighbor to see if it has a marble and the jump destination is empty
                 y, x = neighbor
-                if self._is_inbounds(neighbor) and np.sum(self.state[1:4, y, x]) == 1:
+                if self._is_inbounds(neighbor) and np.sum(self.state[self.MARBLE_LAYERS, y, x]) == 1:
                     dst_index = self.get_jump_destination(src_index, neighbor)
                     y, x = dst_index
-                    if self._is_inbounds(dst_index) and np.sum(self.state[:4, y, x]) == 1:
+                    if self._is_inbounds(dst_index) and np.sum(self.state[self.BOARD_LAYERS, y, x]) == 1:
                         # Set this move as a valid action in the filter matrix
                         moves[direction, src_y, src_x] = True
         return moves
 
     def _get_open_rings(self):
         # Return a list of indices for all of the open rings
-        open_rings = zip(*np.where(np.sum(self.state[:4], axis=0) == 1))
+        open_rings = zip(*np.where(np.sum(self.state[self.BOARD_LAYERS], axis=0) == 1))
         return open_rings
 
     def _is_removable(self, index):
-        # Check if the ring at index is removable. A ring is removable if two of its neighbors 
+        # Check if the ring at index is removable. A ring is removable if two of its neighbors
         # in a row are missing and the ring itself is empty.
         y, x = index
-        if np.sum(self.state[0:4, y, x]) != 1:
+        if np.sum(self.state[self.BOARD_LAYERS, y, x]) != 1:
             return False
         neighbors = self.get_neighbors(index)
         # Add the first neighbor index to the end so that if the first and last are both empty then it still passes
@@ -456,7 +493,7 @@ class ZertzBoard:
         # Track the number of consecutive empty neighboring rings
         adjacent_empty = 0
         for neighbor in neighbors:
-            if self._is_inbounds(neighbor) and self.state[0][neighbor] == 1:
+            if self._is_inbounds(neighbor) and self.state[self.RING_LAYER][neighbor] == 1:
                 # If the neighbor index is in bounds and not removed then reset the empty counter
                 adjacent_empty = 0
             else:
@@ -607,7 +644,7 @@ class ZertzBoard:
             raise IndexError(f"Position ({y}, {x}) is out of bounds")
 
         # If the ring has been removed from the board, return empty string
-        if self.state[0, y, x] == 0:
+        if self.state[self.RING_LAYER, y, x] == 0:
             return ''
 
         if self.flattened_letters is not None:

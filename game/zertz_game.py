@@ -52,9 +52,9 @@ class ZertzGame:
     def get_cur_player_value(self):
         # Returns 1 if current player is player 0 and -1 if current player is player 1
         player_value = None
-        if self.board.state[-1, 0, 0] == 0:
+        if self.board.global_state[self.board.CUR_PLAYER] == self.board.PLAYER_1:
             player_value = 1
-        elif self.board.state[-1, 0, 0] == 1:
+        elif self.board.global_state[self.board.CUR_PLAYER] == self.board.PLAYER_2:
             player_value = -1
         return player_value
 
@@ -119,7 +119,6 @@ class ZertzGame:
         # Return True if ended or False if not ended
         # Create lists to help index into the game state and win_con
         marble_types = ['w', 'g', 'b']
-        captured_layers_start = [self.t * 4 + 4, self.t * 4 + 7]
 
         # Check if any player's captured marbles are enough to satisfy a win condition
         for win_con in self.win_con:
@@ -129,27 +128,29 @@ class ZertzGame:
                 if marble_type in win_con:
                     required[i] = win_con[marble_type]
 
-            # Build the list of captured marble amounts for each player
-            for layer_start in captured_layers_start:
-                captured = self.board.state[layer_start: layer_start + 3, 0, 0]
-                if np.all(captured >= required):
-                    return True
+            # Check player 1's captured marbles
+            player1_captured = self.board.global_state[self.board.P1_CAP_SLICE]
+            if np.all(player1_captured >= required):
+                return True
+
+            # Check player 2's captured marbles
+            player2_captured = self.board.global_state[self.board.P2_CAP_SLICE]
+            if np.all(player2_captured >= required):
+                return True
 
         # If board has every ring covered with a marble then the last player who played is winner
-        if np.all(np.sum(self.board.state[:4], axis=0) != 1):
+        if np.all(np.sum(self.board.state[self.board.BOARD_LAYERS], axis=0) != 1):
             return True
 
         # Check if current player has no marbles available (pool + captured = 0 for all types)
         # If so, the opponent wins
-        supply_start = self.board.MARBLE_TO_SUPPLY['w']
-        pool_marbles = self.board.state[supply_start: supply_start + 3, 0, 0]
+        pool_marbles = self.board.global_state[self.board.SUPPLY_SLICE]
 
-        # Get current player's captured marbles
-        if self.board.get_cur_player() == 0:
-            player_captured_start = supply_start + 3
+        # Get current player's captured marbles from global_state
+        if self.board.get_cur_player() == self.board.PLAYER_1:
+            captured_marbles = self.board.global_state[self.board.P1_CAP_SLICE]
         else:
-            player_captured_start = supply_start + 6
-        captured_marbles = self.board.state[player_captured_start: player_captured_start + 3, 0, 0]
+            captured_marbles = self.board.global_state[self.board.P2_CAP_SLICE]
 
         # If player has no marbles in pool or captured, they lose
         if np.all(pool_marbles + captured_marbles == 0):
@@ -311,10 +312,13 @@ class ZertzGame:
         #   4 - black marble
         print("---------------")
         print("Board state:")
-        print(self.board.state[0] + self.board.state[1] + self.board.state[2] * 2 + self.board.state[3] * 3)
+        print(self.board.state[self.board.RING_LAYER] +
+              self.board.state[self.board.MARBLE_TO_LAYER['w']] +
+              self.board.state[self.board.MARBLE_TO_LAYER['g']] * 2 +
+              self.board.state[self.board.MARBLE_TO_LAYER['b']] * 3)
         print("---------------")
         print("Marble supply:")
-        print(self.board.state[-10:-1, 0, 0])
+        print(self.board.global_state[self.board.SUPPLY_SLICE])
         print("---------------")
 
     def take_action(self, action_type, action):
