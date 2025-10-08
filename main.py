@@ -10,7 +10,7 @@ import hashlib
 
 from panda3d.core import loadPrcFileData
 
-from game.zertz_game import ZertzGame
+from game.zertz_game import ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN
 from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer
 from renderer.zertz_renderer import ZertzRenderer
 import numpy as np
@@ -18,7 +18,7 @@ import numpy as np
 
 class ZertzGameController:
 
-    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False):
+    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None):
         self.rings = rings
         self.marbles = {'w': 6, 'g': 8, 'b': 10}
         # the first player to obtain either 3 marbles of each color, or 4 white
@@ -37,6 +37,8 @@ class ZertzGameController:
         self.log_file = None
         self.log_filename = None
         self.headless = headless
+        self.max_games = max_games  # None means play indefinitely
+        self.games_played = 0
 
         # Set random seed before any random operations
         # This ensures reproducibility for game moves (not used in replay mode)
@@ -288,19 +290,34 @@ class ZertzGameController:
                 player.add_capture(result)
 
         game_over = self.game.get_game_ended()
-        if game_over:
-            winner = 1 if game_over == 1 else 2
+        if game_over is not None:  # None means game continuing.
+            if game_over in [PLAYER_1_WIN, PLAYER_2_WIN]:
+                winner = game_over
+            else:
+                winner = None  # Tie
+
             print()
-            print(f'Winner: Player {winner}')
+            if winner:
+                print(f'Winner: Player {winner}')
+            else:
+                print('Game ended in a tie')
             self.game.print_state()
 
             print(self.player1.captured)
             print(self.player2.captured)
 
+            # Increment games played counter
+            self.games_played += 1
+
             if self.replay_mode:
                 print("Replay complete")
                 return task.done
+            elif self.max_games is not None and self.games_played >= self.max_games:
+                # Reached max games limit
+                print(f"Completed {self.games_played} game(s)")
+                return task.done
             else:
+                # Continue with next game
                 self._reset_board()
         return task.again
 
@@ -314,11 +331,13 @@ if __name__ == '__main__':
     parser.add_argument('--log', action='store_true', help='Log game actions to zertzlog_<seed>.txt (ignored if --replay is used)')
     parser.add_argument('--partial', action='store_true', help='Continue with random play after replay ends (only with --replay)')
     parser.add_argument('--headless', action='store_true', help='Run without 3D renderer')
+    parser.add_argument('--games', type=int, help='Number of games to play (default: play indefinitely)')
     args = parser.parse_args()
 
     loadPrcFileData("", "gl-version 3 2")
     game = ZertzGameController(rings=args.rings, replay_file=args.replay, seed=args.seed,
-                                log_to_file=args.log, partial_replay=args.partial, headless=args.headless)
+                                log_to_file=args.log, partial_replay=args.partial, headless=args.headless,
+                                max_games=args.games)
     game.run()
 
     # # game.print_state()

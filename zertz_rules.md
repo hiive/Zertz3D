@@ -100,10 +100,35 @@ That player is the **winner**.
 ---
 
 ## Special Cases
-1. If the **pool is empty**, continue playing with your **captured marbles**.  
+1. If the **pool is empty**, continue playing with your **captured marbles**.
    You may play any color from your collection, just as from the pool.
 2. If the **entire board becomes occupied** before a win condition is met, the **player making the last move** wins and claims all remaining marbles.
 3. If both players repeat the same sequence of moves indefinitely, the game is a **tie**.
+
+---
+
+## Player Immobilization and Loop Detection
+
+### Case 1: Single Player Immobilized
+- If a player has no legal moves (no marbles to play, no captures possible), their turn is **automatically skipped** (they "pass").
+- The opponent continues playing until:
+  - They also cannot move, or
+  - They win via standard marble combination.
+- **No penalty** for being unable to move.
+
+### Case 2: Both Players Immobilized
+- When neither player can move (consecutive passes), the game **ends immediately**.
+- Winner is determined by checking standard victory conditions:
+  - 3 marbles of each color, **or**
+  - 4 white, **or**
+  - 5 grey, **or**
+  - 6 black.
+- If neither player has met a win condition, the game is a **tie**.
+
+### Case 3: Infinite Loop Detection
+- If the last 2 move-pairs (4 total moves) exactly match the preceding 2 move-pairs, an infinite loop is detected.
+- The game ends immediately in a **tie**.
+- This prevents players from repeating the same sequence indefinitely.
 
 ---
 

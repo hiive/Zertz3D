@@ -30,6 +30,8 @@ class RandomZertzPlayer(ZertzPlayer):
         - Placement actions: shape (3, width², width² + 1)
         - Capture actions: shape (6, width, width)
         Note: Captures are mandatory, so placement mask will be empty if captures exist.
+
+        If no valid actions exist, player passes ('PASS', None).
         """
         p_actions, c_actions = self.game.get_valid_actions()
 
@@ -46,8 +48,8 @@ class RandomZertzPlayer(ZertzPlayer):
             ax = 'PUT'
             a1, a2, a3 = p1, p2, p3
         else:
-            # No valid actions (shouldn't happen in a valid game state)
-            raise ValueError("No valid actions available")
+            # No valid actions - player must pass
+            return ('PASS', None)
 
         ip = np.random.randint(a1.size)
         action = ax, (a1[ip], a2[ip], a3[ip])

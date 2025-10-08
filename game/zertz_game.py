@@ -7,10 +7,16 @@ from .zertz_board import ZertzBoard
 # For full rules: http://www.gipf.com/zertz/rules/rules.html
 # Class interface inspired by https://github.com/suragnair/alpha-zero-general
 
+# Game outcome constants
+PLAYER_1_WIN = 1
+PLAYER_2_WIN = -1
+TIE = 0
+# None = game not over
+
 class ZertzGame:
     def __init__(self, rings=37, marbles=None, win_con=None, t=1, board_layout=None, clone=None, clone_state=None):
         if clone is not None:
-            # Creates an instance of ZertzGame with settings copied from clone and updated to 
+            # Creates an instance of ZertzGame with settings copied from clone and updated to
             # have the same board state as clone_state
             self.initial_rings = clone.initial_rings
             self.t = clone.t
@@ -19,6 +25,8 @@ class ZertzGame:
             self.board = ZertzBoard(clone=clone.board)
             self.board.state = np.copy(clone_state)
             self.board_layout = np.copy(clone.board_layout)
+            self.move_history = list(clone.move_history)  # Copy history
+            self.loop_detection_pairs = clone.loop_detection_pairs
             assert clone.board.state.shape[0] == clone_state.shape[0]
         else:
             # The size of the game board
@@ -43,6 +51,13 @@ class ZertzGame:
             else:
                 self.win_con = win_con
 
+            # Move history for loop detection
+            # Track (action_type, action) tuples; 'PASS' when player has no valid moves
+            # Loop detection: if last 2 move-pairs == preceding 2 move-pairs → tie
+            # Immobilization: if last 2 moves are both 'PASS' → game ends
+            self.move_history = []
+            self.loop_detection_pairs = 2  # Number of repeated pairs to trigger tie
+
     def __deepcopy__(self, memo):
         return ZertzGame(clone=self, clone_state=self.board.state)
 
@@ -57,6 +72,48 @@ class ZertzGame:
         elif self.board.global_state[self.board.CUR_PLAYER] == self.board.PLAYER_2:
             player_value = -1
         return player_value
+
+    def _has_valid_moves(self):
+        """Check if current player has any valid moves.
+
+        Returns:
+            bool: True if player has at least one valid action
+        """
+        placement, capture = self.get_valid_actions()
+        return np.any(placement) or np.any(capture)
+
+    def _has_move_loop(self):
+        """Detect if last k move-pairs equal preceding k move-pairs.
+
+        For k=2: Check if moves[-4:] (last 2 pairs) == moves[-8:-4] (preceding 2 pairs)
+
+        Returns:
+            bool: True if loop detected
+        """
+        k = self.loop_detection_pairs
+        needed_moves = k * 4  # k pairs = 2k full turns = 4k moves
+
+        if len(self.move_history) < needed_moves:
+            return False
+
+        # Get last k pairs (4k moves)
+        last_k_pairs = self.move_history[-needed_moves // 2:]
+        # Get preceding k pairs
+        preceding_k_pairs = self.move_history[-needed_moves:-needed_moves // 2]
+
+        return last_k_pairs == preceding_k_pairs
+
+    def _both_players_immobilized(self):
+        """Check if last 2 moves were both passes (both players immobilized).
+
+        Returns:
+            bool: True if both players consecutively passed
+        """
+        if len(self.move_history) < 2:
+            return False
+
+        return (self.move_history[-1] == ('PASS', None) and
+                self.move_history[-2] == ('PASS', None))
 
     def get_current_state(self):
         """Returns complete observable game state for ML.
@@ -89,7 +146,7 @@ class ZertzGame:
         """
         if cur_state is None:
             # Use the internal game state to determine the next state
-            self.board.take_action(action, action_type)
+            self.take_action(action_type, action)  # Records state history
             return self.get_current_state()
         else:
             # Return the next state for an arbitrary spatial state
@@ -128,8 +185,15 @@ class ZertzGame:
         return self.board.get_placement_shape()
 
     def _is_game_over(self):
-        # Return True if ended or False if not ended
-        # Create lists to help index into the game state and win_con
+        """Return True if game has ended.
+
+        End conditions:
+        1. Win by captured marbles (3 of each, or 4W/5G/6B)
+        2. Board fully occupied
+        3. Player has no marbles
+        4. Both players immobilized (consecutive passes)
+        5. Move loop detected (last 2 pairs == preceding 2 pairs)
+        """
         marble_types = ['w', 'g', 'b']
 
         # Check if any player's captured marbles are enough to satisfy a win condition
@@ -168,21 +232,63 @@ class ZertzGame:
         if np.all(pool_marbles + captured_marbles == 0):
             return True
 
+        # Check for both players immobilized (consecutive passes)
+        if self._both_players_immobilized():
+            return True
+
+        # Check for move loop (last 2 pairs == preceding 2 pairs)
+        if self._has_move_loop():
+            return True
+
         return False
 
     def get_game_ended(self, cur_state=None):
-        # Returns 1 if first player won and -1 if second player won.
-        # If no players have won then return 0.
+        """Returns outcome of the game.
+
+        Returns:
+            PLAYER_1_WIN (1): Player 1 won
+            PLAYER_2_WIN (-1): Player 2 won
+            TIE (0): Tie
+            None: Game not over
+        """
         if cur_state is None:
-            if self._is_game_over():
-                # The winner is the player that made the previous action
-                if np.sum(self.board.state[self.board.CAPTURE_LAYER]) == 0:
-                    return -1 * self.get_cur_player_value()
-                else:
-                    # The game is over in the middle of the players turn during a chain capture
-                    # if they have enough marbles to meet a win condition.
-                    return self.get_cur_player_value()
-            return 0
+            if not self._is_game_over():
+                return None
+
+            # Check for tie conditions first
+            if self._has_move_loop():
+                # Move loop detected → tie
+                return TIE
+
+            if self._both_players_immobilized():
+                # Both players immobilized → determine winner by captured marbles
+                p1_captured = self.board.global_state[self.board.P1_CAP_SLICE]
+                p2_captured = self.board.global_state[self.board.P2_CAP_SLICE]
+
+                # Check each win condition
+                for win_con in self.win_con:
+                    required = np.zeros(3)
+                    marble_types = ['w', 'g', 'b']
+                    for i, marble_type in enumerate(marble_types):
+                        if marble_type in win_con:
+                            required[i] = win_con[marble_type]
+
+                    if np.all(p1_captured >= required):
+                        return PLAYER_1_WIN
+                    if np.all(p2_captured >= required):
+                        return PLAYER_2_WIN
+
+                # Neither player met win condition → tie
+                return TIE
+
+            # Standard win conditions
+            # The winner is the player that made the previous action
+            if np.sum(self.board.state[self.board.CAPTURE_LAYER]) == 0:
+                return PLAYER_2_WIN if self.get_cur_player_value() == 1 else PLAYER_1_WIN
+            else:
+                # The game is over in the middle of the players turn during a chain capture
+                # if they have enough marbles to meet a win condition.
+                return PLAYER_1_WIN if self.get_cur_player_value() == 1 else PLAYER_2_WIN
         else:
             # Return if game is ended for an arbitrary game state
             temp_game = ZertzGame(clone=self, clone_state=cur_state)
@@ -269,6 +375,13 @@ class ZertzGame:
         # Translate an action tuple and type to a human readable string representation
         action_str = action_type + ' '
         action_dict = {}
+
+        if action_type == 'PASS':
+            # Player has no valid moves and must pass
+            action_str = 'PASS'
+            action_dict = {'action': 'PASS'}
+            return action_str, action_dict
+
         if action_type == 'PUT':
             marble_type, put, rem = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
@@ -334,4 +447,22 @@ class ZertzGame:
         print("---------------")
 
     def take_action(self, action_type, action):
-        return self.board.take_action(action, action_type)
+        """Execute an action and record move for loop detection.
+
+        Args:
+            action_type: 'PUT', 'CAP', or 'PASS'
+            action: Action tuple (or None for PASS)
+
+        Returns:
+            Result from board.take_action() (or None for PASS)
+        """
+        # Record the move for loop detection
+        self.move_history.append((action_type, action))
+
+        if action_type == 'PASS':
+            # Player passes (no valid moves), switch player
+            self.board._next_player()
+            return None
+        else:
+            # Execute the action
+            return self.board.take_action(action, action_type)
