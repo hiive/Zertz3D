@@ -297,7 +297,7 @@ class ZertzGameController:
             # Show detailed capture moves
             capture_positions = np.argwhere(capture)
             if len(capture_positions) > 0:
-                print(f"Capture moves available:")
+                print("Capture moves available:")
                 for i, (direction, y, x) in enumerate(capture_positions[:10]):  # Show up to 10
                     try:
                         _, action_dict = self.game.action_to_str("CAP", (direction, y, x))
@@ -456,6 +456,10 @@ class ZertzGameController:
                             self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
                 else:
                     player.add_capture(result)
+
+            # Update frozen region visuals after any action
+            if self.renderer is not None:
+                self.renderer.update_frozen_regions(self.game.board)
 
         game_over = self.game.get_game_ended()
         if game_over is not None:  # None means game continuing.

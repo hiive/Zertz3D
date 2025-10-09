@@ -233,6 +233,7 @@ class ZertzBoard:
         self.letter_layout = None
         self.flattened_letters = None
         self.board_layout = None
+        self.frozen_positions = set()  # Set of (y, x) tuples for frozen isolated regions
 
         if clone is not None:
             self.rings = clone.rings
@@ -241,6 +242,7 @@ class ZertzBoard:
             self.CAPTURE_LAYER = clone.CAPTURE_LAYER
             self.state = np.copy(clone.state)
             self.global_state = np.copy(clone.global_state)
+            self.frozen_positions = set(clone.frozen_positions)  # Copy frozen positions
             if hasattr(clone, 'letter_layout') and clone.letter_layout is not None:
                 self.letter_layout = np.copy(clone.letter_layout)
             if hasattr(clone, 'flattened_letters') and clone.flattened_letters is not None:
@@ -480,7 +482,9 @@ class ZertzBoard:
                         # Per official rules: "marbles in isolated regions are not reusable once disconnected"
                         # "They stay on the board as inert pieces, unplayable and uncapturable"
                         # These rings and marbles remain in state but are inaccessible
-                        pass
+                        # Mark all positions in this frozen region for visual fade effect
+                        for pos in region:
+                            self.frozen_positions.add(pos)
                     else:
                         # All rings in region are occupied: capture all marbles and remove all rings
                         for index in region:

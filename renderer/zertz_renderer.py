@@ -8,7 +8,7 @@ import numpy as np
 import simplepbr
 from direct.showbase.ShowBase import ShowBase
 
-from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material
+from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material, TransparencyAttrib
 
 from renderer.water_node import WaterNode
 from renderer.zertz_models import BasePiece, SkyBox, make_marble
@@ -517,6 +517,27 @@ class ZertzRenderer(ShowBase):
                     'duration': action_duration,
                     'defer': action_duration
                 })
+
+    def update_frozen_regions(self, board):
+        """Apply visual fade effect to rings in frozen isolated regions.
+
+        Args:
+            board: ZertzBoard instance with frozen_positions set
+        """
+        fade_alpha = 0.7  # Alpha value for frozen rings (0=invisible, 1=fully opaque)
+
+        for pos in board.frozen_positions:
+            # Convert board index to position string
+            pos_str = board.index_to_str(pos)
+
+            if not pos_str:  # Skip if position has been removed
+                continue
+
+            # Apply fade to ring (base piece) only - marbles stay fully visible
+            if pos_str in self.pos_to_base:
+                base_piece = self.pos_to_base[pos_str]
+                base_piece.model.setColorScale(1, 1, 1, fade_alpha)  # White tint with reduced alpha
+                base_piece.model.setTransparency(TransparencyAttrib.MAlpha)  # Enable alpha transparency
 
     def show_marble_placement(self, player, action_dict, action_duration=0):
         """Place a marble on the board (PUT action only, no ring removal)."""

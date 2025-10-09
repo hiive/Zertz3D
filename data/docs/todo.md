@@ -7,11 +7,13 @@
 
 ## Missing Test Coverage:
 
-  1. Marble Supply Fix (logic implemented, tests incomplete)
+  1. Marble Supply Fix (✅ COMPLETED - 5 tests in test_marble_supply.py)
 
-  - ❌ No test for: "One marble type empty, others available → cannot use captured marbles"
-  - ❌ No test for: "All marbles empty → can use captured marbles"
-  - ❌ No test for: Transition from supply to captured marbles
+  - ✅ One marble type empty, others available → cannot use captured marbles
+  - ✅ All marbles empty → can use captured marbles
+  - ✅ Transition from supply to captured marbles
+  - ✅ Player 2 uses correct captured pool
+  - ✅ Partial supply depletion doesn't allow captured marble use
 
   2. Isolated Regions (7 tests in test_isolated_regions.py)
 
@@ -23,10 +25,10 @@
   - ❌ What if main board becomes smaller than an isolated region?
   - ❌ Capture action creating isolation
 
-  3. Win Conditions (logic implemented in _is_game_over, tests incomplete)
+  3. Win Conditions (✅ COMPLETED - 2 tests in test_win_conditions.py)
 
-  - ❌ Win during chain capture
-  - ❌ Win immediately after isolated region capture
+  - ✅ Win during chain capture (test_win_during_chain_capture)
+  - ✅ Win immediately after isolated region capture (test_win_after_isolated_region_capture)
   - ✅ Board completely full (logic exists in _is_game_over)
   - ✅ Player runs out of marbles (logic exists in _is_game_over, tested via test_player_can_pass_when_no_valid_moves)
   - ✅ Immobilization win conditions (3 tests in test_pass_and_loops.py)
@@ -94,6 +96,22 @@ policy = PolicyHead(combined)
 ```
 
 ## Recently Completed (2025-10-09)
+
+### ✅ Frozen Region Visual Effect
+- Rings in frozen isolated regions (regions with vacant rings) now appear faded
+- Uses 70% opacity (TransparencyAttrib.MAlpha) for subtle washed-out appearance
+- Marbles in frozen regions remain fully visible (only rings fade)
+- Visual feedback applied immediately when region becomes frozen
+- Implementation: `board.frozen_positions` set tracks frozen positions, `renderer.update_frozen_regions()` applies visual effect
+
+### ✅ Test Coverage Improvements
+- **Marble Supply Logic**: 5 comprehensive tests in `test_marble_supply.py`
+  - Validates supply-first rule (can't use captured marbles when any supply available)
+  - Tests transition from supply to captured marble usage
+  - Verifies player-specific captured pools
+- **Win Conditions**: 2 tests in `test_win_conditions.py`
+  - Win detection during chain captures
+  - Win detection after isolated region capture
 
 ### ✅ Blitz Mode Implementation
 - Added game variant constants (STANDARD_MARBLES, BLITZ_MARBLES, etc.)

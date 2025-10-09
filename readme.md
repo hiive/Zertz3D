@@ -161,6 +161,13 @@ Run tests with pytest:
 uv run pytest
 ```
 
+### Visual Features
+
+- **Frozen Region Indication**: Isolated regions with vacant rings (unplayable per official rules) are visually distinguished with faded/transparent rings (70% opacity)
+- **Move Highlighting**: Use `--show-moves` flag to see valid placement positions (green), removable rings (red), and capture paths (blue)
+- **Water Reflections**: Dynamic water plane with custom shaders for realistic reflections
+- **Dynamic Lighting**: Directional and ambient lighting for depth and atmosphere
+
 ### Key Technical Details
 
 - **RNG Separation**: Game logic uses seeded numpy.random for deterministic gameplay, while visual effects (marble rotations) use independent unseeded random instances
