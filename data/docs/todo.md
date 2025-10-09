@@ -1,10 +1,5 @@
 # Zertz3D TODO and Improvement Suggestions
 
-## Code Quality Improvements
-
-### ZertzRenderer
-1. Visual indicators for valid moves.
-
 ## Feature Ideas
 - Add game statistics tracking
 - Network multiplayer support
@@ -97,3 +92,42 @@ global_features = Dense(global_input)     # → (batch, 64)
 combined = concat([spatial_features, global_features])
 policy = PolicyHead(combined)
 ```
+
+## Recently Completed (2025-10-09)
+
+### ✅ Blitz Mode Implementation
+- Added game variant constants (STANDARD_MARBLES, BLITZ_MARBLES, etc.)
+- Updated controller to accept `--blitz` parameter
+- Auto-detection of blitz mode from replay file headers
+- Validation: blitz only works with 37 rings
+- Log files include variant header (`# Variant: Blitz`)
+- Documentation updated in readme.md
+
+### ✅ PASS Action Bug Fixes
+**Bug 1: Infinite PASS Loop with --show-moves**
+- State machine now handles PASS actions as special case
+- Executes action immediately with no highlight phases
+- Falls through to game_over check instead of blocking
+
+**Bug 2: Renderer Crash on PASS**
+- Renderer now checks for PASS action and returns early
+- No attempt to access 'marble' field for PASS actions
+
+### ✅ Visual Indicators for Valid Moves
+- Implemented via `--show-moves` flag
+- **Green highlights** for valid placement positions (dark green + subtle glow)
+- **Red highlights** for removable rings
+- **Blue highlights** for capture paths
+- **Cornflower blue highlights** for selected captures (brighter)
+- Queue-based highlight system with timing/duration control
+- State machine manages highlight phases during move visualization
+- Color constants: PLACEMENT_HIGHLIGHT_COLOR, REMOVABLE_HIGHLIGHT_COLOR, CAPTURE_HIGHLIGHT_COLOR
+
+### ✅ Code Quality: Animation Queue Refactoring
+- Refactored animation queue from tuples to dictionaries
+- Changed from: `(entity, src, dst, scale, duration, defer)`
+- Changed to: `{'entity': ..., 'src': ..., 'dst': ..., ...}`
+- Benefits: Self-documenting, type-safe, extensible, maintainable
+- All 8 animation queue calls updated in renderer
+
+## Future Enhancements

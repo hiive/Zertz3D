@@ -141,28 +141,32 @@ class ZertzRenderer(ShowBase):
         #
         # self.board_marble_scale, action_duration
 
-        # to_put_back = []
+        # Process animation queue - add new animations
         while not self.animation_queue.empty():
             try:
                 anim_info = self.animation_queue.get_nowait()
-                # print(anim_info)
-                entity, src, dst, scale, duration, defer = anim_info
-                #if entity in self.current_animations:
-                    # if it's already being animated, put it back in queue
-                    # to_put_back.append(anim_info)
-                    #pass
-                #else:
-                self.current_animations[entity] = (src, dst, entity.get_scale(), scale, duration, task.time,
-                                                   task.time + defer)
+                entity = anim_info['entity']
+                self.current_animations[entity] = {
+                    'src': anim_info['src'],
+                    'dst': anim_info['dst'],
+                    'src_scale': entity.get_scale(),
+                    'dst_scale': anim_info['scale'],
+                    'duration': anim_info['duration'],
+                    'insert_time': task.time,
+                    'start_time': task.time + anim_info['defer']
+                }
             except Empty:
                 pass
 
-        # for anim_info in to_put_back:
-        #     self.animation_queue.put(anim_info)
-
+        # Update all active animations
         to_remove = []
         for entity, anim_data in self.current_animations.items():
-            src, dst, src_scale, dst_scale, duration, insert_time, start_time = anim_data
+            src = anim_data['src']
+            dst = anim_data['dst']
+            src_scale = anim_data['src_scale']
+            dst_scale = anim_data['dst_scale']
+            duration = anim_data['duration']
+            start_time = anim_data['start_time']
             elapsed_time = task.time - start_time
             if elapsed_time < 0:
                 continue
@@ -476,7 +480,14 @@ class ZertzRenderer(ShowBase):
             if action_duration == 0:
                 base_piece.hide()
             else:
-                self.animation_queue.put((base_piece, base_pos, None, None, action_duration, action_duration))
+                self.animation_queue.put({
+                    'entity': base_piece,
+                    'src': base_pos,
+                    'dst': None,
+                    'scale': None,
+                    'duration': action_duration,
+                    'defer': action_duration
+                })
             self.removed_bases.append((base_piece, base_pos))
 
         # If there's a marble, remove it and add to player's captured pool
@@ -498,8 +509,14 @@ class ZertzRenderer(ShowBase):
                 captured_marble.set_pos(player_pool_coords)
                 captured_marble.set_scale(self.captured_marble_scale)
             else:
-                self.animation_queue.put((captured_marble, src_coords, player_pool_coords,
-                                          self.captured_marble_scale, action_duration, action_duration))
+                self.animation_queue.put({
+                    'entity': captured_marble,
+                    'src': src_coords,
+                    'dst': player_pool_coords,
+                    'scale': self.captured_marble_scale,
+                    'duration': action_duration,
+                    'defer': action_duration
+                })
 
     def show_marble_placement(self, player, action_dict, action_duration=0):
         """Place a marble on the board (PUT action only, no ring removal)."""
@@ -525,8 +542,14 @@ class ZertzRenderer(ShowBase):
             put_marble.set_pos(dst_coords)
             put_marble.set_scale(self.board_marble_scale)
         else:
-            self.animation_queue.put((put_marble, src_coords, dst_coords,
-                                      self.board_marble_scale, action_duration, 0))
+            self.animation_queue.put({
+                'entity': put_marble,
+                'src': src_coords,
+                'dst': dst_coords,
+                'scale': self.board_marble_scale,
+                'duration': action_duration,
+                'defer': 0
+            })
         self.pos_to_marble[dst] = put_marble
 
     def show_ring_removal(self, action_dict, action_duration=0):
@@ -540,7 +563,14 @@ class ZertzRenderer(ShowBase):
                 if action_duration == 0:
                     base_piece.hide()
                 else:
-                    self.animation_queue.put((base_piece, base_pos, None, None, action_duration, action_duration))
+                    self.animation_queue.put({
+                        'entity': base_piece,
+                        'src': base_pos,
+                        'dst': None,
+                        'scale': None,
+                        'duration': action_duration,
+                        'defer': action_duration
+                    })
                 self.removed_bases.append((base_piece, base_pos))
 
     def show_action(self, player, action_dict, action_duration=0):
@@ -575,8 +605,14 @@ class ZertzRenderer(ShowBase):
             if action_duration == 0:
                 action_marble.set_pos(dst_coords)
             else:
-                self.animation_queue.put((action_marble, src_coords, dst_coords,
-                                          self.board_marble_scale, action_duration, 0))
+                self.animation_queue.put({
+                    'entity': action_marble,
+                    'src': src_coords,
+                    'dst': dst_coords,
+                    'scale': self.board_marble_scale,
+                    'duration': action_duration,
+                    'defer': 0
+                })
 
             # captured_marble.hide()
             capture_pool = self.player_pools[player.n][captured_marble_color]
@@ -591,8 +627,14 @@ class ZertzRenderer(ShowBase):
                 captured_marble.set_pos(player_pool_coords)
                 captured_marble.set_scale(self.captured_marble_scale)
             else:
-                self.animation_queue.put((captured_marble, cap_coords, player_pool_coords,
-                                          self.captured_marble_scale, action_duration, action_duration))
+                self.animation_queue.put({
+                    'entity': captured_marble,
+                    'src': cap_coords,
+                    'dst': player_pool_coords,
+                    'scale': self.captured_marble_scale,
+                    'duration': action_duration,
+                    'defer': action_duration
+                })
 
     def reset_board(self):
         for b, pos in self.removed_bases:

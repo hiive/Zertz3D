@@ -38,6 +38,9 @@ uv run main.py --rings 61
 # Use a specific random seed for reproducible games
 uv run main.py --seed 1234567890
 
+# Play blitz variant (faster games, fewer marbles, lower win thresholds)
+uv run main.py --blitz
+
 # Replay a game from a text file (board size is auto-detected)
 uv run main.py --replay path/to/replay.txt
 
@@ -106,6 +109,29 @@ Additional end conditions:
 - Last player to place when board is full
 - Opponent has no marbles to play
 - Loop detection (repeated move patterns result in tie)
+
+## Game Variants
+
+### Standard Mode
+The default game mode with standard marble counts and win conditions as described above.
+
+### Blitz Mode
+A faster, more aggressive variant designed for quick, tactical play. Enable with `--blitz`.
+
+**Marble counts:**
+- 5 white (vs 6 in standard)
+- 7 gray (vs 8 in standard)
+- 9 black (vs 10 in standard)
+
+**Win conditions:**
+- 2 of each color (2 white, 2 gray, 2 black), OR
+- 3 white, OR
+- 4 gray, OR
+- 5 black
+
+**Requirements:**
+- Only works with 37-ring boards
+- Games are shorter and more unforgiving
 
 ## Board Sizes
 
