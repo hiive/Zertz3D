@@ -10,6 +10,7 @@ Supports all board sizes:
 - Computes the geometric center as the mean of all ring coordinates.
 - Highlights any rings whose centers are within a small distance tolerance
   of the nearest-to-center distance.
+- Rotates the layout 30° counter-clockwise so a point faces upward.
 """
 
 import sys
@@ -67,6 +68,7 @@ def visualize_board(rings=37):
     ax.set_aspect('equal')
     ax.grid(False)
 
+    # Collect all ring coordinates
     positions = []
     for y in range(W):
         for x in range(W):
@@ -76,9 +78,23 @@ def visualize_board(rings=37):
                 cart = axial_to_cart(q, r, size)
                 positions.append((label, (y, x), (q, r), cart))
 
-    # Extract all coordinates and compute geometric center
+    # Compute geometric center
     all_coords = np.stack([p[3] for p in positions])
     geometric_center = np.mean(all_coords, axis=0)
+
+    # --------------------------------------------------------------- #
+    # Apply 30° CCW rotation about the geometric center
+    # --------------------------------------------------------------- #
+    theta = np.deg2rad(30)
+    R = np.array([[np.cos(theta), -np.sin(theta)],
+                  [np.sin(theta),  np.cos(theta)]])
+    rotated_coords = (all_coords - geometric_center) @ R.T + geometric_center
+
+    # Replace positions’ Cartesian coords with rotated versions
+    positions = [(label, yx, qr, rc)
+                 for (label, yx, qr, _), rc in zip(positions, rotated_coords)]
+    all_coords = rotated_coords
+    # --------------------------------------------------------------- #
 
     # Compute distances to center
     dists = np.linalg.norm(all_coords - geometric_center, axis=1)
@@ -98,11 +114,14 @@ def visualize_board(rings=37):
         else:
             color = 'blue'
             lw = 1.3
-        ax.add_patch(Circle((xc, yc), ring_radius, fill=False, edgecolor=color, linewidth=lw))
-        ax.text(xc, yc, label, ha='center', va='center', fontsize=8, fontweight='bold')
+        ax.add_patch(Circle((xc, yc), ring_radius,
+                            fill=False, edgecolor=color, linewidth=lw))
+        ax.text(xc, yc, label, ha='center', va='center',
+                fontsize=8, fontweight='bold')
 
     # Draw geometric center as red star
-    ax.plot(geometric_center[0], geometric_center[1], 'r*', markersize=16, label='Geometric Center')
+    ax.plot(geometric_center[0], geometric_center[1], 'r*',
+            markersize=16, label='Geometric Center')
 
     # Formatting
     pad = 2.2 * size
