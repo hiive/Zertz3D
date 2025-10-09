@@ -161,4 +161,42 @@ policy = PolicyHead(combined)
 - Benefits: Self-documenting, type-safe, extensible, maintainable
 - All 8 animation queue calls updated in renderer
 
+## Recently Completed (Latest Update)
+
+### ✅ Official Zèrtz Notation Support
+- Added `action_to_notation()` method in `zertz_game.py`
+- Converts actions to official notation format from http://www.gipf.com/zertz/notations/notation.html
+- Placement: `Wd4` (place White on d4) or `Bd7,b2` (place Black on d7, remove b2)
+- Capture: `x e3Wg3` (jump from e3 over White to g3)
+- Pass: `-`
+- Game controller now prints both internal format and official notation for each move
+
+### ✅ Coordinate Label Display
+- Added `--show-coords` command line flag
+- Displays coordinate labels (e.g., A1, B2) on rings in 3D view
+- Labels use billboard effect to always face camera
+- Helps with learning board positions and debugging
+- Implementation: `pos_to_label` dictionary in renderer tracks text nodes
+
+### ✅ Move Highlight State Machine Improvements
+- Refactored to use per-phase highlight durations instead of single global duration
+- Added phase constants (PHASE_PLACEMENT_HIGHLIGHTS, PHASE_SELECTED_PLACEMENT, etc.)
+- Phase-specific durations:
+  - Placement/removal/selected phases: 0.15s (quick)
+  - Capture highlights: 0.6s (longer to show multiple options)
+- Smart capture handling: auto-skip highlighting when only one capture available
+- Improved UX: reduces unnecessary waiting for single-option captures
+
+### ✅ Game Controller Refinements
+- Unified result processing code path (both state machine and direct execution)
+- Added wait for animations to complete before starting highlights (prevents overlapping effects)
+- Better state machine flow: cleaner separation between highlight phases and action execution
+- Notation output integrated into move logging
+
+### ✅ Coordinate System Documentation
+- Updated `str_to_index()` and `index_to_str()` documentation
+- Clarified bottom-up numbering: A1 is at bottom, numbers increase upward
+- Matches official Zèrtz notation from http://www.gipf.com/zertz/notations/notation.html
+- Updated visualization tool to flip Y-axis for correct display
+
 ## Future Enhancements

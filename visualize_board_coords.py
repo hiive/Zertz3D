@@ -90,7 +90,13 @@ def visualize_board(rings=37):
                   [np.sin(theta),  np.cos(theta)]])
     rotated_coords = (all_coords - geometric_center) @ R.T + geometric_center
 
-    # Replace positions’ Cartesian coords with rotated versions
+    # --------------------------------------------------------------- #
+    # Flip Y so numbering increases upward (A1 bottom)
+    # --------------------------------------------------------------- #
+    rotated_coords[:, 1] *= -1
+    geometric_center[1] *= -1
+
+    # Replace positions' Cartesian coords with rotated versions
     positions = [(label, yx, qr, rc)
                  for (label, yx, qr, _), rc in zip(positions, rotated_coords)]
     all_coords = rotated_coords

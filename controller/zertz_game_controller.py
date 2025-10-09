@@ -19,9 +19,10 @@ import numpy as np
 
 class ZertzGameController:
 
-    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None, show_moves=False, blitz=False):
+    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None, show_moves=False, show_coords=False, blitz=False):
         self.rings = rings
         self.blitz = blitz
+        self.show_coords = show_coords
 
         # Set marbles and win conditions based on variant
         if blitz:
@@ -49,7 +50,6 @@ class ZertzGameController:
 
         # Show moves mode
         self.show_moves = show_moves
-        self.highlight_duration = 0.2  # Duration to show each highlight phase (seconds)
         self.highlight_sm = None  # State machine for highlights (created after game is initialized)
 
         # Set random seed before any random operations
@@ -69,7 +69,7 @@ class ZertzGameController:
             raise ValueError("Blitz mode only works with 37 rings")
 
         # Create renderer with detected board size (only if not headless)
-        self.renderer = None if headless else ZertzRenderer(rings=self.rings)
+        self.renderer = None if headless else ZertzRenderer(rings=self.rings, show_coords=self.show_coords)
 
         self._reset_board()
 
@@ -261,7 +261,7 @@ class ZertzGameController:
 
         # Create or recreate highlight state machine
         if self.show_moves and self.renderer is not None:
-            self.highlight_sm = MoveHighlightStateMachine(self.renderer, self.game, self.highlight_duration)
+            self.highlight_sm = MoveHighlightStateMachine(self.renderer, self.game)
 
         if self.replay_mode:
             print("-- Replay Mode --")
@@ -358,30 +358,18 @@ class ZertzGameController:
         print("---" + "-" * 30 + "\n")
 
     def update_game(self, task):
-        # State machine for show_moves mode
+        result = None
+        player = None
+
+        # Update state machine if active
         if self.highlight_sm and self.highlight_sm.is_active():
-            # Update state machine
             should_continue = self.highlight_sm.update(task)
             if should_continue:
                 return task.again
-
             # State machine finished, get result and player
             result = self.highlight_sm.get_pending_result()
             player = self.highlight_sm.get_pending_player()
-
-            # Process result
-            if result is not None:
-                if isinstance(result, list):
-                    for removal in result:
-                        if removal['marble'] is not None:
-                            player.add_capture(removal['marble'])
-                        if self.renderer is not None:
-                            self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
-                else:
-                    player.add_capture(result)
-
-        # Get next action
-        if not (self.highlight_sm and self.highlight_sm.is_active()):
+        else:
             # Get next action
             p_ix = self.game.get_cur_player_value()
             player = self.player1 if p_ix == 1 else self.player2
@@ -406,31 +394,11 @@ class ZertzGameController:
                 else:
                     raise
 
-            # If show_moves is enabled, start the state machine
-            if self.show_moves and self.renderer is not None:
-                self._display_valid_moves(player)
-                # Log and print action before starting state machine
-                try:
-                    _, action_dict = self.game.action_to_str(ax, ay)
-                except IndexError as e:
-                    print(f"Error converting action to string: {e}")
-                    print(f"Action type: {ax}, Action: {ay}")
-                    raise
-                self._log_action(player.n, action_dict)
-                print(f'Player {player.n}: {action_dict}')
-
-                # Start state machine for all actions
-                self.highlight_sm.start(ax, ay, player)
-                # For PASS actions, state machine completes immediately (phase=None)
-                # Don't return early - fall through to game_over check
-                if self.highlight_sm.is_active():
-                    return task.again
-                # PASS completed, fall through to game_over check below
-
-            # Execute action immediately if not showing moves or headless
+            # Display valid moves if enabled
             if self.show_moves:
                 self._display_valid_moves(player)
 
+            # Convert action to string and log
             try:
                 _, action_dict = self.game.action_to_str(ax, ay)
             except IndexError as e:
@@ -439,28 +407,44 @@ class ZertzGameController:
                 raise
 
             self._log_action(player.n, action_dict)
-            print(f'Player {player.n}: {action_dict}')
+            notation = self.game.action_to_notation(action_dict)
+            print(f'Player {player.n}: {action_dict} ({notation})')
 
-            if self.renderer is not None:
-                self.renderer.show_action(player, action_dict, task.delay_time)
+            # Execute action via state machine or directly
+            if self.show_moves and self.renderer is not None:
+                # Wait for any previous animations to complete before starting highlights
+                if self.renderer.current_animations:
+                    return task.again
 
-            result = self.game.take_action(ax, ay)
+                # Start state machine for all actions
+                self.highlight_sm.start(ax, ay, player)
+                if self.highlight_sm.is_active():
+                    # State machine started, will complete in future ticks
+                    return task.again
+                # PASS action completed immediately
+                result = self.highlight_sm.get_pending_result()
+            else:
+                # Execute action directly without state machine
+                if self.renderer is not None:
+                    self.renderer.show_action(player, action_dict, task.delay_time)
+                result = self.game.take_action(ax, ay)
 
-            # Handle result
-            if result is not None:
-                if isinstance(result, list):
-                    for removal in result:
-                        if removal['marble'] is not None:
-                            player.add_capture(removal['marble'])
-                        if self.renderer is not None:
-                            self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
-                else:
-                    player.add_capture(result)
+        # Process result (common path for both state machine and direct execution)
+        if result is not None:
+            if isinstance(result, list):
+                for removal in result:
+                    if removal['marble'] is not None:
+                        player.add_capture(removal['marble'])
+                    if self.renderer is not None:
+                        self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
+            else:
+                player.add_capture(result)
 
-            # Update frozen region visuals after any action
-            if self.renderer is not None:
-                self.renderer.update_frozen_regions(self.game.board)
+        # Update frozen region visuals after any action completes
+        if self.renderer is not None:
+            self.renderer.update_frozen_regions(self.game.board)
 
+        # Check game over
         game_over = self.game.get_game_ended()
         if game_over is not None:  # None means game continuing.
             if game_over in [PLAYER_1_WIN, PLAYER_2_WIN]:

@@ -52,6 +52,12 @@ uv run main.py --games 10
 
 # Log game actions to file
 uv run main.py --log
+
+# Show valid moves before each turn (highlights placement/capture/removal positions)
+uv run main.py --show-moves
+
+# Display coordinate labels on rings in 3D view
+uv run main.py --show-coords
 ```
 
 ## Project Structure
@@ -90,12 +96,17 @@ Two types of actions:
 - **Placement (PUT)**: Place a marble and remove a ring
   - Format: `PUT {marble} {dst} {remove}`
   - Example: `PUT g B5 G3`
+  - Official notation: `Gb5` or `Gb5,g3` (with ring removal)
 
 - **Capture (CAP)**: Jump over an opponent's marble
   - Format: `CAP {marble} {src} {capture} {dst}`
   - Example: `CAP b C4 g D5 E6`
+  - Official notation: `x c4Ge6` (jump from c4 over Gray to e6)
 
 - **Pass (PASS)**: Used when no valid moves available
+  - Official notation: `-`
+
+The game now outputs both internal format and official Zèrtz notation (from http://www.gipf.com/zertz/notations/notation.html) for each move.
 
 ### Win Conditions
 
@@ -165,15 +176,19 @@ uv run pytest
 
 - **Frozen Region Indication**: Isolated regions with vacant rings (unplayable per official rules) are visually distinguished with faded/transparent rings (70% opacity)
 - **Move Highlighting**: Use `--show-moves` flag to see valid placement positions (green), removable rings (red), and capture paths (blue)
+  - Intelligent highlighting: automatically skips highlight phase when only one capture is available
+  - Per-phase timing: different durations for placement, removal, and capture highlights
+- **Coordinate Labels**: Use `--show-coords` flag to display coordinate labels on rings (e.g., A1, B2) that always face the camera
 - **Water Reflections**: Dynamic water plane with custom shaders for realistic reflections
 - **Dynamic Lighting**: Directional and ambient lighting for depth and atmosphere
 
 ### Key Technical Details
 
 - **RNG Separation**: Game logic uses seeded numpy.random for deterministic gameplay, while visual effects (marble rotations) use independent unseeded random instances
-- **Coordinate Systems**: Custom board layouts use `flattened_letters` array for coordinate mapping (e.g., 61-ring boards skip 'I')
+- **Coordinate Systems**: Uses bottom-up numbering where A1 is at the bottom of column A (official Zèrtz notation). Custom board layouts use `flattened_letters` array for coordinate mapping (e.g., 61-ring boards skip 'I')
 - **Symmetry Transforms**: Implements D6 (37/61 rings) and D3 (48 rings) dihedral group symmetries for state canonicalization
 - **ML Integration**: State separated into spatial (L×H×W board features) and global (10-element vector) components for machine learning applications
+- **Official Notation**: Game outputs moves in official Zèrtz notation format (e.g., `Wd4`, `x e3Wg3`, `-`) alongside internal dictionary format
 
 For more detailed technical documentation, see `CLAUDE.md`.
 

@@ -967,9 +967,11 @@ class ZertzBoard:
         return translated
 
     def str_to_index(self, index_str):
-        # Given a string like 'A1' return an index (y, x) based on the board shape
-
-        # If using custom board layout, search for the coordinate in the layout
+        """
+        Convert a coordinate string like 'A1' (bottom numbering) to array indices (y, x).
+        In this official layout, row numbers count upward from the bottom of the board.
+        """
+        # Handle custom layouts first
         if self.flattened_letters is not None:
             try:
                 flat_index = np.where(self.flattened_letters == index_str)[0][0]
@@ -979,48 +981,44 @@ class ZertzBoard:
             except IndexError:
                 raise ValueError(f"Coordinate '{index_str}' not found in board layout")
 
-        # Otherwise calculate using standard hexagon formula
-        letter, number = index_str
+        # Split into components
+        letter = index_str[0].upper()
+        number = int(index_str[1:])
 
-        # Calculate x
-        letter = letter.upper()
         x = ord(letter) - 65  # ord('A') == 65
-
-        # Calculate y
         mid = self.width // 2
-        number = int(number)
         offset = max(mid - x, 0)
-        y = self.width - (number + offset)
 
+        # Flip numbering: A1 is bottom, so y increases upward
+        y = (self.width - number) - offset
         return y, x
 
     def index_to_str(self, index):
-        # Given an index (y, x) return a string like 'A1' based on the board shape
+        """
+        Convert array indices (y, x) to ZÈRTZ coordinates like 'A1' (bottom numbering).
+        """
         y, x = index
 
-        # Check if this ring position still exists on the board
         if not self._is_inbounds(index):
             raise IndexError(f"Position ({y}, {x}) is out of bounds")
 
-        # If the ring has been removed from the board, return empty string
         if self.state[self.RING_LAYER, y, x] == 0:
             return ''
 
         if self.flattened_letters is not None:
             ix = y * self.width + x
-            # Bounds check for custom board layouts
             if ix >= len(self.flattened_letters):
-                raise IndexError(f"Position ({y}, {x}) -> index {ix} is out of bounds for board with {len(self.flattened_letters)} positions")
+                raise IndexError(
+                    f"Position ({y}, {x}) -> index {ix} is out of bounds "
+                    f"for board with {len(self.flattened_letters)} positions")
             return self.flattened_letters[ix]
 
-        # Calculate letter
-        letter = chr(x + 65)  # chr(65) == 'A'
-
-        # Calculate number
+        letter = chr(x + 65)
         mid = self.width // 2
         offset = max(mid - x, 0)
 
-        number = str(self.width - (y + offset))
+        # Flip numbering: bottom = 1
+        number = str((self.width - y) - offset)
         return letter + number
 
     # =========================  AXIAL COORDINATES  =========================

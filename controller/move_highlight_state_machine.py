@@ -6,17 +6,31 @@ import numpy as np
 class MoveHighlightStateMachine:
     """Manages the multi-phase highlighting sequence for showing moves."""
 
-    def __init__(self, renderer, game, highlight_duration):
+    # Phase constants
+    PHASE_PLACEMENT_HIGHLIGHTS = 'placement_highlights'
+    PHASE_SELECTED_PLACEMENT = 'selected_placement'
+    PHASE_REMOVAL_HIGHLIGHTS = 'removal_highlights'
+    PHASE_SELECTED_REMOVAL = 'selected_removal'
+    PHASE_CAPTURE_HIGHLIGHTS = 'capture_highlights'
+    PHASE_SELECTED_CAPTURE = 'selected_capture'
+
+    def __init__(self, renderer, game):
         """Initialize the state machine.
 
         Args:
             renderer: ZertzRenderer instance
             game: ZertzGame instance
-            highlight_duration: Duration in seconds for each highlight phase
         """
         self.renderer = renderer
         self.game = game
-        self.highlight_duration = highlight_duration
+        self.highlight_durations = {
+            self.PHASE_PLACEMENT_HIGHLIGHTS: 0.15,
+            self.PHASE_SELECTED_PLACEMENT: 0.15,
+            self.PHASE_REMOVAL_HIGHLIGHTS: 0.15,
+            self.PHASE_SELECTED_REMOVAL: 0.15,
+            self.PHASE_CAPTURE_HIGHLIGHTS: 0.6,
+            self.PHASE_SELECTED_CAPTURE: 0.15,
+        }
 
         # State tracking
         self.phase = None  # Current phase: 'placement_highlights', 'selected_placement', etc.
@@ -41,11 +55,11 @@ class MoveHighlightStateMachine:
         if ax == "PUT":
             # Queue placement highlights and start the sequence
             self._queue_placement_highlights()
-            self.phase = 'placement_highlights'
+            self.phase = self.PHASE_PLACEMENT_HIGHLIGHTS
         elif ax == "CAP":
             # Queue capture highlights and start the sequence
             self._queue_capture_highlights()
-            self.phase = 'capture_highlights'
+            self.phase = self.PHASE_CAPTURE_HIGHLIGHTS
         elif ax == "PASS":
             # PASS has no visuals, but execute the action to switch players
             result = self.game.take_action(ax, ay)
@@ -70,17 +84,17 @@ class MoveHighlightStateMachine:
             return True  # Still waiting for highlights to finish
 
         # Highlights finished, advance to next phase
-        if self.phase == 'placement_highlights':
+        if self.phase == self.PHASE_PLACEMENT_HIGHLIGHTS:
             self._on_placement_highlights_done()
-        elif self.phase == 'selected_placement':
+        elif self.phase == self.PHASE_SELECTED_PLACEMENT:
             self._on_selected_placement_done(task)
-        elif self.phase == 'removal_highlights':
+        elif self.phase == self.PHASE_REMOVAL_HIGHLIGHTS:
             self._on_removal_highlights_done()
-        elif self.phase == 'selected_removal':
+        elif self.phase == self.PHASE_SELECTED_REMOVAL:
             return self._on_selected_removal_done(task)
-        elif self.phase == 'capture_highlights':
+        elif self.phase == self.PHASE_CAPTURE_HIGHLIGHTS:
             self._on_capture_highlights_done()
-        elif self.phase == 'selected_capture':
+        elif self.phase == self.PHASE_SELECTED_CAPTURE:
             return self._on_selected_capture_done(task)
 
         return self.is_active()
@@ -103,7 +117,7 @@ class MoveHighlightStateMachine:
                 placement_rings.append(pos_str)
 
         if placement_rings:
-            self.renderer.queue_highlight(placement_rings, self.highlight_duration)
+            self.renderer.queue_highlight(placement_rings, self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS])
 
     def _queue_removal_highlights(self, marble_idx, dst, placement_array, board):
         """Queue highlights for all valid removal positions for this action."""
@@ -125,17 +139,24 @@ class MoveHighlightStateMachine:
         if removable_rings:
             self.renderer.queue_highlight(
                 removable_rings,
-                self.highlight_duration,
+                self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS],
                 color=self.renderer.REMOVABLE_HIGHLIGHT_COLOR,
                 emission=self.renderer.REMOVABLE_HIGHLIGHT_EMISSION
             )
 
     def _queue_capture_highlights(self):
-        """Queue highlights for all valid capture moves, grouped by source marble."""
+        """Queue highlights for all valid capture moves, grouped by source marble.
+
+        If only one capture is available, skip highlighting (will auto-advance to selected_capture phase).
+        """
         placement, capture = self.game.get_valid_actions()
 
         # Find all valid captures: (direction, src_y, src_x)
         capture_positions = np.argwhere(capture)
+
+        # Skip highlighting if only one capture available
+        if len(capture_positions) == 1:
+            return
 
         # Group captures by source position
         captures_by_source = {}  # {src_str: [dst_str1, dst_str2, ...]}
@@ -159,7 +180,7 @@ class MoveHighlightStateMachine:
             highlight_rings = [src_str] + list(destinations)
             self.renderer.queue_highlight(
                 highlight_rings,
-                self.highlight_duration,
+                self.highlight_durations[self.PHASE_CAPTURE_HIGHLIGHTS],
                 color=self.renderer.CAPTURE_HIGHLIGHT_COLOR,
                 emission=self.renderer.CAPTURE_HIGHLIGHT_EMISSION
             )
@@ -177,8 +198,8 @@ class MoveHighlightStateMachine:
 
         # Queue highlight for selected placement ring only
         selected_ring = action_dict['dst']
-        self.renderer.queue_highlight([selected_ring], self.highlight_duration)
-        self.phase = 'selected_placement'
+        self.renderer.queue_highlight([selected_ring], self.highlight_durations[self.PHASE_SELECTED_PLACEMENT])
+        self.phase = self.PHASE_SELECTED_PLACEMENT
 
     def _on_selected_placement_done(self, task):
         """Handle completion of selected placement highlight phase."""
@@ -212,7 +233,7 @@ class MoveHighlightStateMachine:
 
         # Move to removal highlights phase
         if ax == "PUT":
-            self.phase = 'removal_highlights'
+            self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
         else:
             # Capture actions don't have removal phase - animate immediately
             self.renderer.show_action(player, action_dict, task.delay_time)
@@ -227,11 +248,11 @@ class MoveHighlightStateMachine:
         if selected_removal:  # Only if a ring is being removed
             self.renderer.queue_highlight(
                 [selected_removal],
-                self.highlight_duration,
+                self.highlight_durations[self.PHASE_SELECTED_REMOVAL],
                 color=self.renderer.REMOVABLE_HIGHLIGHT_COLOR,
                 emission=self.renderer.REMOVABLE_HIGHLIGHT_EMISSION
             )
-        self.phase = 'selected_removal'
+        self.phase = self.PHASE_SELECTED_REMOVAL
 
     def _on_selected_removal_done(self, task):
         """Handle completion of selected removal highlight phase."""
@@ -267,11 +288,11 @@ class MoveHighlightStateMachine:
 
         self.renderer.queue_highlight(
             selected_rings,
-            self.highlight_duration,
+            self.highlight_durations[self.PHASE_SELECTED_CAPTURE],
             color=self.renderer.SELECTED_CAPTURE_HIGHLIGHT_COLOR,
             emission=self.renderer.SELECTED_CAPTURE_HIGHLIGHT_EMISSION
         )
-        self.phase = 'selected_capture'
+        self.phase = self.PHASE_SELECTED_CAPTURE
 
     def _on_selected_capture_done(self, task):
         """Handle completion of selected capture highlight phase."""

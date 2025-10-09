@@ -435,6 +435,47 @@ class ZertzGame:
             }
         return action_str, action_dict
 
+    def action_to_notation(self, action_dict):
+        """Convert action_dict to official Zèrtz notation.
+
+        Notation format from http://www.gipf.com/zertz/notations/notation.html:
+        - Placement: [Color][coord] or [Color][coord],[removed_coord]
+          Examples: "Wd4" or "Bd7,b2"
+        - Capture: x [src][captured_color][dst]
+          Example: "x e3Wg3"
+        - Pass: "-"
+
+        Args:
+            action_dict: Dictionary with action details
+
+        Returns:
+            str: Notation string
+        """
+        if action_dict['action'] == 'PASS':
+            return '-'
+
+        if action_dict['action'] == 'PUT':
+            # Convert marble color to uppercase
+            marble = action_dict['marble'].upper()
+            # Convert destination to lowercase
+            dst = action_dict['dst'].lower()
+
+            # Check if a ring was removed
+            if action_dict['remove']:
+                remove = action_dict['remove'].lower()
+                return f"{marble}{dst},{remove}"
+            else:
+                return f"{marble}{dst}"
+
+        elif action_dict['action'] == 'CAP':
+            # Convert to lowercase and get captured marble as uppercase
+            src = action_dict['src'].lower()
+            dst = action_dict['dst'].lower()
+            captured = action_dict['capture'].upper()
+            return f"x {src}{captured}{dst}"
+
+        return ''
+
     def print_state(self):
         # Print the board state and supplies to the console
         #   0 - empty space

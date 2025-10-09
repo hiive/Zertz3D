@@ -8,7 +8,7 @@ import numpy as np
 import simplepbr
 from direct.showbase.ShowBase import ShowBase
 
-from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material, TransparencyAttrib
+from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material, TransparencyAttrib, TextNode
 
 from renderer.water_node import WaterNode
 from renderer.zertz_models import BasePiece, SkyBox, make_marble
@@ -43,7 +43,7 @@ class ZertzRenderer(ShowBase):
         61: {'center_pos': 'E5', 'cam_dist': 11, 'cam_height': 10}
     }
 
-    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37):
+    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False):
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
@@ -60,7 +60,9 @@ class ZertzRenderer(ShowBase):
         self.pos_to_marble = {}
         self.removed_bases = []
         self.pos_to_coords = {}
+        self.pos_to_label = {}  # Maps position strings to text labels
         self.pos_array = None
+        self.show_coords = show_coords
 
         # Highlight queue for move visualization
         self.highlight_queue = SimpleQueue()
@@ -438,6 +440,21 @@ class ZertzRenderer(ShowBase):
                     base_piece.set_pos(coords)
                     self.pos_to_base[pos] = base_piece
                     self.pos_to_coords[pos] = coords
+
+                    # Create coordinate label if show_coords is enabled
+                    if self.show_coords:
+                        text_node = TextNode(f'label_{pos}')
+                        text_node.setText(pos)
+                        text_node.setAlign(TextNode.ACenter)
+                        text_node.setTextColor(1, 1, 1, 1)  # White text
+                        text_node_path = self.render.attachNewNode(text_node)
+                        # Position label above the ring
+                        label_z = 0.4  # Height above ring
+                        text_node_path.setPos(x, y, label_z)
+                        text_node_path.setScale(0.15)  # Text size
+                        # Make text face camera (billboard effect)
+                        text_node_path.setBillboardPointEye()
+                        self.pos_to_label[pos] = text_node_path
 
             logger.debug(f"Board row {i}: {self.pos_array[i]}")
 
