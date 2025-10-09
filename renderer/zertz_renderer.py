@@ -546,7 +546,13 @@ class ZertzRenderer(ShowBase):
     def show_action(self, player, action_dict, action_duration=0):
         # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}
         # Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'G2', 'dst': 'E2', 'capture': 'b'}
+        # Player 1: {'action': 'PASS'}
         action = action_dict['action']
+
+        # PASS actions have no visual component
+        if action == 'PASS':
+            return
+
         action_marble_color = action_dict['marble']
         dst = action_dict['dst']
         dst_coords = self.pos_to_coords[dst]

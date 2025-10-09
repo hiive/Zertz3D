@@ -8,7 +8,9 @@ import ast
 import time
 import hashlib
 
-from game.zertz_game import ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN
+from game.zertz_game import (ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN,
+                             STANDARD_MARBLES, BLITZ_MARBLES,
+                             STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS)
 from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer
 from renderer.zertz_renderer import ZertzRenderer
 from controller.move_highlight_state_machine import MoveHighlightStateMachine
@@ -17,12 +19,18 @@ import numpy as np
 
 class ZertzGameController:
 
-    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None, show_moves=False):
+    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None, show_moves=False, blitz=False):
         self.rings = rings
-        self.marbles = {'w': 6, 'g': 8, 'b': 10}
-        # the first player to obtain either 3 marbles of each color, or 4 white
-        # marbles, or 5 grey marbles, or 6 black marbles wins the game.
-        self.win_condition = [{'w': 4}, {'g': 5}, {'b': 6}, {'w': 3, 'g': 3, 'b': 3}]
+        self.blitz = blitz
+
+        # Set marbles and win conditions based on variant
+        if blitz:
+            self.marbles = BLITZ_MARBLES
+            self.win_condition = BLITZ_WIN_CONDITIONS
+        else:
+            self.marbles = STANDARD_MARBLES
+            self.win_condition = STANDARD_WIN_CONDITIONS
+
         self.t = 5
 
         self.player1 = None
@@ -41,7 +49,7 @@ class ZertzGameController:
 
         # Show moves mode
         self.show_moves = show_moves
-        self.highlight_duration = 0.5  # Duration to show each highlight phase (seconds)
+        self.highlight_duration = 0.2  # Duration to show each highlight phase (seconds)
         self.highlight_sm = None  # State machine for highlights (created after game is initialized)
 
         # Set random seed before any random operations
@@ -55,6 +63,10 @@ class ZertzGameController:
         # Load replay first to detect board size
         if self.replay_mode:
             self.replay_actions = self._load_replay(replay_file)
+
+        # Validate blitz mode (only works with 37 rings)
+        if self.blitz and self.rings != 37:
+            raise ValueError("Blitz mode only works with 37 rings")
 
         # Create renderer with detected board size (only if not headless)
         self.renderer = None if headless else ZertzRenderer(rings=self.rings)
@@ -96,15 +108,23 @@ class ZertzGameController:
             return ZertzBoard.LARGE_BOARD_61
 
     def _load_replay(self, replay_file):
-        """Load replay actions from a text file and detect board size."""
+        """Load replay actions from a text file and detect board size and variant."""
         print(f"Loading replay from: {replay_file}")
         player1_actions = []
         player2_actions = []
         all_actions = []
+        detected_blitz = False
 
         with open(replay_file, 'r') as f:
             for line in f:
                 line = line.strip()
+
+                # Check for variant in comment headers
+                if line.startswith('# Variant:'):
+                    variant = line.split(':', 1)[1].strip().lower()
+                    if variant == 'blitz':
+                        detected_blitz = True
+
                 if not line or line.startswith('#'):
                     continue
 
@@ -124,6 +144,20 @@ class ZertzGameController:
         detected_rings = self._detect_board_size(all_actions)
         print(f"Detected board size: {detected_rings} rings")
         self.rings = detected_rings
+
+        # Handle blitz variant detection
+        if detected_blitz:
+            print("Detected blitz variant from replay file")
+            if self.blitz:
+                print("  (--blitz flag also specified)")
+            else:
+                print("  (automatically enabling blitz mode)")
+                self.blitz = True
+                self.marbles = BLITZ_MARBLES
+                self.win_condition = BLITZ_WIN_CONDITIONS
+        elif self.blitz:
+            print("Warning: --blitz flag specified but replay file is standard mode")
+            print("         Using blitz rules anyway")
 
         print(f"Loaded {len(player1_actions)} actions for Player 1")
         print(f"Loaded {len(player2_actions)} actions for Player 2")
@@ -148,10 +182,13 @@ class ZertzGameController:
     def _open_log_file(self):
         """Open a new log file for the current game."""
         if self.log_to_file and not self.replay_mode:
-            self.log_filename = f"zertzlog_{self.current_seed}.txt"
+            variant = "_blitz" if self.blitz else ""
+            self.log_filename = f"zertzlog{variant}_{self.current_seed}.txt"
             self.log_file = open(self.log_filename, 'w')
             self.log_file.write(f"# Seed: {self.current_seed}\n")
             self.log_file.write(f"# Rings: {self.rings}\n")
+            if self.blitz:
+                self.log_file.write("# Variant: Blitz\n")
             self.log_file.write("#\n")
             print(f"Logging game to: {self.log_filename}")
 
@@ -205,7 +242,8 @@ class ZertzGameController:
 
     def _reset_board(self):
         # Setup
-        print("** New game **")
+        variant_text = " (BLITZ)" if self.blitz else ""
+        print(f"** New game{variant_text} **")
 
         # Close previous log file if it exists
         if self.log_file is not None:
@@ -381,9 +419,13 @@ class ZertzGameController:
                 self._log_action(player.n, action_dict)
                 print(f'Player {player.n}: {action_dict}')
 
-                # Start state machine for both PUT and CAP actions
+                # Start state machine for all actions
                 self.highlight_sm.start(ax, ay, player)
-                return task.again
+                # For PASS actions, state machine completes immediately (phase=None)
+                # Don't return early - fall through to game_over check
+                if self.highlight_sm.is_active():
+                    return task.again
+                # PASS completed, fall through to game_over check below
 
             # Execute action immediately if not showing moves or headless
             if self.show_moves:

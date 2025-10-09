@@ -32,8 +32,8 @@ class MoveHighlightStateMachine:
         """Start the highlighting sequence for an action.
 
         Args:
-            ax: Action type ("PUT" or "CAP")
-            ay: Action tuple
+            ax: Action type ("PUT", "CAP", or "PASS")
+            ay: Action tuple (or None for PASS)
             player: Player making the move
         """
         self.pending_action = (ax, ay, player)
@@ -46,6 +46,11 @@ class MoveHighlightStateMachine:
             # Queue capture highlights and start the sequence
             self._queue_capture_highlights()
             self.phase = 'capture_highlights'
+        elif ax == "PASS":
+            # PASS has no visuals, but execute the action to switch players
+            result = self.game.take_action(ax, ay)
+            self.pending_result = result
+            self.phase = None  # Done immediately (no highlight phases)
 
     def update(self, task):
         """Update the state machine. Called each frame.

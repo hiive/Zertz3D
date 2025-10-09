@@ -13,6 +13,13 @@ PLAYER_2_WIN = -1
 TIE = 0
 # None = game not over
 
+# Game variant configurations
+STANDARD_MARBLES = {'w': 6, 'g': 8, 'b': 10}
+BLITZ_MARBLES = {'w': 5, 'g': 7, 'b': 9}
+
+STANDARD_WIN_CONDITIONS = [{'w': 3, 'g': 3, 'b': 3}, {'w': 4}, {'g': 5}, {'b': 6}]
+BLITZ_WIN_CONDITIONS = [{'w': 2, 'g': 2, 'b': 2}, {'w': 3}, {'g': 4}, {'b': 5}]
+
 class ZertzGame:
     def __init__(self, rings=37, marbles=None, win_con=None, t=1, board_layout=None, clone=None, clone_state=None):
         if clone is not None:
