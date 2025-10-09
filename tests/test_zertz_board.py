@@ -357,54 +357,60 @@ class TestBoardMethods:
     """Stub tests for board game logic methods."""
 
     def test_get_neighbors(self, board):
-        """Test neighbor calculation."""
-        # TODO: Implement full test
-        neighbors = board.get_neighbors((3, 3))
-        assert len(neighbors) == 6  # Hexagonal board has 6 neighbors
+        """Test neighbor calculation for hexagonal grid."""
+        # Test a center position - should have 6 neighbors
+        center_pos = (board.width // 2, board.width // 2)
+        neighbors = board.get_neighbors(center_pos)
+        assert len(neighbors) == 6, "Hexagonal board center should have 6 neighbors"
+
+        # All neighbors should be distinct
+        assert len(set(neighbors)) == len(neighbors), "Neighbors should be unique"
+
+        # All neighbors should be in bounds
+        for ny, nx in neighbors:
+            assert board._is_inbounds((ny, nx)), f"Neighbor {(ny, nx)} should be in bounds"
+
+        # Test corner position - may have fewer neighbors
+        corner_pos = (0, 0)
+        corner_neighbors = board.get_neighbors(corner_pos)
+        assert len(corner_neighbors) <= 6, "Corner position should have <= 6 neighbors"
+        assert len(corner_neighbors) >= 2, "Corner position should have at least 2 neighbors"
+
+        # Test that neighbors are exactly one step away in each direction
+        for neighbor in neighbors[:3]:  # Check first 3 for efficiency
+            ny, nx = neighbor
+            y, x = center_pos
+            # Hexagonal neighbors differ by combinations of [-1, 0, 1] in both dimensions
+            assert abs(ny - y) <= 1 and abs(nx - x) <= 1
+            assert (ny, nx) != (y, x), "Neighbor should not be the same as origin"
 
     def test_is_inbounds(self, board):
-        """Test boundary checking."""
-        # TODO: Implement full test
+        """Test boundary checking for all board positions."""
+        # Valid corner positions
         assert board._is_inbounds((0, 0)) == True
+        assert board._is_inbounds((board.width - 1, board.width - 1)) == True
+
+        # Out of bounds positions
         assert board._is_inbounds((board.width, board.width)) == False
+        assert board._is_inbounds((-1, 0)) == False
+        assert board._is_inbounds((0, -1)) == False
 
-    def test_get_regions(self, board):
-        """Test region detection."""
-        # TODO: Implement full test
-        regions = board._get_regions()
-        assert len(regions) >= 1  # At least one region should exist
+    # Note: test_get_regions is covered in test_isolated_regions.py
+    # Note: test_take_placement_action and test_take_capture_action are covered extensively in other test files
 
-    def test_get_marble_type_at(self, board):
-        """Test marble type detection."""
-        # TODO: Implement after placing marbles
-        pass
-
-    def test_take_placement_action(self, board):
-        """Test placement action execution."""
-        # TODO: Implement with valid action
-        pass
-
-    def test_take_capture_action(self, board):
-        """Test capture action execution."""
-        # TODO: Implement with valid capture setup
-        pass
-
-    def test_get_valid_moves(self, board):
-        """Test valid move generation."""
-        # TODO: Implement full test
+    def test_get_valid_moves_shape(self, board):
+        """Test that get_valid_moves returns correctly shaped arrays."""
         placement, capture = board.get_valid_moves()
         assert placement.shape == board.get_placement_shape()
         assert capture.shape == board.get_capture_shape()
 
-    def test_get_placement_moves(self, board):
-        """Test placement move generation."""
-        # TODO: Implement full test
+    def test_get_placement_moves_shape(self, board):
+        """Test that placement moves array has correct shape."""
         moves = board.get_placement_moves()
         assert moves.shape == (3, board.width ** 2, board.width ** 2 + 1)
 
-    def test_get_capture_moves(self, board):
-        """Test capture move generation."""
-        # TODO: Implement full test
+    def test_get_capture_moves_shape(self, board):
+        """Test that capture moves array has correct shape."""
         moves = board.get_capture_moves()
         assert moves.shape == (6, board.width, board.width)
 
@@ -412,23 +418,60 @@ class TestBoardMethods:
 class TestSymmetryOperations:
     """Test board state symmetry operations."""
 
-    def test_get_rotational_symmetries(self, board):
-        """Test 180° board rotation."""
-        # TODO: Implement full test
+    def test_get_rotational_symmetries(self, small_board):
+        """Test 180° board state rotation preserves shape and transforms marbles correctly."""
+        board = small_board
+
+        # Place a marble at a known position
+        test_pos = board.str_to_index('B3')
+        white_layer = board.MARBLE_TO_LAYER['w']
+        board.state[white_layer][test_pos] = 1
+
+        # Get rotated state
         rotated = board._get_rotational_symmetries()
+
+        # Check shape is preserved
         assert rotated.shape == board.state.shape
 
-    def test_get_mirror_symmetries(self, board):
-        """Test board mirroring."""
-        # TODO: Implement full test
+        # Check that the marble has moved to the rotated position
+        # B3 rotates 180° to F3
+        rotated_pos = board.str_to_index('F3')
+        assert rotated[white_layer][rotated_pos] == 1, "Marble should be at rotated position"
+        assert rotated[white_layer][test_pos] == 0, "Original position should be empty after rotation"
+
+    def test_get_mirror_symmetries(self, small_board):
+        """Test board state mirroring preserves shape and transforms marbles correctly."""
+        board = small_board
+
+        # Place a marble at a known position
+        test_pos = board.str_to_index('B3')
+        gray_layer = board.MARBLE_TO_LAYER['g']
+        board.state[gray_layer][test_pos] = 1
+
+        # Get mirrored state
         mirrored = board._get_mirror_symmetries()
+
+        # Check shape is preserved
         assert mirrored.shape == board.state.shape
 
+        # Check that the marble has moved to the mirrored position
+        # B3 mirrors to C5
+        mirrored_pos = board.str_to_index('C5')
+        assert mirrored[gray_layer][mirrored_pos] == 1, "Marble should be at mirrored position"
+        assert mirrored[gray_layer][test_pos] == 0, "Original position should be empty after mirroring"
+
     def test_get_state_symmetries(self, board):
-        """Test all symmetry generation."""
-        # TODO: Implement full test
+        """Test that get_state_symmetries returns mirror, rotate, and mirror+rotate transformations."""
         symmetries = board.get_state_symmetries()
-        assert len(symmetries) == 3  # Mirror, rotate, mirror+rotate
+
+        # Should return 3 symmetries: mirror, rotate, mirror+rotate
+        assert len(symmetries) == 3, "Should return 3 symmetries"
+
+        # Each symmetry is a tuple (transform_id, transformed_state)
+        # All symmetries should have same shape as original state
+        for transform_id, sym_state in symmetries:
+            assert isinstance(transform_id, int), "Transform ID should be an integer"
+            assert sym_state.shape == board.state.shape, "Symmetry should preserve state shape"
 
 
 def test_capture_sequence_continues_with_same_marble():
