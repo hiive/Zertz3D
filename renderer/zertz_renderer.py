@@ -31,6 +31,10 @@ class ZertzRenderer(ShowBase):
     PLACEMENT_HIGHLIGHT_EMISSION = LVector4(0.0, 0.08, 0.0, 1)  # Subtle green glow
     REMOVABLE_HIGHLIGHT_COLOR = LVector4(0.4, 0.0, 0.0, 1)      # Dark red base
     REMOVABLE_HIGHLIGHT_EMISSION = LVector4(0.08, 0.0, 0.0, 1)  # Subtle red glow
+    CAPTURE_HIGHLIGHT_COLOR = LVector4(0.0, 0.0, 0.4, 1)        # Dark blue base
+    CAPTURE_HIGHLIGHT_EMISSION = LVector4(0.0, 0.0, 0.08, 1)    # Subtle blue glow
+    SELECTED_CAPTURE_HIGHLIGHT_COLOR = LVector4(0.39, 0.58, 0.93, 1)      # Cornflower blue
+    SELECTED_CAPTURE_HIGHLIGHT_EMISSION = LVector4(0.08, 0.12, 0.19, 1)   # Cornflower blue glow
 
     # Camera configuration per board size
     CAMERA_CONFIG = {
@@ -681,7 +685,7 @@ class ZertzRenderer(ShowBase):
         self.highlighted_rings.clear()
 
     def _apply_highlight(self, highlight_info, current_time):
-        """Apply a highlight to the specified rings.
+        """Apply a highlight to the specified rings and/or marbles.
 
         Args:
             highlight_info: Dict with 'rings', 'duration', 'color', 'emission'
@@ -692,14 +696,26 @@ class ZertzRenderer(ShowBase):
         emission = highlight_info.get('emission', self.PLACEMENT_HIGHLIGHT_EMISSION)
         duration = highlight_info['duration']
 
-        # Store original materials
+        # Store original materials and what type was highlighted
         original_materials = {}
 
         for pos_str in rings:
-            if pos_str in self.pos_to_base:
-                base_piece = self.pos_to_base[pos_str]
-                original_mat = base_piece.model.getMaterial()
-                original_materials[pos_str] = original_mat
+            # Try to highlight marble first, then ring
+            entity = None
+            entity_type = None
+
+            if pos_str in self.pos_to_marble:
+                # Highlight the marble at this position
+                entity = self.pos_to_marble[pos_str]
+                entity_type = 'marble'
+            elif pos_str in self.pos_to_base:
+                # Highlight the ring at this position
+                entity = self.pos_to_base[pos_str]
+                entity_type = 'ring'
+
+            if entity is not None:
+                original_mat = entity.model.getMaterial()
+                original_materials[pos_str] = (original_mat, entity_type)
 
                 # Create and apply highlight material
                 highlight_mat = Material()
@@ -712,7 +728,7 @@ class ZertzRenderer(ShowBase):
 
                 highlight_mat.setBaseColor(color)
                 highlight_mat.setEmission(emission)
-                base_piece.model.setMaterial(highlight_mat, 1)
+                entity.model.setMaterial(highlight_mat, 1)
 
         # Update highlight_info with calculated end time and original materials
         highlight_info['end_time'] = current_time + duration
@@ -726,13 +742,21 @@ class ZertzRenderer(ShowBase):
         """
         original_materials = highlight_info.get('original_materials', {})
 
-        for pos_str, original_mat in original_materials.items():
-            if pos_str in self.pos_to_base:
-                base_piece = self.pos_to_base[pos_str]
+        for pos_str, mat_info in original_materials.items():
+            original_mat, entity_type = mat_info
+
+            # Get the entity based on type
+            entity = None
+            if entity_type == 'marble' and pos_str in self.pos_to_marble:
+                entity = self.pos_to_marble[pos_str]
+            elif entity_type == 'ring' and pos_str in self.pos_to_base:
+                entity = self.pos_to_base[pos_str]
+
+            if entity is not None:
                 if original_mat is not None:
-                    base_piece.model.setMaterial(original_mat, 1)
+                    entity.model.setMaterial(original_mat, 1)
                 else:
-                    base_piece.model.clearMaterial()
+                    entity.model.clearMaterial()
 
     def queue_highlight(self, rings, duration, color=None, emission=None):
         """Add a highlight to the queue.

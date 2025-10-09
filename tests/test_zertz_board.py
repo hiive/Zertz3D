@@ -429,3 +429,71 @@ class TestSymmetryOperations:
         # TODO: Implement full test
         symmetries = board.get_state_symmetries()
         assert len(symmetries) == 3  # Mirror, rotate, mirror+rotate
+
+
+def test_capture_sequence_continues_with_same_marble():
+    """Test that after a capture, only the marble that just moved can continue capturing.
+
+    Per Zertz rules: "If you can make multiple jumps in one sequence, you must
+    continue until no more jumps are possible" - with the SAME marble.
+
+    Scenario:
+    - Marble A (white at C2) captures marble X (white at D3) and lands at E3
+    - Marble A is now adjacent to marble B (gray at F2)
+    - ONLY marble A should be able to capture (continue its sequence)
+    - Marble B should NOT be able to capture (it's not its turn in the sequence)
+    """
+    board = ZertzBoard(rings=ZertzBoard.SMALL_BOARD_37)
+
+    # Clear the board of marbles and capture layer
+    board.state[board.MARBLE_LAYERS] = 0
+    board.state[board.CAPTURE_LAYER] = 0
+
+    # Set up scenario: place marbles for a capture sequence
+    # Marble A (white) at C2
+    c2_idx = board.str_to_index('C2')
+    white_layer = board.MARBLE_TO_LAYER['w']
+    board.state[white_layer][c2_idx] = 1
+
+    # Marble X (white) at D3 (will be captured)
+    d3_idx = board.str_to_index('D3')
+    board.state[white_layer][d3_idx] = 1
+
+    # Marble B (gray) at F2
+    f2_idx = board.str_to_index('F2')
+    gray_layer = board.MARBLE_TO_LAYER['g']
+    board.state[gray_layer][f2_idx] = 1
+
+    # Get initial capture moves - should show A can capture X
+    captures_before = board.get_capture_moves()
+
+    # Verify A can capture X (C2 → D3 → E3)
+    # Direction 4 from C2 should be valid (southeast direction)
+    c2_y, c2_x = c2_idx
+    assert captures_before[4, c2_y, c2_x], "Marble A at C2 should be able to capture X at D3"
+
+    # Simulate the capture: A moves from C2 to E3, X is removed
+    board.state[white_layer][c2_idx] = 0
+    e3_idx = board.str_to_index('E3')
+    board.state[white_layer][e3_idx] = 1
+    board.state[white_layer][d3_idx] = 0  # X is captured
+
+    # Mark A as the marble that just moved (this is what the game does)
+    board.state[board.CAPTURE_LAYER] = 0
+    board.state[board.CAPTURE_LAYER][e3_idx] = 1
+
+    # Now get capture moves after the first capture
+    captures_after = board.get_capture_moves()
+
+    # CRITICAL TEST: Only marble A should be able to capture (continue its sequence)
+    # A can capture B: E3 → F2 → G1 (direction 5)
+    e3_y, e3_x = e3_idx
+    assert captures_after[5, e3_y, e3_x], "Marble A at E3 should be able to capture B at F2"
+
+    # B should NOT be able to capture A (it's not B's turn in the sequence)
+    f2_y, f2_x = f2_idx
+    assert not captures_after[2, f2_y, f2_x], "Marble B at F2 should NOT be able to capture A (wrong sequence)"
+
+    # Verify we found exactly 1 capture option (only A can continue)
+    total_captures = np.sum(captures_after)
+    assert total_captures == 1, f"Expected 1 capture option (only A continues), found {total_captures}"
