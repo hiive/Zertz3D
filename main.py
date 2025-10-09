@@ -8,8 +8,6 @@ import ast
 import time
 import hashlib
 
-from panda3d.core import loadPrcFileData
-
 from game.zertz_game import ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN
 from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer
 from renderer.zertz_renderer import ZertzRenderer
@@ -18,7 +16,7 @@ import numpy as np
 
 class ZertzGameController:
 
-    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None):
+    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None, show_moves=False):
         self.rings = rings
         self.marbles = {'w': 6, 'g': 8, 'b': 10}
         # the first player to obtain either 3 marbles of each color, or 4 white
@@ -39,6 +37,15 @@ class ZertzGameController:
         self.headless = headless
         self.max_games = max_games  # None means play indefinitely
         self.games_played = 0
+
+        # Show moves mode
+        self.show_moves = show_moves
+        self.highlight_duration = 1.5  # Duration to show each highlight phase (seconds)
+        self.pending_action = None  # Store action while showing highlights
+        self.pending_player = None  # Store player while showing highlights
+        self.show_moves_phase = None  # Track phase: 'placement_highlights', 'selected_placement', 'removal_highlights', 'selected_removal', None
+        self.pending_result = None  # Store result from take_action for later processing
+        self.pending_action_dict = None  # Store action_dict before take_action changes game state
 
         # Set random seed before any random operations
         # This ensures reproducibility for game moves (not used in replay mode)
@@ -228,66 +235,315 @@ class ZertzGameController:
             # Open log file for new game
             self._open_log_file()
 
-    def update_game(self, task):
-        p_ix = self.game.get_cur_player_value()
-        player = self.player1 if p_ix == 1 else self.player2
+    def _display_valid_moves(self, player):
+        """Display valid move information for the current player.
 
-        try:
-            ax, ay = player.get_action()
-        except ValueError as e:
-            print(f"Error getting action: {e}")
-            if self.replay_mode:
-                if self.partial_replay:
-                    print("Replay finished - continuing with random play")
-                    # Switch to random players
-                    self.player1 = RandomZertzPlayer(self.game, 1)
-                    self.player2 = RandomZertzPlayer(self.game, 2)
-                    # Copy captured marbles from replay players
-                    self.player1.captured = player.captured if player.n == 1 else self.player1.captured
-                    self.player2.captured = player.captured if player.n == 2 else self.player2.captured
-                    self.replay_mode = False
-                    # Get new action from random player
-                    player = self.player1 if p_ix == 1 else self.player2
-                    ax, ay = player.get_action()
+        Args:
+            player: The current player
+        """
+        placement, capture = self.game.get_valid_actions()
+
+        print(f"\n--- Valid Moves for Player {player.n} ---")
+
+        # Count valid moves
+        num_placement = np.sum(placement)
+        num_capture = np.sum(capture)
+
+        print(f"Placement moves: {num_placement}")
+        print(f"Capture moves: {num_capture}")
+
+        # If there are captures, they are mandatory
+        if num_capture > 0:
+            print("CAPTURES ARE MANDATORY")
+            # Show some example capture positions
+            capture_positions = np.argwhere(capture)
+            if len(capture_positions) > 0:
+                print(f"Sample capture positions:")
+                for i, (direction, y, x) in enumerate(capture_positions[:5]):  # Show up to 5
+                    src_str = self.game.board.index_to_str((y, x))
+                    print(f"  - Jump from {src_str} (direction {direction})")
+                if len(capture_positions) > 5:
+                    print(f"  ... and {len(capture_positions) - 5} more")
+        else:
+            # Show placement information - separate positions from removals
+            placement_positions = np.argwhere(placement)
+            if len(placement_positions) > 0:
+                # Group by (marble, destination) to find unique placement positions
+                marble_types = ['w', 'g', 'b']
+                placements = {}  # {(marble, dst_str): [list of removal positions]}
+                removals_set = set()  # Track all possible removals
+
+                for marble_idx, dst, rem in placement_positions:
+                    marble = marble_types[marble_idx]
+                    dst_y = dst // self.game.board.width
+                    dst_x = dst % self.game.board.width
+                    dst_str = self.game.board.index_to_str((dst_y, dst_x))
+
+                    key = (marble, dst_str)
+                    if key not in placements:
+                        placements[key] = []
+
+                    if rem != self.game.board.width ** 2:
+                        rem_y = rem // self.game.board.width
+                        rem_x = rem % self.game.board.width
+                        rem_str = self.game.board.index_to_str((rem_y, rem_x))
+                        placements[key].append(rem_str)
+                        removals_set.add(rem_str)
+
+                print(f"\nPlacement positions ({len(placements)} unique):")
+                for i, ((marble, dst_str), _) in enumerate(list(placements.items())[:10]):
+                    print(f"  - PUT {marble} at {dst_str}")
+                if len(placements) > 10:
+                    print(f"  ... and {len(placements) - 10} more")
+
+                if removals_set:
+                    print(f"\nRings available to remove ({len(removals_set)}):")
+                    removals_list = sorted(list(removals_set))
+                    # Show first 10
+                    print(f"  {', '.join(removals_list[:10])}")
+                    if len(removals_list) > 10:
+                        print(f"  ... and {len(removals_list) - 10} more")
+
+        # Show current captured marbles
+        print(f"\nPlayer {player.n} captured: {player.captured}")
+        print("---" + "-" * 30 + "\n")
+
+    def _queue_placement_highlights(self):
+        """Queue placement highlights only."""
+        placement, capture = self.game.get_valid_actions()
+
+        # Find destinations with ANY valid placement (any marble type, any removal option)
+        valid_dests = np.any(placement, axis=(0, 2))  # Shape: (width²,)
+        dest_indices = np.argwhere(valid_dests).flatten()
+
+        placement_rings = []
+        width = self.game.board.width
+        for dst_idx in dest_indices:
+            dst_y = dst_idx // width
+            dst_x = dst_idx % width
+            pos_str = self.game.board.index_to_str((dst_y, dst_x))
+            if pos_str:
+                placement_rings.append(pos_str)
+
+        if placement_rings:
+            self.renderer.queue_highlight(placement_rings, self.highlight_duration)
+
+    def _queue_removal_highlights(self, marble_idx, dst, placement_array, board):
+        """Queue removal highlights for a specific placement action.
+
+        Args:
+            marble_idx: Index of marble type (0=w, 1=g, 2=b)
+            dst: Destination index where marble will be placed
+            placement_array: The placement array from BEFORE the action
+            board: ZertzBoard instance to use for index_to_str conversion
+        """
+        width = board.width
+
+        # Get valid removal indices for this (marble_idx, dst) combination
+        removal_mask = placement_array[marble_idx, dst, :]
+        removable_indices = np.argwhere(removal_mask).flatten()
+
+        removable_rings = []
+        for rem_idx in removable_indices:
+            if rem_idx != width ** 2 and rem_idx != dst:  # Exclude "no removal" and destination
+                rem_y = rem_idx // width
+                rem_x = rem_idx % width
+                rem_str = board.index_to_str((rem_y, rem_x))
+                if rem_str:
+                    removable_rings.append(rem_str)
+
+        if removable_rings:
+            self.renderer.queue_highlight(
+                removable_rings,
+                self.highlight_duration,
+                color=self.renderer.REMOVABLE_HIGHLIGHT_COLOR,
+                emission=self.renderer.REMOVABLE_HIGHLIGHT_EMISSION
+            )
+
+    def update_game(self, task):
+        # State machine for show_moves mode
+        if self.pending_action is not None:
+            if self.renderer is not None and self.renderer.is_highlight_active():
+                # Still showing highlights, wait
+                return task.again
+
+            # Highlights finished, check which phase we're in
+            if self.show_moves_phase == 'placement_highlights':
+                # All placement highlights done, now show just the selected ring
+                ax, ay, player = self.pending_action
+
+                try:
+                    _, action_dict = self.game.action_to_str(ax, ay)
+                except IndexError as e:
+                    print(f"Error converting action to string: {e}")
+                    print(f"Action type: {ax}, Action: {ay}")
+                    raise
+
+                # Queue highlight for selected placement ring only
+                selected_ring = action_dict['dst']
+                self.renderer.queue_highlight([selected_ring], self.highlight_duration)
+                self.show_moves_phase = 'selected_placement'
+
+            elif self.show_moves_phase == 'selected_placement':
+                # Selected placement highlight done, place marble and execute game logic
+                ax, ay, player = self.pending_action
+
+                try:
+                    _, action_dict = self.game.action_to_str(ax, ay)
+                except IndexError as e:
+                    print(f"Error converting action to string: {e}")
+                    print(f"Action type: {ax}, Action: {ay}")
+                    raise
+
+                # Save action_dict before game state changes
+                self.pending_action_dict = action_dict
+
+                self._log_action(player.n, action_dict)
+                print(f'Player {player.n}: {action_dict}')
+
+                # Get placement array BEFORE executing action (for removal highlights)
+                placement_before, _ = self.game.get_valid_actions()
+
+                # Queue removal highlights BEFORE executing action (so board is in original state)
+                if ax == "PUT":
+                    marble_idx, dst, rem = ay  # Unpack action tuple
+                    self._queue_removal_highlights(marble_idx, dst, placement_before, self.game.board)
+
+                # Animate marble placement
+                if self.renderer is not None and ax == "PUT":
+                    self.renderer.show_marble_placement(player, action_dict, task.delay_time)
+
+                # Execute game logic
+                result = self.game.take_action(ax, ay)
+                self.pending_result = result
+
+                # Move to removal highlights phase
+                if ax == "PUT":
+                    self.show_moves_phase = 'removal_highlights'
                 else:
-                    print("Replay finished")
-                    return task.done
-            else:
+                    # Capture actions don't have removal phase - animate immediately
+                    if self.renderer is not None:
+                        self.renderer.show_action(player, action_dict, task.delay_time)
+
+                    self.pending_action = None
+                    self.show_moves_phase = None
+                    # Process result immediately
+                    if result is not None:
+                        if isinstance(result, list):
+                            for removal in result:
+                                if removal['marble'] is not None:
+                                    player.add_capture(removal['marble'])
+                                if self.renderer is not None:
+                                    self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
+                        else:
+                            player.add_capture(result)
+
+            elif self.show_moves_phase == 'removal_highlights':
+                # All removal highlights done, now show just the selected ring
+                # Use the saved action_dict (before game state changed)
+                action_dict = self.pending_action_dict
+
+                # Queue highlight for selected removal ring only
+                selected_removal = action_dict['remove']
+                if selected_removal:  # Only if a ring is being removed
+                    self.renderer.queue_highlight(
+                        [selected_removal],
+                        self.highlight_duration,
+                        color=self.renderer.REMOVABLE_HIGHLIGHT_COLOR,
+                        emission=self.renderer.REMOVABLE_HIGHLIGHT_EMISSION
+                    )
+                self.show_moves_phase = 'selected_removal'
+
+            elif self.show_moves_phase == 'selected_removal':
+                # Selected removal highlight done, now animate ring removal and process result
+                ax, ay, player = self.pending_action
+                result = self.pending_result
+                action_dict = self.pending_action_dict  # Use saved action_dict
+
+                # Now animate ring removal only (marble was already placed)
+                if self.renderer is not None:
+                    self.renderer.show_ring_removal(action_dict, task.delay_time)
+
+                # Process result
+                if result is not None:
+                    if isinstance(result, list):
+                        for removal in result:
+                            if removal['marble'] is not None:
+                                player.add_capture(removal['marble'])
+                            if self.renderer is not None:
+                                self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
+                    else:
+                        player.add_capture(result)
+
+                self.pending_action = None
+                self.show_moves_phase = None
+                self.pending_result = None
+
+        else:
+            # Get next action
+            p_ix = self.game.get_cur_player_value()
+            player = self.player1 if p_ix == 1 else self.player2
+
+            try:
+                ax, ay = player.get_action()
+            except ValueError as e:
+                print(f"Error getting action: {e}")
+                if self.replay_mode:
+                    if self.partial_replay:
+                        print("Replay finished - continuing with random play")
+                        self.player1 = RandomZertzPlayer(self.game, 1)
+                        self.player2 = RandomZertzPlayer(self.game, 2)
+                        self.player1.captured = player.captured if player.n == 1 else self.player1.captured
+                        self.player2.captured = player.captured if player.n == 2 else self.player2.captured
+                        self.replay_mode = False
+                        player = self.player1 if p_ix == 1 else self.player2
+                        ax, ay = player.get_action()
+                    else:
+                        print("Replay finished")
+                        return task.done
+                else:
+                    raise
+
+            # If show_moves is enabled, queue highlights and wait
+            if self.show_moves and self.renderer is not None:
+                self._display_valid_moves(player)
+                # Only highlight for PUT actions, skip CAP for now
+                if ax == "PUT":
+                    self._queue_placement_highlights()
+                    self.pending_action = (ax, ay, player)
+                    self.show_moves_phase = 'placement_highlights'
+                    return task.again
+                # For CAP actions, fall through to execute immediately
+
+            # Execute action immediately if not showing moves or headless
+            if self.show_moves:
+                self._display_valid_moves(player)
+
+            try:
+                _, action_dict = self.game.action_to_str(ax, ay)
+            except IndexError as e:
+                print(f"Error converting action to string: {e}")
+                print(f"Action type: {ax}, Action: {ay}")
                 raise
 
-        try:
-            _, action_dict = self.game.action_to_str(ax, ay)
-        except IndexError as e:
-            print(f"Error converting action to string: {e}")
-            print(f"Action type: {ax}, Action: {ay}")
-            raise
+            self._log_action(player.n, action_dict)
+            print(f'Player {player.n}: {action_dict}')
 
-        # Log the action
-        self._log_action(player.n, action_dict)
+            if self.renderer is not None:
+                self.renderer.show_action(player, action_dict, task.delay_time)
 
-        # Always print the action (regardless of headless or render mode)
-        print(f'Player {player.n}: {action_dict}')
+            result = self.game.take_action(ax, ay)
 
-        # Show action in renderer if available
-        if self.renderer is not None:
-            self.renderer.show_action(player, action_dict, task.delay_time)
-
-        result = self.game.take_action(ax, ay)
-
-        # Handle result - could be captured marble type (CAP) or isolated removals list (PUT) or None
-        if result is not None:
-            if isinstance(result, list):
-                # Isolated region removals from PUT action
-                for removal in result:
-                    if removal['marble'] is not None:
-                        # Ring with marble - capture it
-                        player.add_capture(removal['marble'])
-                    # Animate the isolated ring/marble removal (if renderer exists)
-                    if self.renderer is not None:
-                        self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
-            else:
-                # Normal capture from CAP action
-                player.add_capture(result)
+            # Handle result
+            if result is not None:
+                if isinstance(result, list):
+                    for removal in result:
+                        if removal['marble'] is not None:
+                            player.add_capture(removal['marble'])
+                        if self.renderer is not None:
+                            self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
+                else:
+                    player.add_capture(result)
 
         game_over = self.game.get_game_ended()
         if game_over is not None:  # None means game continuing.
@@ -332,12 +588,12 @@ if __name__ == '__main__':
     parser.add_argument('--partial', action='store_true', help='Continue with random play after replay ends (only with --replay)')
     parser.add_argument('--headless', action='store_true', help='Run without 3D renderer')
     parser.add_argument('--games', type=int, help='Number of games to play (default: play indefinitely)')
+    parser.add_argument('--show-moves', action='store_true', help='Show valid moves before each turn')
     args = parser.parse_args()
 
-    loadPrcFileData("", "gl-version 3 2")
     game = ZertzGameController(rings=args.rings, replay_file=args.replay, seed=args.seed,
                                 log_to_file=args.log, partial_replay=args.partial, headless=args.headless,
-                                max_games=args.games)
+                                max_games=args.games, show_moves=args.show_moves)
     game.run()
 
     # # game.print_state()

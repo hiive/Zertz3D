@@ -8,7 +8,7 @@ import numpy as np
 import simplepbr
 from direct.showbase.ShowBase import ShowBase
 
-from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties
+from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material
 
 from renderer.water_node import WaterNode
 from renderer.zertz_models import BasePiece, SkyBox, make_marble
@@ -26,6 +26,12 @@ class ZertzRenderer(ShowBase):
     PLAYER_POOL_OFFSET_SCALE = 0.8
     PLAYER_POOL_MEMBER_OFFSET_X = 0.6
 
+    # Move visualization
+    PLACEMENT_HIGHLIGHT_COLOR = LVector4(0.0, 0.4, 0.0, 1)      # Dark green base
+    PLACEMENT_HIGHLIGHT_EMISSION = LVector4(0.0, 0.08, 0.0, 1)  # Subtle green glow
+    REMOVABLE_HIGHLIGHT_COLOR = LVector4(0.4, 0.0, 0.0, 1)      # Dark red base
+    REMOVABLE_HIGHLIGHT_EMISSION = LVector4(0.08, 0.0, 0.0, 1)  # Subtle red glow
+
     # Camera configuration per board size
     CAMERA_CONFIG = {
         37: {'center_pos': 'D4', 'cam_dist': 10, 'cam_height': 8},
@@ -34,6 +40,8 @@ class ZertzRenderer(ShowBase):
     }
 
     def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37):
+        # Configure OpenGL version before initializing ShowBase
+        loadPrcFileData("", "gl-version 3 2")
         super().__init__()
 
         props = WindowProperties()
@@ -49,6 +57,10 @@ class ZertzRenderer(ShowBase):
         self.removed_bases = []
         self.pos_to_coords = {}
         self.pos_array = None
+
+        # Highlight queue for move visualization
+        self.highlight_queue = SimpleQueue()
+        self.current_highlight = None  # {'rings': [...], 'end_time': t, 'original_materials': {...}}
 
         self.x_base_size = self.BASE_SIZE_X
         self.y_base_size = self.BASE_SIZE_Y
@@ -185,6 +197,24 @@ class ZertzRenderer(ShowBase):
 
         for entity in to_remove:
             self.current_animations.pop(entity)
+
+        # Process highlight queue
+        # Check if current highlight has expired
+        if self.current_highlight is not None:
+            if task.time >= self.current_highlight['end_time']:
+                # Clear current highlight
+                self._clear_highlight(self.current_highlight)
+                self.current_highlight = None
+
+        # Start next highlight if no current highlight and queue has items
+        if self.current_highlight is None:
+            try:
+                highlight_info = self.highlight_queue.get_nowait()
+                # Apply highlight immediately
+                self._apply_highlight(highlight_info, task.time)
+                self.current_highlight = highlight_info
+            except Empty:
+                pass
 
         return task.cont
 
@@ -467,6 +497,48 @@ class ZertzRenderer(ShowBase):
                 self.animation_queue.put((captured_marble, src_coords, player_pool_coords,
                                           self.captured_marble_scale, action_duration, action_duration))
 
+    def show_marble_placement(self, player, action_dict, action_duration=0):
+        """Place a marble on the board (PUT action only, no ring removal)."""
+        action_marble_color = action_dict['marble']
+        dst = action_dict['dst']
+        dst_coords = self.pos_to_coords[dst]
+        action_duration *= 0.45
+
+        # add marble from pool
+        pool = self.marble_pool[action_marble_color]
+        if len(pool) == 0:
+            pool = self.player_pools[player.n][action_marble_color]
+        if len(pool) == 0:
+            logger.error(f"No marbles available in pool for player {player.n}, color {action_marble_color}")
+            return
+        put_marble = pool.pop()
+        mip = self.marbles_in_play[action_marble_color]
+        src_coords = put_marble.get_pos()
+        if put_marble not in [p for p, _ in mip]:
+            mip.append((put_marble, src_coords))
+
+        if action_duration == 0:
+            put_marble.set_pos(dst_coords)
+            put_marble.set_scale(self.board_marble_scale)
+        else:
+            self.animation_queue.put((put_marble, src_coords, dst_coords,
+                                      self.board_marble_scale, action_duration, 0))
+        self.pos_to_marble[dst] = put_marble
+
+    def show_ring_removal(self, action_dict, action_duration=0):
+        """Remove a ring from the board (PUT action only)."""
+        action_duration *= 0.45
+        base_piece_id = action_dict['remove']
+        if base_piece_id != '':
+            if base_piece_id in self.pos_to_base:
+                base_piece = self.pos_to_base[base_piece_id]
+                base_pos = base_piece.get_pos()
+                if action_duration == 0:
+                    base_piece.hide()
+                else:
+                    self.animation_queue.put((base_piece, base_pos, None, None, action_duration, action_duration))
+                self.removed_bases.append((base_piece, base_pos))
+
     def show_action(self, player, action_dict, action_duration=0):
         # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}
         # Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'G2', 'dst': 'E2', 'capture': 'b'}
@@ -477,37 +549,9 @@ class ZertzRenderer(ShowBase):
         action_duration *= 0.45
 
         if action == 'PUT':
-            # remove piece
-            base_piece_id = action_dict['remove']
-            if base_piece_id != '':
-                base_piece = self.pos_to_base[base_piece_id]
-                base_pos = base_piece.get_pos()
-                # base_piece.hide()
-                if action_duration == 0:
-                    base_piece.hide()
-                else:
-                    self.animation_queue.put((base_piece, base_pos, None, None, action_duration, action_duration))
-                self.removed_bases.append((base_piece, base_pos))
-            # add marble from pool
-            pool = self.marble_pool[action_marble_color]
-            if len(pool) == 0:
-                pool = self.player_pools[player.n][action_marble_color]
-            if len(pool) == 0:
-                logger.error(f"No marbles available in pool for player {player.n}, color {action_marble_color}")
-                return
-            put_marble = pool.pop()
-            mip = self.marbles_in_play[action_marble_color]
-            src_coords = put_marble.get_pos()
-            if put_marble not in [p for p, _ in mip]:
-                mip.append((put_marble, src_coords))
-
-            if action_duration == 0:
-                put_marble.set_pos(dst_coords)
-                put_marble.set_scale(self.board_marble_scale)
-            else:
-                self.animation_queue.put((put_marble, src_coords, dst_coords,
-                                          self.board_marble_scale, action_duration, 0))
-            self.pos_to_marble[dst] = put_marble
+            # Call the split methods
+            self.show_marble_placement(player, action_dict, action_duration / 0.45)  # Undo the scaling since the methods apply it
+            self.show_ring_removal(action_dict, action_duration / 0.45)
 
         elif action == 'CAP':
             src = action_dict['src']
@@ -557,3 +601,170 @@ class ZertzRenderer(ShowBase):
             self.animation_queue.get()
 
         self.current_animations = {}
+
+    def highlight_placement_positions(self, placement_array, board):
+        """Highlight rings where marbles can be placed.
+
+        Args:
+            placement_array: numpy array (3, width², width²+1) of valid placements
+            board: ZertzBoard instance to convert indices to position strings
+        """
+        # Extract unique destination positions
+        placement_positions = np.argwhere(placement_array)
+        unique_dests = set()
+        for marble_idx, dst, rem in placement_positions:
+            unique_dests.add(dst)
+
+        # Highlight each valid placement position
+        for dst_idx in unique_dests:
+            dst_y = dst_idx // board.width
+            dst_x = dst_idx % board.width
+            pos_str = board.index_to_str((dst_y, dst_x))
+
+            if pos_str and pos_str in self.pos_to_base:
+                base_piece = self.pos_to_base[pos_str]
+                original_mat = base_piece.model.getMaterial()
+                self.highlighted_rings[pos_str] = original_mat
+
+                # Create highlight material matching original properties
+                highlight_mat = Material()
+                if original_mat is not None:
+                    highlight_mat.setMetallic(original_mat.getMetallic())
+                    highlight_mat.setRoughness(original_mat.getRoughness())
+                else:
+                    highlight_mat.setMetallic(0.9)
+                    highlight_mat.setRoughness(0.1)
+
+                highlight_mat.setBaseColor(self.PLACEMENT_HIGHLIGHT_COLOR)
+                highlight_mat.setEmission(self.PLACEMENT_HIGHLIGHT_EMISSION)
+                base_piece.model.setMaterial(highlight_mat, 1)
+
+    def highlight_removable_rings(self, removable_indices, board):
+        """Highlight rings that can be removed.
+
+        Args:
+            removable_indices: List of board indices for removable rings
+            board: ZertzBoard instance to convert indices to position strings
+        """
+        for rem_idx in removable_indices:
+            rem_y = rem_idx // board.width
+            rem_x = rem_idx % board.width
+            pos_str = board.index_to_str((rem_y, rem_x))
+
+            if pos_str and pos_str in self.pos_to_base:
+                base_piece = self.pos_to_base[pos_str]
+                original_mat = base_piece.model.getMaterial()
+                self.highlighted_rings[pos_str] = original_mat
+
+                # Create highlight material using same colors as placement
+                highlight_mat = Material()
+                if original_mat is not None:
+                    highlight_mat.setMetallic(original_mat.getMetallic())
+                    highlight_mat.setRoughness(original_mat.getRoughness())
+                else:
+                    highlight_mat.setMetallic(0.9)
+                    highlight_mat.setRoughness(0.1)
+
+                highlight_mat.setBaseColor(self.PLACEMENT_HIGHLIGHT_COLOR)
+                highlight_mat.setEmission(self.PLACEMENT_HIGHLIGHT_EMISSION)
+                base_piece.model.setMaterial(highlight_mat, 1)
+
+    def clear_move_highlights(self):
+        """Clear all move highlights and restore original materials."""
+        for pos_str, original_mat in self.highlighted_rings.items():
+            if pos_str in self.pos_to_base:
+                base_piece = self.pos_to_base[pos_str]
+                if original_mat is not None:
+                    base_piece.model.setMaterial(original_mat, 1)
+                else:
+                    base_piece.model.clearMaterial()
+        self.highlighted_rings.clear()
+
+    def _apply_highlight(self, highlight_info, current_time):
+        """Apply a highlight to the specified rings.
+
+        Args:
+            highlight_info: Dict with 'rings', 'duration', 'color', 'emission'
+            current_time: Current task time
+        """
+        rings = highlight_info['rings']
+        color = highlight_info.get('color', self.PLACEMENT_HIGHLIGHT_COLOR)
+        emission = highlight_info.get('emission', self.PLACEMENT_HIGHLIGHT_EMISSION)
+        duration = highlight_info['duration']
+
+        # Store original materials
+        original_materials = {}
+
+        for pos_str in rings:
+            if pos_str in self.pos_to_base:
+                base_piece = self.pos_to_base[pos_str]
+                original_mat = base_piece.model.getMaterial()
+                original_materials[pos_str] = original_mat
+
+                # Create and apply highlight material
+                highlight_mat = Material()
+                if original_mat is not None:
+                    highlight_mat.setMetallic(original_mat.getMetallic())
+                    highlight_mat.setRoughness(original_mat.getRoughness())
+                else:
+                    highlight_mat.setMetallic(0.9)
+                    highlight_mat.setRoughness(0.1)
+
+                highlight_mat.setBaseColor(color)
+                highlight_mat.setEmission(emission)
+                base_piece.model.setMaterial(highlight_mat, 1)
+
+        # Update highlight_info with calculated end time and original materials
+        highlight_info['end_time'] = current_time + duration
+        highlight_info['original_materials'] = original_materials
+
+    def _clear_highlight(self, highlight_info):
+        """Clear a highlight and restore original materials.
+
+        Args:
+            highlight_info: Dict with 'original_materials'
+        """
+        original_materials = highlight_info.get('original_materials', {})
+
+        for pos_str, original_mat in original_materials.items():
+            if pos_str in self.pos_to_base:
+                base_piece = self.pos_to_base[pos_str]
+                if original_mat is not None:
+                    base_piece.model.setMaterial(original_mat, 1)
+                else:
+                    base_piece.model.clearMaterial()
+
+    def queue_highlight(self, rings, duration, color=None, emission=None):
+        """Add a highlight to the queue.
+
+        Args:
+            rings: List of position strings (e.g., ['A1', 'B2', 'C3'])
+            duration: How long to show highlight in seconds
+            color: LVector4 color (defaults to PLACEMENT_HIGHLIGHT_COLOR)
+            emission: LVector4 emission (defaults to PLACEMENT_HIGHLIGHT_EMISSION)
+        """
+        highlight_info = {
+            'rings': rings,
+            'duration': duration,
+            'color': color if color is not None else self.PLACEMENT_HIGHLIGHT_COLOR,
+            'emission': emission if emission is not None else self.PLACEMENT_HIGHLIGHT_EMISSION
+        }
+        self.highlight_queue.put(highlight_info)
+
+    def is_highlight_active(self):
+        """Check if any highlights are active or queued."""
+        return self.current_highlight is not None or not self.highlight_queue.empty()
+
+    def clear_highlight_queue(self):
+        """Clear all queued highlights and current highlight."""
+        # Clear current highlight if exists
+        if self.current_highlight is not None:
+            self._clear_highlight(self.current_highlight)
+            self.current_highlight = None
+
+        # Empty the queue
+        while not self.highlight_queue.empty():
+            try:
+                self.highlight_queue.get_nowait()
+            except Empty:
+                break
