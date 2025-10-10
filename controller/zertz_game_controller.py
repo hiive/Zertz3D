@@ -53,7 +53,6 @@ class ZertzGameController:
         # Initialize renderer with game state
         if self.renderer is not None:
             self.renderer.reset_board()
-            self.renderer.init_highlight_state_machine(self.session.game)
 
         # Open log file for first game (if not in replay mode)
         if not self.session.is_replay_mode():
@@ -111,7 +110,6 @@ class ZertzGameController:
         # Reset renderer if present
         if self.renderer is not None:
             self.renderer.reset_board()
-            self.renderer.init_highlight_state_machine(self.session.game)
 
         # Open log file for new game (if not in replay mode)
         if not self.session.is_replay_mode():

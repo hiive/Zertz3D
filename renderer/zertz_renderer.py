@@ -28,7 +28,7 @@ class MoveHighlightStateMachine:
     PHASE_SELECTED_CAPTURE = 'selected_capture'
     PHASE_ANIMATING = 'animating'  # Waiting for final move animations to complete
 
-    def __init__(self, renderer, game):
+    def __init__(self, renderer):
         """Initialize the state machine.
 
         Args:
@@ -36,7 +36,6 @@ class MoveHighlightStateMachine:
             game: ZertzGame instance (used only for read-only operations like get_valid_actions)
         """
         self.renderer = renderer
-        self.game = game
         self.highlight_durations = {
             self.PHASE_PLACEMENT_HIGHLIGHTS: 0.5,
             self.PHASE_SELECTED_PLACEMENT: 0.5,
@@ -493,7 +492,7 @@ class ZertzRenderer(ShowBase):
                 to_remove.append(anim_item)
                 continue
 
-            # Update animation (only for move type)
+            # Update animation
             if anim_type == 'move':
                 entity = anim_item['entity']
                 src = anim_item['src']
@@ -525,6 +524,53 @@ class ZertzRenderer(ShowBase):
 
                 x, y, z = self.get_current_pos(anim_factor, dst, src, jump=jump)
                 entity.set_pos((x, y, z))
+            elif anim_type == 'highlight':
+                # Update highlight blend (pulsing effect)
+                original_materials = anim_item.get('original_materials', {})
+                target_color = anim_item.get('target_color', self.PLACEMENT_HIGHLIGHT_COLOR)
+                target_emission = anim_item.get('target_emission', self.PLACEMENT_HIGHLIGHT_EMISSION)
+                duration = anim_item['duration']
+                start_time = anim_item['start_time']
+                elapsed_time = task.time - start_time
+
+                # Use sine wave for smooth pulsing: fade in (0 to 1), fade out (1 to 0)
+                # sin goes from 0 -> 1 -> 0 over the animation duration
+                pulse_factor = math.sin((elapsed_time / duration) * math.pi)
+
+                # Update material for each entity in the highlight
+                for pos_str, mat_info in original_materials.items():
+                    (original_mat, entity_type, original_color, original_emission,
+                     original_metallic, original_roughness) = mat_info
+
+                    # Get the entity
+                    entity = None
+                    if entity_type == 'marble' and pos_str in self.pos_to_marble:
+                        entity = self.pos_to_marble[pos_str]
+                    elif entity_type == 'ring' and pos_str in self.pos_to_base:
+                        entity = self.pos_to_base[pos_str]
+
+                    if entity is not None:
+                        # Blend between original and target colors
+                        blended_color = LVector4(
+                            original_color.x + (target_color.x - original_color.x) * pulse_factor,
+                            original_color.y + (target_color.y - original_color.y) * pulse_factor,
+                            original_color.z + (target_color.z - original_color.z) * pulse_factor,
+                            original_color.w + (target_color.w - original_color.w) * pulse_factor
+                        )
+                        blended_emission = LVector4(
+                            original_emission.x + (target_emission.x - original_emission.x) * pulse_factor,
+                            original_emission.y + (target_emission.y - original_emission.y) * pulse_factor,
+                            original_emission.z + (target_emission.z - original_emission.z) * pulse_factor,
+                            original_emission.w + (target_emission.w - original_emission.w) * pulse_factor
+                        )
+
+                        # Create and apply blended material
+                        blended_mat = Material()
+                        blended_mat.setMetallic(original_metallic)
+                        blended_mat.setRoughness(original_roughness)
+                        blended_mat.setBaseColor(blended_color)
+                        blended_mat.setEmission(blended_emission)
+                        entity.model.setMaterial(blended_mat, 1)
 
         # Remove completed animations
         for anim_item in to_remove:
@@ -990,14 +1036,8 @@ class ZertzRenderer(ShowBase):
 
         self.current_animations = []
 
-    def init_highlight_state_machine(self, game):
-        """Initialize the highlight state machine with game reference.
-
-        Args:
-            game: ZertzGame instance for the state machine to use
-        """
         if self.show_moves:
-            self.highlight_sm = MoveHighlightStateMachine(self, game)
+            self.highlight_sm = MoveHighlightStateMachine(self)
 
     def is_busy(self):
         """Check if renderer is busy with highlights or animations.
@@ -1086,23 +1126,33 @@ class ZertzRenderer(ShowBase):
 
             if entity is not None:
                 original_mat = entity.model.getMaterial()
-                original_materials[pos_str] = (original_mat, entity_type)
 
-                # Create and apply highlight material
-                highlight_mat = Material()
+                # Store original material properties for blending
                 if original_mat is not None:
-                    highlight_mat.setMetallic(original_mat.getMetallic())
-                    highlight_mat.setRoughness(original_mat.getRoughness())
+                    original_color = original_mat.getBaseColor()
+                    original_emission = original_mat.getEmission()
+                    original_metallic = original_mat.getMetallic()
+                    original_roughness = original_mat.getRoughness()
                 else:
-                    highlight_mat.setMetallic(0.9)
-                    highlight_mat.setRoughness(0.1)
+                    # Default properties if no material exists
+                    original_color = LVector4(0.8, 0.8, 0.8, 1.0)
+                    original_emission = LVector4(0.0, 0.0, 0.0, 1.0)
+                    original_metallic = 0.9
+                    original_roughness = 0.1
 
-                highlight_mat.setBaseColor(color)
-                highlight_mat.setEmission(emission)
-                entity.model.setMaterial(highlight_mat, 1)
+                original_materials[pos_str] = (
+                    original_mat,
+                    entity_type,
+                    original_color,
+                    original_emission,
+                    original_metallic,
+                    original_roughness
+                )
 
-        # Store original materials for later restoration
+        # Store original materials and target colors for later blending
         highlight_info['original_materials'] = original_materials
+        highlight_info['target_color'] = color
+        highlight_info['target_emission'] = emission
 
     def _clear_highlight(self, highlight_info):
         """Clear a highlight and restore original materials.
@@ -1113,7 +1163,7 @@ class ZertzRenderer(ShowBase):
         original_materials = highlight_info.get('original_materials', {})
 
         for pos_str, mat_info in original_materials.items():
-            original_mat, entity_type = mat_info
+            original_mat, entity_type, _, _, _, _ = mat_info
 
             # Get the entity based on type
             entity = None
