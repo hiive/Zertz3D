@@ -305,3 +305,157 @@ def test_all_capture_colors(game, capture_color, expected_char):
     notation = game.action_to_notation(action_dict)
     assert expected_char in notation
     assert notation == f'x c3{expected_char}e3'
+
+
+# ============================================================================
+# Isolation Tests (for Temporal Coupling Issue 2)
+# ============================================================================
+
+def test_put_with_single_marble_isolation(game):
+    """Test placement with single marble isolation."""
+    action_dict = {
+        'action': 'PUT',
+        'marble': 'b',
+        'dst': 'D7',
+        'remove': 'B2'
+    }
+
+    # Isolation result: single marble captured
+    isolation_result = [{'marble': 'w', 'pos': 'A1'}]
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    assert notation == 'Bd7,b2 x Wa1'
+
+
+def test_put_with_multiple_marble_isolation(game):
+    """Test placement with multiple marble isolation."""
+    action_dict = {
+        'action': 'PUT',
+        'marble': 'b',
+        'dst': 'D7',
+        'remove': 'B2'
+    }
+
+    # Isolation result: two marbles captured
+    isolation_result = [
+        {'marble': 'w', 'pos': 'A1'},
+        {'marble': 'w', 'pos': 'A2'}
+    ]
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    assert notation == 'Bd7,b2 x Wa1Wa2'
+
+
+def test_put_with_mixed_color_isolation(game):
+    """Test placement isolating marbles of different colors."""
+    action_dict = {
+        'action': 'PUT',
+        'marble': 'g',
+        'dst': 'E5',
+        'remove': 'C3'
+    }
+
+    # Isolation result: different colored marbles
+    isolation_result = [
+        {'marble': 'w', 'pos': 'A1'},
+        {'marble': 'g', 'pos': 'B2'},
+        {'marble': 'b', 'pos': 'C1'}
+    ]
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    assert notation == 'Ge5,c3 x Wa1Gb2Bc1'
+
+
+def test_put_no_removal_with_isolation(game):
+    """Test placement without ring removal but with isolation."""
+    action_dict = {
+        'action': 'PUT',
+        'marble': 'w',
+        'dst': 'D4',
+        'remove': ''
+    }
+
+    # Isolation result
+    isolation_result = [{'marble': 'b', 'pos': 'G1'}]
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    assert notation == 'Wd4 x Bg1'
+
+
+def test_put_with_empty_isolation_list(game):
+    """Test that empty isolation list doesn't add 'x' notation."""
+    action_dict = {
+        'action': 'PUT',
+        'marble': 'w',
+        'dst': 'D4',
+        'remove': 'B2'
+    }
+
+    # Empty isolation list
+    isolation_result = []
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    assert notation == 'Wd4,b2'
+    assert ' x ' not in notation
+
+
+def test_put_with_none_marble_in_isolation(game):
+    """Test isolation result with None marble (vacant ring removed)."""
+    action_dict = {
+        'action': 'PUT',
+        'marble': 'b',
+        'dst': 'D7',
+        'remove': 'B2'
+    }
+
+    # Isolation result: vacant ring (marble is None) should not appear in notation
+    isolation_result = [
+        {'marble': 'w', 'pos': 'A1'},
+        {'marble': None, 'pos': 'A2'},  # Vacant ring
+        {'marble': 'g', 'pos': 'B1'}
+    ]
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    # Should only include marbles with actual colors
+    assert notation == 'Bd7,b2 x Wa1Gb1'
+
+
+def test_isolation_coordinates_lowercase(game):
+    """Test that isolation coordinates are lowercased."""
+    action_dict = {
+        'action': 'PUT',
+        'marble': 'w',
+        'dst': 'D4',
+        'remove': 'B2'
+    }
+
+    # Isolation with uppercase coordinates (should be lowercased)
+    isolation_result = [
+        {'marble': 'w', 'pos': 'A1'},
+        {'marble': 'G', 'pos': 'B2'}
+    ]
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    # All positions should be lowercase
+    assert 'a1' in notation.lower()
+    assert 'b2' in notation.lower()
+
+
+def test_capture_action_ignores_isolation(game):
+    """Test that CAP actions don't use isolation_result (captures don't cause isolation)."""
+    action_dict = {
+        'action': 'CAP',
+        'marble': 'b',
+        'src': 'E3',
+        'dst': 'G3',
+        'capture': 'w',
+        'cap': 'F3'
+    }
+
+    # Isolation result should be ignored for captures
+    isolation_result = [{'marble': 'w', 'pos': 'A1'}]
+
+    notation = game.action_to_notation(action_dict, isolation_result)
+    # Should be normal capture notation without isolation
+    assert notation == 'x e3Wg3'
+    assert ' x ' not in notation[1:]  # No second 'x' for isolation
