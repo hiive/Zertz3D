@@ -50,8 +50,14 @@ uv run main.py --headless
 # Control number of games to play (default: play indefinitely)
 uv run main.py --games 10
 
-# Log game actions to file
+# Log game actions to file (dictionary format)
 uv run main.py --log
+
+# Log game moves using official Zèrtz notation
+uv run main.py --log-notation
+
+# Use both logging formats simultaneously
+uv run main.py --log --log-notation
 
 # Show valid moves before each turn (highlights placement/capture/removal positions)
 uv run main.py --show-moves
@@ -107,6 +113,15 @@ Two types of actions:
   - Official notation: `-`
 
 The game now outputs both internal format and official Zèrtz notation (from http://www.gipf.com/zertz/notations/notation.html) for each move.
+
+### Notation Log Files
+
+Use the `--log-notation` flag to create a separate log file containing moves in official notation format:
+- File format: `zertzlog_{seed}_notation.txt` or `zertzlog_blitz_{seed}_notation.txt`
+- First line: board size and variant (e.g., "37" or "37 Blitz")
+- Subsequent lines: one move per line in official notation
+- Supports isolation notation: `Bd7,b2 x Wa1Wa2` (placement that isolates marbles)
+- Can be used with `--log` to generate both formats simultaneously
 
 ### Win Conditions
 
@@ -189,6 +204,7 @@ uv run pytest
 - **Symmetry Transforms**: Implements D6 (37/61 rings) and D3 (48 rings) dihedral group symmetries for state canonicalization
 - **ML Integration**: State separated into spatial (L×H×W board features) and global (10-element vector) components for machine learning applications
 - **Official Notation**: Game outputs moves in official Zèrtz notation format (e.g., `Wd4`, `x e3Wg3`, `-`) alongside internal dictionary format
+- **Unified Animation System**: Single animation queue handles both movement animations and highlight effects (material changes). Type discrimination (`'move'` vs `'highlight'`) allows different processing paths while maintaining consistent timing and lifecycle. Highlights apply instantly; moves interpolate over time
 
 For more detailed technical documentation, see `CLAUDE.md`.
 

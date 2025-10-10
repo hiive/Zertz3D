@@ -15,11 +15,12 @@ if __name__ == '__main__':
     parser.add_argument('--games', type=int, help='Number of games to play (default: play indefinitely)')
     parser.add_argument('--show-moves', action='store_true', help='Show valid moves before each turn')
     parser.add_argument('--show-coords', action='store_true', help='Show coordinate labels on rings in 3D view')
+    parser.add_argument('--log-notation', action='store_true', help='Log game moves using official Zèrtz notation')
     parser.add_argument('--blitz', action='store_true', help='Use blitz variant (37 rings only, fewer marbles, lower win thresholds)')
     args = parser.parse_args()
 
     game = ZertzGameController(rings=args.rings, replay_file=args.replay, seed=args.seed,
                                 log_to_file=args.log, partial_replay=args.partial, headless=args.headless,
                                 max_games=args.games, show_moves=args.show_moves, show_coords=args.show_coords,
-                                blitz=args.blitz)
+                                log_notation=args.log_notation, blitz=args.blitz)
     game.run()

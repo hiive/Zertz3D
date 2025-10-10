@@ -435,18 +435,23 @@ class ZertzGame:
             }
         return action_str, action_dict
 
-    def action_to_notation(self, action_dict):
+    def action_to_notation(self, action_dict, isolation_result=None):
         """Convert action_dict to official Zèrtz notation.
 
         Notation format from http://www.gipf.com/zertz/notations/notation.html:
         - Placement: [Color][coord] or [Color][coord],[removed_coord]
           Examples: "Wd4" or "Bd7,b2"
+        - Placement with isolation: [Color][coord],[removed_coord] x [Color][pos]...
+          Example: "Bd7,b2 x Wa1Wa2"
         - Capture: x [src][captured_color][dst]
           Example: "x e3Wg3"
         - Pass: "-"
 
         Args:
             action_dict: Dictionary with action details
+            isolation_result: Optional isolation result from take_action()
+                - Single marble: captured marble color (str)
+                - Multiple marbles: list of dicts [{'marble': 'w', 'pos': 'A1'}, ...]
 
         Returns:
             str: Notation string
@@ -463,9 +468,22 @@ class ZertzGame:
             # Check if a ring was removed
             if action_dict['remove']:
                 remove = action_dict['remove'].lower()
-                return f"{marble}{dst},{remove}"
+                notation = f"{marble}{dst},{remove}"
             else:
-                return f"{marble}{dst}"
+                notation = f"{marble}{dst}"
+
+            # Add isolation captures if any
+            if isolation_result and isinstance(isolation_result, list):
+                isolated_parts = []
+                for removal in isolation_result:
+                    if removal['marble']:
+                        color = removal['marble'].upper()
+                        pos = removal['pos'].lower()
+                        isolated_parts.append(f"{color}{pos}")
+                if isolated_parts:
+                    notation += " x " + "".join(isolated_parts)
+
+            return notation
 
         elif action_dict['action'] == 'CAP':
             # Convert to lowercase and get captured marble as uppercase
@@ -475,6 +493,84 @@ class ZertzGame:
             return f"x {src}{captured}{dst}"
 
         return ''
+
+    def get_placement_positions(self, placement_array):
+        """Convert placement array to list of position strings.
+
+        Args:
+            placement_array: Placement array from get_valid_actions() - shape (3, width², width²+1)
+
+        Returns:
+            List of position strings for valid placement destinations
+        """
+        # Find valid destinations by collapsing marble type and removal dimensions
+        valid_dests = np.any(placement_array, axis=(0, 2))
+        dest_indices = np.argwhere(valid_dests).flatten()
+
+        placement_positions = []
+        for dst_idx in dest_indices:
+            dst_y = dst_idx // self.board.width
+            dst_x = dst_idx % self.board.width
+            pos_str = self.board.index_to_str((dst_y, dst_x))
+            if pos_str:
+                placement_positions.append(pos_str)
+
+        return placement_positions
+
+    def get_capture_dicts(self, capture_array):
+        """Convert capture array to list of capture move dicts.
+
+        Args:
+            capture_array: Capture array from get_valid_actions() - shape (6, width, width)
+
+        Returns:
+            List of dicts with {action, marble, src, dst, capture, cap} for each valid capture
+        """
+        capture_positions = np.argwhere(capture_array)
+        capture_moves = []
+
+        for direction, src_y, src_x in capture_positions:
+            try:
+                _, action_dict = self.action_to_str("CAP", (direction, src_y, src_x))
+                capture_moves.append(action_dict)
+            except (IndexError, KeyError):
+                continue
+
+        return capture_moves
+
+    def get_removal_map(self, placement_array, action_type, action):
+        """Build map of removal positions for a specific PUT action.
+
+        Args:
+            placement_array: Placement array from get_valid_actions()
+            action_type: Action type (must be "PUT")
+            action: Action tuple (marble_idx, dst, rem)
+
+        Returns:
+            Dict mapping (marble_idx, dst) -> list of removable position strings
+            Returns empty dict if action_type is not "PUT"
+        """
+        if action_type != "PUT":
+            return {}
+
+        marble_idx, dst, rem = action
+        width = self.board.width
+
+        # Get the removal dimension for this specific (marble, destination) pair
+        removal_mask = placement_array[marble_idx, dst, :]
+        removable_indices = np.argwhere(removal_mask).flatten()
+
+        removable_positions = []
+        for rem_idx in removable_indices:
+            # Skip the "no removal" option (width²) and the destination itself
+            if rem_idx != width ** 2 and rem_idx != dst:
+                rem_y = rem_idx // width
+                rem_x = rem_idx % width
+                rem_str = self.board.index_to_str((rem_y, rem_x))
+                if rem_str:
+                    removable_positions.append(rem_str)
+
+        return {(marble_idx, dst): removable_positions}
 
     def print_state(self):
         # Print the board state and supplies to the console

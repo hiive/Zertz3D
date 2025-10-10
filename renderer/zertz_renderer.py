@@ -16,6 +16,293 @@ from renderer.zertz_models import BasePiece, SkyBox, make_marble
 logger = logging.getLogger(__name__)
 
 
+class MoveHighlightStateMachine:
+    """Manages the multi-phase highlighting sequence for showing moves."""
+
+    # Phase constants
+    PHASE_PLACEMENT_HIGHLIGHTS = 'placement_highlights'
+    PHASE_SELECTED_PLACEMENT = 'selected_placement'
+    PHASE_REMOVAL_HIGHLIGHTS = 'removal_highlights'
+    PHASE_SELECTED_REMOVAL = 'selected_removal'
+    PHASE_CAPTURE_HIGHLIGHTS = 'capture_highlights'
+    PHASE_SELECTED_CAPTURE = 'selected_capture'
+    PHASE_ANIMATING = 'animating'  # Waiting for final move animations to complete
+
+    def __init__(self, renderer, game):
+        """Initialize the state machine.
+
+        Args:
+            renderer: ZertzRenderer instance
+            game: ZertzGame instance (used only for read-only operations like get_valid_actions)
+        """
+        self.renderer = renderer
+        self.game = game
+        self.highlight_durations = {
+            self.PHASE_PLACEMENT_HIGHLIGHTS: 0.5,
+            self.PHASE_SELECTED_PLACEMENT: 0.5,
+            self.PHASE_REMOVAL_HIGHLIGHTS: 0.5,
+            self.PHASE_SELECTED_REMOVAL: 0.5,
+            self.PHASE_CAPTURE_HIGHLIGHTS: 0.5,
+            self.PHASE_SELECTED_CAPTURE: 0.5,
+        }
+
+        # State tracking
+        self.phase = None  # Current phase: 'placement_highlights', 'selected_placement', etc.
+        self.pending_action = None  # (ax, ay, player) tuple
+        self.pending_action_dict = None  # Action dict
+        self.pending_result = None  # Result passed from controller
+        self.placement_positions = None  # List of position strings for placement highlights
+        self.capture_moves = None  # List of capture move dicts
+        self.removal_map = None  # Map of (marble_idx, dst) -> list of removable positions
+        self.task_delay_time = 0  # Animation duration from controller's task
+
+    def is_active(self):
+        """Check if the state machine is currently active."""
+        return self.phase is not None
+
+    def start(self, ax, ay, player, action_dict, result, task_delay_time,
+             placement_positions=None, capture_moves=None, removal_map=None):
+        """Start the highlighting sequence for an action.
+
+        Args:
+            ax: Action type ("PUT", "CAP", or "PASS")
+            ay: Action tuple (or None for PASS)
+            player: Player making the move
+            action_dict: Action dictionary
+            result: Result from game.take_action() (already executed by controller)
+            task_delay_time: Animation duration from controller's task
+            placement_positions: List of position strings for placement highlights
+            capture_moves: List of capture move dicts with pre-converted strings
+            removal_map: Dict mapping (marble_idx, dst) -> list of removable positions
+        """
+        self.pending_action = (ax, ay, player)
+        self.pending_action_dict = action_dict
+        self.pending_result = result
+        self.task_delay_time = task_delay_time
+        self.placement_positions = placement_positions
+        self.capture_moves = capture_moves
+        self.removal_map = removal_map
+
+        if ax == "PUT":
+            # Queue placement highlights and start the sequence
+            self._queue_placement_highlights(placement_positions)
+            self.phase = self.PHASE_PLACEMENT_HIGHLIGHTS
+        elif ax == "CAP":
+            # Queue capture highlights and start the sequence
+            self._queue_capture_highlights(capture_moves)
+            self.phase = self.PHASE_CAPTURE_HIGHLIGHTS
+        elif ax == "PASS":
+            # PASS has no visuals, action already executed by controller
+            self.phase = None  # Done immediately (no highlight phases)
+
+    def update(self, task):
+        """Update the state machine. Called each frame.
+
+        Args:
+            task: Panda3D task object
+
+        Returns:
+            True if the state machine should continue (waiting for animations or processing)
+            False if the state machine is done and game should proceed
+        """
+        if not self.is_active():
+            return False
+
+        # Check if animations are still active
+        if self.renderer.is_animation_active():
+            return True  # Still waiting for animations to finish
+
+        # Animations finished, advance to next phase
+        if self.phase == self.PHASE_PLACEMENT_HIGHLIGHTS:
+            self._on_placement_highlights_done()
+        elif self.phase == self.PHASE_SELECTED_PLACEMENT:
+            self._on_selected_placement_done(task)
+        elif self.phase == self.PHASE_REMOVAL_HIGHLIGHTS:
+            self._on_removal_highlights_done()
+        elif self.phase == self.PHASE_SELECTED_REMOVAL:
+            self._on_selected_removal_done(task)
+        elif self.phase == self.PHASE_CAPTURE_HIGHLIGHTS:
+            self._on_capture_highlights_done()
+        elif self.phase == self.PHASE_SELECTED_CAPTURE:
+            self._on_selected_capture_done(task)
+        elif self.phase == self.PHASE_ANIMATING:
+            # Waiting for final move animations to complete
+            # When we reach here, animations are done, so phase can be set to None
+            self.phase = None
+
+        return self.is_active()
+
+    def _queue_placement_highlights(self, placement_positions):
+        """Queue highlights for all valid placement positions.
+
+        Args:
+            placement_positions: List of position strings (pre-converted by controller)
+        """
+        if placement_positions:
+            self.renderer.queue_highlight(placement_positions, self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS])
+
+    def _queue_removal_highlights(self, removal_positions, defer=0):
+        """Queue highlights for all valid removal positions for this action.
+
+        Args:
+            removal_positions: List of position strings (pre-converted by controller)
+            defer: Delay before starting the highlight (seconds)
+        """
+        if removal_positions:
+            self.renderer.queue_highlight(
+                removal_positions,
+                self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS],
+                color=self.renderer.REMOVABLE_HIGHLIGHT_COLOR,
+                emission=self.renderer.REMOVABLE_HIGHLIGHT_EMISSION,
+                defer=defer
+            )
+
+    def _queue_capture_highlights(self, capture_moves):
+        """Queue highlights for all valid capture moves, grouped by source marble.
+
+        If only one capture is available, skip highlighting (will auto-advance to selected_capture phase).
+
+        Args:
+            capture_moves: List of capture move dicts (pre-converted by controller)
+        """
+        # Skip highlighting if only one capture available
+        if capture_moves and len(capture_moves) == 1:
+            print(f"[StateMachine] Skipping capture highlights - only 1 capture available")
+            return
+
+        # Group captures by source position
+        captures_by_source = {}  # {src_str: [dst_str1, dst_str2, ...]}
+        for action_dict in capture_moves:
+            src_str = action_dict['src']
+            dst_str = action_dict['dst']
+
+            if src_str not in captures_by_source:
+                captures_by_source[src_str] = set()
+            if dst_str:
+                captures_by_source[src_str].add(dst_str)
+
+        print(f"[StateMachine] Queueing capture highlights: {len(capture_moves)} total captures, {len(captures_by_source)} source groups")
+
+        # Queue highlights sequentially - each group displays one after another
+        capture_duration = self.highlight_durations[self.PHASE_CAPTURE_HIGHLIGHTS]
+        defer_time = 0
+        for src_str, destinations in captures_by_source.items():
+            # Highlight the source marble and all its possible destinations
+            highlight_rings = [src_str] + list(destinations)
+            print(f"[StateMachine]   Group: src={src_str}, destinations={list(destinations)}, defer={defer_time}")
+            self.renderer.queue_highlight(
+                highlight_rings,
+                capture_duration,
+                color=self.renderer.CAPTURE_HIGHLIGHT_COLOR,
+                emission=self.renderer.CAPTURE_HIGHLIGHT_EMISSION,
+                defer=defer_time
+            )
+            # Next group starts when this one ends
+            defer_time += capture_duration
+
+    def _on_placement_highlights_done(self):
+        """Handle completion of placement highlights phase."""
+        action_dict = self.pending_action_dict
+
+        # Queue highlight for selected placement ring only
+        selected_ring = action_dict['dst']
+        self.renderer.queue_highlight([selected_ring], self.highlight_durations[self.PHASE_SELECTED_PLACEMENT])
+        self.phase = self.PHASE_SELECTED_PLACEMENT
+
+    def _on_selected_placement_done(self, task):
+        """Handle completion of selected placement highlight phase."""
+        ax, ay, player = self.pending_action
+        action_dict = self.pending_action_dict
+
+        # Animate marble placement (action already executed by controller)
+        if ax == "PUT":
+            self.renderer.show_marble_placement(player, action_dict, self.task_delay_time)
+
+            # Calculate marble placement animation duration (same calculation as in show_marble_placement)
+            marble_animation_duration = self.task_delay_time * 0.45
+
+            # Queue removal highlights AFTER marble placement animation completes
+            if self.removal_map is not None:
+                marble_idx, dst, rem = ay  # Unpack action tuple
+                key = (marble_idx, dst)
+                removal_positions = self.removal_map.get(key, [])
+                self._queue_removal_highlights(removal_positions, defer=marble_animation_duration)
+
+        # Move to removal highlights phase
+        if ax == "PUT":
+            self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
+        else:
+            # Shouldn't reach here for PUT actions
+            self.phase = None  # Done
+
+    def _on_removal_highlights_done(self):
+        """Handle completion of removal highlights phase."""
+        action_dict = self.pending_action_dict
+
+        # Queue highlight for selected removal ring only
+        selected_removal = action_dict['remove']
+        if selected_removal:  # Only if a ring is being removed
+            self.renderer.queue_highlight(
+                [selected_removal],
+                self.highlight_durations[self.PHASE_SELECTED_REMOVAL],
+                color=self.renderer.REMOVABLE_HIGHLIGHT_COLOR,
+                emission=self.renderer.REMOVABLE_HIGHLIGHT_EMISSION
+            )
+        self.phase = self.PHASE_SELECTED_REMOVAL
+
+    def _on_selected_removal_done(self, task):
+        """Handle completion of selected removal highlight phase."""
+        action_dict = self.pending_action_dict
+
+        # Now animate ring removal only (marble was already placed)
+        self.renderer.show_ring_removal(action_dict, self.task_delay_time)
+
+        # Wait for final move animations to complete
+        self.phase = self.PHASE_ANIMATING
+
+    def _on_capture_highlights_done(self):
+        """Handle completion of capture highlights phase."""
+        action_dict = self.pending_action_dict
+
+        # Queue highlight for selected capture (src and dst) only in cornflower blue
+        src_ring = action_dict['src']
+        dst_ring = action_dict['dst']
+        selected_rings = [src_ring, dst_ring]
+
+        self.renderer.queue_highlight(
+            selected_rings,
+            self.highlight_durations[self.PHASE_SELECTED_CAPTURE],
+            color=self.renderer.SELECTED_CAPTURE_HIGHLIGHT_COLOR,
+            emission=self.renderer.SELECTED_CAPTURE_HIGHLIGHT_EMISSION
+        )
+        self.phase = self.PHASE_SELECTED_CAPTURE
+
+    def _on_selected_capture_done(self, task):
+        """Handle completion of selected capture highlight phase."""
+        ax, ay, player = self.pending_action
+        action_dict = self.pending_action_dict
+
+        # Animate capture action (action already executed by controller)
+        self.renderer.show_action(player, action_dict, self.task_delay_time)
+
+        # Wait for final move animations to complete
+        self.phase = self.PHASE_ANIMATING
+
+    def get_pending_player(self):
+        """Get the player from the pending action."""
+        if self.pending_action:
+            return self.pending_action[2]
+        return None
+
+    def get_pending_result(self):
+        """Get the pending result after action execution."""
+        return self.pending_result
+
+    def get_pending_action_dict(self):
+        """Get the pending action dictionary."""
+        return self.pending_action_dict
+
+
 class ZertzRenderer(ShowBase):
     # Rendering constants
     BASE_SIZE_X = 0.8
@@ -43,10 +330,13 @@ class ZertzRenderer(ShowBase):
         61: {'center_pos': 'E5', 'cam_dist': 11, 'cam_height': 10}
     }
 
-    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False):
+    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False, show_moves=False):
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
+
+        self.show_moves = show_moves
+        self.highlight_sm = None  # Initialized later when game board is available
 
         props = WindowProperties()
         # props.setSize(1364, 768)
@@ -55,7 +345,7 @@ class ZertzRenderer(ShowBase):
         self.win.requestProperties(props)
 
         self.animation_queue = SimpleQueue()
-        self.current_animations = {}
+        self.current_animations = []  # List of active animation items (both moves and highlights)
         self.pos_to_base = {}
         self.pos_to_marble = {}
         self.removed_bases = []
@@ -63,10 +353,7 @@ class ZertzRenderer(ShowBase):
         self.pos_to_label = {}  # Maps position strings to text labels
         self.pos_array = None
         self.show_coords = show_coords
-
-        # Highlight queue for move visualization
-        self.highlight_queue = SimpleQueue()
-        self.current_highlight = None  # {'rings': [...], 'end_time': t, 'original_materials': {...}}
+        self._animation_id_counter = 0  # For generating unique IDs
 
         self.x_base_size = self.BASE_SIZE_X
         self.y_base_size = self.BASE_SIZE_Y
@@ -137,94 +424,111 @@ class ZertzRenderer(ShowBase):
         self.task = self.taskMgr.add(self.update, 'zertzUpdate', sort=50)
 
     def update(self, task):
-        # for m in self.marble_pool:
-        #    m.model.setR(10*task.time)
-        # entity, src_coords, dst_coords,
-        #
-        # self.board_marble_scale, action_duration
+        """Update all animations - both move and highlight types."""
+
+        # Update state machine if active
+        if self.highlight_sm and self.highlight_sm.is_active():
+            self.highlight_sm.update(task)
 
         # Process animation queue - add new animations
         while not self.animation_queue.empty():
             try:
-                anim_info = self.animation_queue.get_nowait()
-                entity = anim_info['entity']
-                self.current_animations[entity] = {
-                    'src': anim_info['src'],
-                    'dst': anim_info['dst'],
-                    'src_scale': entity.get_scale(),
-                    'dst_scale': anim_info['scale'],
-                    'duration': anim_info['duration'],
-                    'insert_time': task.time,
-                    'start_time': task.time + anim_info['defer']
-                }
+                anim_item = self.animation_queue.get_nowait()
+                anim_type = anim_item.get('type', 'move')  # Default to 'move' for backward compatibility
+
+                # Generate unique ID
+                self._animation_id_counter += 1
+                anim_item['id'] = self._animation_id_counter
+
+                # Set timing
+                defer = anim_item.get('defer', 0)
+                anim_item['insert_time'] = task.time
+                anim_item['start_time'] = task.time + defer
+                anim_item['end_time'] = anim_item['start_time'] + anim_item['duration']
+
+                if anim_type == 'move':
+                    # For move animations, store initial scale
+                    entity = anim_item['entity']
+                    if 'src_scale' not in anim_item:
+                        anim_item['src_scale'] = entity.get_scale()
+                    anim_item['dst_scale'] = anim_item.get('scale')
+                elif anim_type == 'highlight':
+                    # For highlights, apply immediately (materials don't animate)
+                    if task.time >= anim_item['start_time']:
+                        self._apply_highlight(anim_item)
+
+                self.current_animations.append(anim_item)
             except Empty:
                 pass
 
         # Update all active animations
         to_remove = []
-        for entity, anim_data in self.current_animations.items():
-            src = anim_data['src']
-            dst = anim_data['dst']
-            src_scale = anim_data['src_scale']
-            dst_scale = anim_data['dst_scale']
-            duration = anim_data['duration']
-            start_time = anim_data['start_time']
-            elapsed_time = task.time - start_time
-            if elapsed_time < 0:
+        for anim_item in self.current_animations:
+            anim_type = anim_item.get('type', 'move')
+
+            # For highlights, apply when start time is reached (if not already applied)
+            if anim_type == 'highlight' and 'original_materials' not in anim_item:
+                if task.time >= anim_item['start_time']:
+                    self._apply_highlight(anim_item)
+
+            # Check if animation hasn't started yet
+            if task.time < anim_item['start_time']:
                 continue
-            elif elapsed_time > duration:
-                to_remove.append(entity)
-                if dst_scale is not None:
-                    entity.set_scale(dst_scale)
-                if dst is not None:
-                    entity.set_pos(dst)
+
+            # Check if animation has ended
+            if task.time >= anim_item['end_time']:
+                if anim_type == 'move':
+                    # Set final position and scale
+                    entity = anim_item['entity']
+                    dst_scale = anim_item.get('dst_scale')
+                    dst = anim_item.get('dst')
+                    if dst_scale is not None:
+                        entity.set_scale(dst_scale)
+                    if dst is not None:
+                        entity.set_pos(dst)
+                elif anim_type == 'highlight':
+                    # Clear highlight
+                    self._clear_highlight(anim_item)
+
+                to_remove.append(anim_item)
                 continue
-            anim_factor = elapsed_time / duration
 
-            if src_scale is not None and dst_scale is not None:
-                sx = src_scale.x + (dst_scale - src_scale.x) * anim_factor
-                entity.set_scale(sx)
+            # Update animation (only for move type)
+            if anim_type == 'move':
+                entity = anim_item['entity']
+                src = anim_item['src']
+                dst = anim_item.get('dst')
+                src_scale = anim_item.get('src_scale')
+                dst_scale = anim_item.get('dst_scale')
+                duration = anim_item['duration']
+                start_time = anim_item['start_time']
+                elapsed_time = task.time - start_time
+                anim_factor = elapsed_time / duration
 
-            jump = True
-            if dst is None:
-                dx, dy, dz = src
-                adx = -1 if dx < 0 else 1
-                ady = -1 if dy < 0 else 1
+                # Update scale
+                if src_scale is not None and dst_scale is not None:
+                    sx = src_scale.x + (dst_scale - src_scale.x) * anim_factor
+                    entity.set_scale(sx)
 
-                dx = max(10, abs(dx) * 10) * adx
-                dy = max(4, abs(dy) * 4) * ady
+                # Update position
+                jump = True
+                if dst is None:
+                    # Disappearing animation (ring removal)
+                    dx, dy, dz = src
+                    adx = -1 if dx < 0 else 1
+                    ady = -1 if dy < 0 else 1
+                    dx = max(10, abs(dx) * 10) * adx
+                    dy = max(4, abs(dy) * 4) * ady
+                    fz = 1.5
+                    dst = (dx, dy, dz*fz)
+                    jump = False
 
-                # dx = -7.5 if dx < 0 else 7.5
+                x, y, z = self.get_current_pos(anim_factor, dst, src, jump=jump)
+                entity.set_pos((x, y, z))
 
-                fz = 1.5
-                dst = (dx, dy, dz*fz)
-                #anim_factor = anim_factor
-                jump = False
-                # entity.hide()
-            #else:
-            x, y, z = self.get_current_pos(anim_factor, dst, src, jump=jump)
-            entity.set_pos((x, y, z))
-
-        for entity in to_remove:
-            self.current_animations.pop(entity)
-
-        # Process highlight queue
-        # Check if current highlight has expired
-        if self.current_highlight is not None:
-            if task.time >= self.current_highlight['end_time']:
-                # Clear current highlight
-                self._clear_highlight(self.current_highlight)
-                self.current_highlight = None
-
-        # Start next highlight if no current highlight and queue has items
-        if self.current_highlight is None:
-            try:
-                highlight_info = self.highlight_queue.get_nowait()
-                # Apply highlight immediately
-                self._apply_highlight(highlight_info, task.time)
-                self.current_highlight = highlight_info
-            except Empty:
-                pass
+        # Remove completed animations
+        for anim_item in to_remove:
+            self.current_animations.remove(anim_item)
 
         return task.cont
 
@@ -535,21 +839,15 @@ class ZertzRenderer(ShowBase):
                     'defer': action_duration
                 })
 
-    def update_frozen_regions(self, board):
+    def update_frozen_regions(self, frozen_position_strs):
         """Apply visual fade effect to rings in frozen isolated regions.
 
         Args:
-            board: ZertzBoard instance with frozen_positions set
+            frozen_position_strs: Set or list of position strings (e.g., {'A1', 'B2'})
         """
         fade_alpha = 0.7  # Alpha value for frozen rings (0=invisible, 1=fully opaque)
 
-        for pos in board.frozen_positions:
-            # Convert board index to position string
-            pos_str = board.index_to_str(pos)
-
-            if not pos_str:  # Skip if position has been removed
-                continue
-
+        for pos_str in frozen_position_strs:
             # Apply fade to ring (base piece) only - marbles stay fully visible
             if pos_str in self.pos_to_base:
                 base_piece = self.pos_to_base[pos_str]
@@ -690,102 +988,89 @@ class ZertzRenderer(ShowBase):
         while not self.animation_queue.empty():
             self.animation_queue.get()
 
-        self.current_animations = {}
+        self.current_animations = []
 
-    def highlight_placement_positions(self, placement_array, board):
-        """Highlight rings where marbles can be placed.
-
-        Args:
-            placement_array: numpy array (3, width², width²+1) of valid placements
-            board: ZertzBoard instance to convert indices to position strings
-        """
-        # Extract unique destination positions
-        placement_positions = np.argwhere(placement_array)
-        unique_dests = set()
-        for marble_idx, dst, rem in placement_positions:
-            unique_dests.add(dst)
-
-        # Highlight each valid placement position
-        for dst_idx in unique_dests:
-            dst_y = dst_idx // board.width
-            dst_x = dst_idx % board.width
-            pos_str = board.index_to_str((dst_y, dst_x))
-
-            if pos_str and pos_str in self.pos_to_base:
-                base_piece = self.pos_to_base[pos_str]
-                original_mat = base_piece.model.getMaterial()
-                self.highlighted_rings[pos_str] = original_mat
-
-                # Create highlight material matching original properties
-                highlight_mat = Material()
-                if original_mat is not None:
-                    highlight_mat.setMetallic(original_mat.getMetallic())
-                    highlight_mat.setRoughness(original_mat.getRoughness())
-                else:
-                    highlight_mat.setMetallic(0.9)
-                    highlight_mat.setRoughness(0.1)
-
-                highlight_mat.setBaseColor(self.PLACEMENT_HIGHLIGHT_COLOR)
-                highlight_mat.setEmission(self.PLACEMENT_HIGHLIGHT_EMISSION)
-                base_piece.model.setMaterial(highlight_mat, 1)
-
-    def highlight_removable_rings(self, removable_indices, board):
-        """Highlight rings that can be removed.
+    def init_highlight_state_machine(self, game):
+        """Initialize the highlight state machine with game reference.
 
         Args:
-            removable_indices: List of board indices for removable rings
-            board: ZertzBoard instance to convert indices to position strings
+            game: ZertzGame instance for the state machine to use
         """
-        for rem_idx in removable_indices:
-            rem_y = rem_idx // board.width
-            rem_x = rem_idx % board.width
-            pos_str = board.index_to_str((rem_y, rem_x))
+        if self.show_moves:
+            self.highlight_sm = MoveHighlightStateMachine(self, game)
 
-            if pos_str and pos_str in self.pos_to_base:
-                base_piece = self.pos_to_base[pos_str]
-                original_mat = base_piece.model.getMaterial()
-                self.highlighted_rings[pos_str] = original_mat
+    def is_busy(self):
+        """Check if renderer is busy with highlights or animations.
 
-                # Create highlight material using same colors as placement
-                highlight_mat = Material()
-                if original_mat is not None:
-                    highlight_mat.setMetallic(original_mat.getMetallic())
-                    highlight_mat.setRoughness(original_mat.getRoughness())
-                else:
-                    highlight_mat.setMetallic(0.9)
-                    highlight_mat.setRoughness(0.1)
+        Returns:
+            True if state machine is active or animations are running
+        """
+        if self.highlight_sm and self.highlight_sm.is_active():
+            return True
+        return self.is_animation_active()
 
-                highlight_mat.setBaseColor(self.PLACEMENT_HIGHLIGHT_COLOR)
-                highlight_mat.setEmission(self.PLACEMENT_HIGHLIGHT_EMISSION)
-                base_piece.model.setMaterial(highlight_mat, 1)
+    def get_pending_action_result(self):
+        """Get result and player from completed highlight state machine.
 
-    def clear_move_highlights(self):
-        """Clear all move highlights and restore original materials."""
-        for pos_str, original_mat in self.highlighted_rings.items():
-            if pos_str in self.pos_to_base:
-                base_piece = self.pos_to_base[pos_str]
-                if original_mat is not None:
-                    base_piece.model.setMaterial(original_mat, 1)
-                else:
-                    base_piece.model.clearMaterial()
-        self.highlighted_rings.clear()
+        Returns:
+            Tuple of (result, player) if state machine just finished, (None, None) otherwise
+        """
+        if self.highlight_sm and not self.highlight_sm.is_active():
+            # Check if there's a pending result (state machine just finished)
+            result = self.highlight_sm.get_pending_result()
+            player = self.highlight_sm.get_pending_player()
+            if result is not None or player is not None:
+                # Clear the pending values after retrieving them
+                self.highlight_sm.pending_result = None
+                self.highlight_sm.pending_action = None
+                return result, player
+        return None, None
 
-    def _apply_highlight(self, highlight_info, current_time):
+    def execute_action(self, player, action_dict, ax, ay, result,
+                       placement_positions, capture_moves, removal_map, task_delay_time):
+        """Execute an action with optional highlighting.
+
+        Args:
+            player: Player making the move
+            action_dict: Action dictionary
+            ax: Action type
+            ay: Action tuple
+            result: Result from game.take_action() (already executed)
+            placement_positions: List of placement position strings (from pre-action board)
+            capture_moves: List of capture move dicts (from pre-action board)
+            removal_map: Dict mapping (marble_idx, dst) -> removable positions (from pre-action board)
+            task_delay_time: Task delay time for animations
+        """
+        if self.show_moves and self.highlight_sm:
+            # Debug logging
+            if ax == "CAP" and capture_moves:
+                print(f"[Renderer] Passing {len(capture_moves)} capture moves to state machine:")
+                for cm in capture_moves:
+                    print(f"  - {cm['src']} -> {cm['dst']}")
+
+            # Start highlighting
+            self.highlight_sm.start(ax, ay, player, action_dict, result, task_delay_time,
+                                   placement_positions, capture_moves, removal_map)
+        else:
+            # Direct visualization without highlights
+            self.show_action(player, action_dict, task_delay_time)
+
+    def _apply_highlight(self, highlight_info):
         """Apply a highlight to the specified rings and/or marbles.
 
         Args:
-            highlight_info: Dict with 'rings', 'duration', 'color', 'emission'
-            current_time: Current task time
+            highlight_info: Dict with 'entities', 'duration', 'color', 'emission',
+                          'start_time', 'end_time' (timing already set by update loop)
         """
-        rings = highlight_info['rings']
+
+        entities_list = highlight_info.get('entities', [])
         color = highlight_info.get('color', self.PLACEMENT_HIGHLIGHT_COLOR)
         emission = highlight_info.get('emission', self.PLACEMENT_HIGHLIGHT_EMISSION)
-        duration = highlight_info['duration']
 
         # Store original materials and what type was highlighted
         original_materials = {}
 
-        for pos_str in rings:
+        for pos_str in entities_list:
             # Try to highlight marble first, then ring
             entity = None
             entity_type = None
@@ -816,8 +1101,7 @@ class ZertzRenderer(ShowBase):
                 highlight_mat.setEmission(emission)
                 entity.model.setMaterial(highlight_mat, 1)
 
-        # Update highlight_info with calculated end time and original materials
-        highlight_info['end_time'] = current_time + duration
+        # Store original materials for later restoration
         highlight_info['original_materials'] = original_materials
 
     def _clear_highlight(self, highlight_info):
@@ -844,7 +1128,24 @@ class ZertzRenderer(ShowBase):
                 else:
                     entity.model.clearMaterial()
 
-    def queue_highlight(self, rings, duration, color=None, emission=None):
+    def queue_animation(self, anim_type='move', defer=0, **kwargs):
+        """Add an animation to the unified queue.
+
+        Args:
+            anim_type: 'move' or 'highlight'
+            defer: Delay before starting (seconds)
+            **kwargs: Type-specific parameters
+                For 'move': entity, src, dst, scale, duration
+                For 'highlight': entities (or rings), duration, color, emission
+        """
+        anim_item = {
+            'type': anim_type,
+            'defer': defer,
+            **kwargs
+        }
+        self.animation_queue.put(anim_item)
+
+    def queue_highlight(self, rings, duration, color=None, emission=None, defer=0):
         """Add a highlight to the queue.
 
         Args:
@@ -852,29 +1153,17 @@ class ZertzRenderer(ShowBase):
             duration: How long to show highlight in seconds
             color: LVector4 color (defaults to PLACEMENT_HIGHLIGHT_COLOR)
             emission: LVector4 emission (defaults to PLACEMENT_HIGHLIGHT_EMISSION)
+            defer: Delay before starting (seconds)
         """
-        highlight_info = {
-            'rings': rings,
-            'duration': duration,
-            'color': color if color is not None else self.PLACEMENT_HIGHLIGHT_COLOR,
-            'emission': emission if emission is not None else self.PLACEMENT_HIGHLIGHT_EMISSION
-        }
-        self.highlight_queue.put(highlight_info)
+        self.queue_animation(
+            anim_type='highlight',
+            defer=defer,
+            entities=rings,
+            duration=duration,
+            color=color if color is not None else self.PLACEMENT_HIGHLIGHT_COLOR,
+            emission=emission if emission is not None else self.PLACEMENT_HIGHLIGHT_EMISSION
+        )
 
-    def is_highlight_active(self):
-        """Check if any highlights are active or queued."""
-        return self.current_highlight is not None or not self.highlight_queue.empty()
-
-    def clear_highlight_queue(self):
-        """Clear all queued highlights and current highlight."""
-        # Clear current highlight if exists
-        if self.current_highlight is not None:
-            self._clear_highlight(self.current_highlight)
-            self.current_highlight = None
-
-        # Empty the queue
-        while not self.highlight_queue.empty():
-            try:
-                self.highlight_queue.get_nowait()
-            except Empty:
-                break
+    def is_animation_active(self):
+        """Check if any animations (move or highlight) are active or queued."""
+        return len(self.current_animations) > 0 or not self.animation_queue.empty()

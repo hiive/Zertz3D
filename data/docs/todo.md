@@ -110,6 +110,30 @@ policy = PolicyHead(combined)
 
 ## Recently Completed (2025-10-09)
 
+### ✅ Unified Animation and Highlight System
+**Major architectural refactoring** - Merged separate animation and highlight queues into a single unified system.
+
+**Key Changes:**
+- Single animation queue replaces separate `animation_queue` and `highlight_queue`
+- Unified `current_animations` list (was dict for moves, separate tracker for highlights)
+- Animation items use type discrimination: `'type': 'move'` or `'type': 'highlight'`
+- Consistent timing model: all items have `insert_time`, `start_time`, `end_time`
+- New `queue_animation()` method as primary interface, `queue_highlight()` is backward-compatible wrapper
+- New `is_animation_active()` unified status check
+- Highlights applied instantly when `start_time` reached, moves interpolate over time
+
+**Benefits:**
+- Simpler mental model: highlights are just a special type of animation
+- Single queue to manage instead of two separate systems
+- Consistent timing and lifecycle for all visual effects
+- Easier to extend with new animation types in the future
+- Reduced code duplication
+
+**Implementation Files:**
+- `renderer/zertz_renderer.py`: Rewrote `update()` method (~100 lines), added `queue_animation()`
+- `controller/move_highlight_state_machine.py`: No changes needed (backward compatibility)
+- Maintains existing API through wrapper methods
+
 ### ✅ Frozen Region Visual Effect
 - Rings in frozen isolated regions (regions with vacant rings) now appear faded
 - Uses 70% opacity (TransparencyAttrib.MAlpha) for subtle washed-out appearance
@@ -161,7 +185,25 @@ policy = PolicyHead(combined)
 - Benefits: Self-documenting, type-safe, extensible, maintainable
 - All 8 animation queue calls updated in renderer
 
-## Recently Completed (Latest Update)
+## Recently Completed (Latest Update - Notation Logging)
+
+### ✅ Official Notation Log Files
+- Added `--log-notation` command line flag
+- Creates separate notation log file: `zertzlog_{seed}_notation.txt` or `zertzlog_blitz_{seed}_notation.txt`
+- File format:
+  - First line: board size and variant (e.g., "37" or "37 Blitz")
+  - Subsequent lines: one move per line in official notation
+- Supports isolation notation: `Bd7,b2 x Wa1Wa2` (placement that isolates marbles)
+- Can be used with `--log` to generate both dictionary and notation formats simultaneously
+- Implementation:
+  - `ZertzGameController`: Added `log_notation` parameter and notation file handling
+  - `_open_log_file()`: Opens notation file with header line
+  - `_close_log_file()`: Closes notation file
+  - `_log_notation()`: Writes notation to file
+  - Refactored `update_game()` to generate notation AFTER action execution (to capture isolation results)
+  - Enhanced `action_to_notation()` to accept optional `isolation_result` parameter
+
+## Recently Completed (Previous Update)
 
 ### ✅ Official Zèrtz Notation Support
 - Added `action_to_notation()` method in `zertz_game.py`
