@@ -53,6 +53,7 @@ class MoveHighlightStateMachine:
         self.placement_positions = None  # List of position strings for placement highlights
         self.capture_moves = None  # List of capture move dicts
         self.removal_map = None  # Map of (marble_idx, dst) -> list of removable positions
+        self.frozen_positions = None  # Set of position strings that are newly frozen
         self.task_delay_time = 0  # Animation duration from controller's task
 
     def is_active(self):
@@ -60,7 +61,7 @@ class MoveHighlightStateMachine:
         return self.phase is not None
 
     def start(self, ax, ay, player, action_dict, result, task_delay_time,
-             placement_positions=None, capture_moves=None, removal_map=None):
+             placement_positions=None, capture_moves=None, removal_map=None, frozen_positions=None):
         """Start the highlighting sequence for an action.
 
         Args:
@@ -73,6 +74,7 @@ class MoveHighlightStateMachine:
             placement_positions: List of position strings for placement highlights
             capture_moves: List of capture move dicts with pre-converted strings
             removal_map: Dict mapping (marble_idx, dst) -> list of removable positions
+            frozen_positions: Set of position strings that are newly frozen
         """
         self.pending_action = (ax, ay, player)
         self.pending_action_dict = action_dict
@@ -81,6 +83,7 @@ class MoveHighlightStateMachine:
         self.placement_positions = placement_positions
         self.capture_moves = capture_moves
         self.removal_map = removal_map
+        self.frozen_positions = frozen_positions
 
         if ax == "PUT":
             # Queue placement highlights and start the sequence
@@ -254,7 +257,8 @@ class MoveHighlightStateMachine:
         action_dict = self.pending_action_dict
 
         # Now animate ring removal only (marble was already placed)
-        self.renderer.show_ring_removal(action_dict, self.task_delay_time)
+        # Pass frozen positions to show_ring_removal
+        self.renderer.show_ring_removal(action_dict, self.task_delay_time, self.frozen_positions)
 
         # Wait for final move animations to complete
         self.phase = self.PHASE_ANIMATING
@@ -337,7 +341,6 @@ class ZertzRenderer(ShowBase):
         self.show_moves = show_moves
         self.update_callback = update_callback
         self.move_duration = move_duration
-        self.pending_frozen_positions = set()
 
         props = WindowProperties()
         # props.setSize(1364, 768)
@@ -982,8 +985,14 @@ class ZertzRenderer(ShowBase):
             })
         self.pos_to_marble[dst] = put_marble
 
-    def show_ring_removal(self, action_dict, action_duration=0):
-        """Remove a ring from the board (PUT action only)."""
+    def show_ring_removal(self, action_dict, action_duration=0, frozen_positions=None):
+        """Remove a ring from the board (PUT action only).
+
+        Args:
+            action_dict: Action dictionary with 'remove' key
+            action_duration: Animation duration
+            frozen_positions: Set of position strings that are newly frozen (for animation)
+        """
         action_duration *= 0.45
         base_piece_id = action_dict['remove']
         if base_piece_id != '':
@@ -1005,18 +1014,18 @@ class ZertzRenderer(ShowBase):
                     })
 
                     # Queue freeze animation right after ring starts moving (so it happens during removal)
-                    if hasattr(self, 'pending_frozen_positions') and self.pending_frozen_positions:
+                    if frozen_positions:
                         freeze_duration = 0.3  # Quick fade
                         self.animation_queue.put({
                             'type': 'freeze',
-                            'positions': list(self.pending_frozen_positions),
+                            'positions': list(frozen_positions),
                             'duration': freeze_duration,
                             'defer': removal_defer  # Start at same time as removal
                         })
 
                 self.removed_bases.append((base_piece, base_pos))
 
-    def show_action(self, player, action_dict, action_duration=0):
+    def show_action(self, player, action_dict, action_duration=0, frozen_positions=None):
         # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}
         # Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'G2', 'dst': 'E2', 'capture': 'b'}
         # Player 1: {'action': 'PASS'}
@@ -1034,7 +1043,7 @@ class ZertzRenderer(ShowBase):
         if action == 'PUT':
             # Call the split methods
             self.show_marble_placement(player, action_dict, action_duration / 0.45)  # Undo the scaling since the methods apply it
-            self.show_ring_removal(action_dict, action_duration / 0.45)
+            self.show_ring_removal(action_dict, action_duration / 0.45, frozen_positions)
 
         elif action == 'CAP':
             src = action_dict['src']
@@ -1111,13 +1120,10 @@ class ZertzRenderer(ShowBase):
         # 6. Clear pos_to_marble dict (CRITICAL - stale entries prevent highlights!)
         self.pos_to_marble.clear()
 
-        # 7. Clear pending state variables
-        self.pending_frozen_positions = set()
-
-        # 89. Rebuild player pools
+        # 7. Rebuild player pools
         self._build_players_marble_pool()
 
-        # 9. Recreate highlight state machine
+        # 8. Recreate highlight state machine
         if self.show_moves:
             self.highlight_sm = MoveHighlightStateMachine(self)
 
@@ -1164,9 +1170,6 @@ class ZertzRenderer(ShowBase):
             task_delay_time: Task delay time for animations
             frozen_position_strs: Set of position strings that are now frozen (for fade animation)
         """
-        # Store frozen positions for use during action animation
-        self.pending_frozen_positions = frozen_position_strs or set()
-
         if self.show_moves and self.highlight_sm:
             # Debug logging
             if ax == "CAP" and capture_moves:
@@ -1174,12 +1177,12 @@ class ZertzRenderer(ShowBase):
                 for cm in capture_moves:
                     print(f"  - {cm['src']} -> {cm['dst']}")
 
-            # Start highlighting
+            # Start highlighting - pass frozen_positions to state machine
             self.highlight_sm.start(ax, ay, player, action_dict, result, task_delay_time,
-                                   placement_positions, capture_moves, removal_map)
+                                   placement_positions, capture_moves, removal_map, frozen_position_strs)
         else:
-            # Direct visualization without highlights
-            self.show_action(player, action_dict, task_delay_time)
+            # Direct visualization without highlights - pass frozen_positions to show_action
+            self.show_action(player, action_dict, task_delay_time, frozen_position_strs)
 
     def _apply_highlight(self, highlight_info):
         """Apply a highlight to the specified rings and/or marbles.
