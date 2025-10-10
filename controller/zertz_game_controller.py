@@ -9,7 +9,7 @@ from controller.replay_loader import ReplayLoader
 from controller.game_logger import GameLogger
 from controller.action_text_renderer import ActionTextRenderer
 from controller.game_session import GameSession
-
+from game.zertz_board import ZertzBoard
 
 class ZertzGameController:
 
@@ -48,7 +48,8 @@ class ZertzGameController:
         )
 
         # Create renderer with detected board size (only if not headless)
-        self.renderer = None if headless else ZertzRenderer(rings=self.session.rings, show_coords=self.show_coords, show_moves=show_moves)
+        board_layout = ZertzBoard.generate_standard_board_layout(self.session.rings)
+        self.renderer = None if headless else ZertzRenderer(rings=self.session.rings, board_layout=board_layout, show_coords=self.show_coords, show_moves=show_moves)
 
         # Initialize renderer with game state
         if self.renderer is not None:
@@ -199,14 +200,23 @@ class ZertzGameController:
                 capture_moves = None
                 removal_map = None
 
+            # Capture frozen positions BEFORE action
+            frozen_before = set(self.session.game.board.frozen_positions)
+
             # Execute action
             result = self.session.game.take_action(ax, ay)
+
+            # Get NEWLY frozen positions after action (for animation)
+            frozen_after = set(self.session.game.board.frozen_positions)
+            newly_frozen = frozen_after - frozen_before
+            frozen_position_strs = {self.session.game.board.index_to_str(pos) for pos in newly_frozen}
+            frozen_position_strs = {pos_str for pos_str in frozen_position_strs if pos_str}
 
             # Pass everything to renderer (renderer decides whether to highlight)
             if self.renderer is not None:
                 self.renderer.execute_action(player, action_dict, ax, ay, result,
                                             placement_positions, capture_moves, removal_map,
-                                            task.delay_time)
+                                            task.delay_time, frozen_position_strs)
                 # Check if renderer started work (highlighting or animations)
                 if self.renderer.is_busy():
                     return task.again
@@ -234,15 +244,6 @@ class ZertzGameController:
                         self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
             else:
                 player.add_capture(result)
-
-        # Update frozen region visuals after any action completes
-        if self.renderer is not None:
-            # Convert frozen positions (tuples) to position strings
-            frozen_positions = self.session.game.board.frozen_positions
-            frozen_position_strs = {self.session.game.board.index_to_str(pos) for pos in frozen_positions}
-            # Remove empty strings (positions that have been removed)
-            frozen_position_strs = {pos_str for pos_str in frozen_position_strs if pos_str}
-            self.renderer.update_frozen_regions(frozen_position_strs)
 
         # Check game over
         game_over = self.session.game.get_game_ended()

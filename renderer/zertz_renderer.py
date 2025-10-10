@@ -329,7 +329,7 @@ class ZertzRenderer(ShowBase):
         61: {'center_pos': 'E5', 'cam_dist': 11, 'cam_height': 10}
     }
 
-    def __init__(self, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False, show_moves=False):
+    def __init__(self, board_layout, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False, show_moves=False):
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
@@ -406,7 +406,7 @@ class ZertzRenderer(ShowBase):
 
         # anim: vx, vy, scale, skip
 
-        self._build_base()
+        self._build_base(board_layout)
 
         self.marble_pool = None
         self.marbles_in_play = None
@@ -488,6 +488,15 @@ class ZertzRenderer(ShowBase):
                 elif anim_type == 'highlight':
                     # Clear highlight
                     self._clear_highlight(anim_item)
+                elif anim_type == 'freeze':
+                    # Ensure final alpha is set
+                    positions = anim_item.get('positions', [])
+                    target_alpha = 0.7
+                    for pos_str in positions:
+                        if pos_str in self.pos_to_base:
+                            base_piece = self.pos_to_base[pos_str]
+                            base_piece.model.setColorScale(1, 1, 1, target_alpha)
+                            base_piece.model.setTransparency(TransparencyAttrib.MAlpha)
 
                 to_remove.append(anim_item)
                 continue
@@ -571,6 +580,25 @@ class ZertzRenderer(ShowBase):
                         blended_mat.setBaseColor(blended_color)
                         blended_mat.setEmission(blended_emission)
                         entity.model.setMaterial(blended_mat, 1)
+            elif anim_type == 'freeze':
+                # Update freeze animation (alpha fade from 1.0 to 0.7)
+                positions = anim_item.get('positions', [])
+                target_alpha = 0.7
+                start_alpha = 1.0
+                duration = anim_item['duration']
+                start_time = anim_item['start_time']
+                elapsed_time = task.time - start_time
+                anim_factor = elapsed_time / duration
+
+                # Linear interpolation from 1.0 to 0.7
+                current_alpha = start_alpha + (target_alpha - start_alpha) * anim_factor
+
+                # Apply alpha to all frozen rings
+                for pos_str in positions:
+                    if pos_str in self.pos_to_base:
+                        base_piece = self.pos_to_base[pos_str]
+                        base_piece.model.setColorScale(1, 1, 1, current_alpha)
+                        base_piece.model.setTransparency(TransparencyAttrib.MAlpha)
 
         # Remove completed animations
         for anim_item in to_remove:
@@ -753,12 +781,9 @@ class ZertzRenderer(ShowBase):
         self.pos_to_coords.clear()
         self.pos_array = None
 
-    def _build_base(self):
+    def _build_base(self, board_layout):
         self._init_pos_coords()
-
-        # Get canonical board layout from game logic (single source of truth)
-        from game.zertz_board import ZertzBoard
-        self.pos_array = ZertzBoard.generate_standard_board_layout(self.rings)
+        self.pos_array = board_layout
 
         # Calculate 3D positions for rendering
         r_max = len(self.letters)
@@ -945,14 +970,27 @@ class ZertzRenderer(ShowBase):
                 if action_duration == 0:
                     base_piece.hide()
                 else:
+                    # Queue ring removal animation
+                    removal_defer = action_duration
                     self.animation_queue.put({
                         'entity': base_piece,
                         'src': base_pos,
                         'dst': None,
                         'scale': None,
                         'duration': action_duration,
-                        'defer': action_duration
+                        'defer': removal_defer
                     })
+
+                    # Queue freeze animation right after ring starts moving (so it happens during removal)
+                    if hasattr(self, 'pending_frozen_positions') and self.pending_frozen_positions:
+                        freeze_duration = 0.3  # Quick fade
+                        self.animation_queue.put({
+                            'type': 'freeze',
+                            'positions': list(self.pending_frozen_positions),
+                            'duration': freeze_duration,
+                            'defer': removal_defer  # Start at same time as removal
+                        })
+
                 self.removed_bases.append((base_piece, base_pos))
 
     def show_action(self, player, action_dict, action_duration=0):
@@ -1067,7 +1105,7 @@ class ZertzRenderer(ShowBase):
         return None, None
 
     def execute_action(self, player, action_dict, ax, ay, result,
-                       placement_positions, capture_moves, removal_map, task_delay_time):
+                       placement_positions, capture_moves, removal_map, task_delay_time, frozen_position_strs=None):
         """Execute an action with optional highlighting.
 
         Args:
@@ -1080,7 +1118,11 @@ class ZertzRenderer(ShowBase):
             capture_moves: List of capture move dicts (from pre-action board)
             removal_map: Dict mapping (marble_idx, dst) -> removable positions (from pre-action board)
             task_delay_time: Task delay time for animations
+            frozen_position_strs: Set of position strings that are now frozen (for fade animation)
         """
+        # Store frozen positions for use during action animation
+        self.pending_frozen_positions = frozen_position_strs or set()
+
         if self.show_moves and self.highlight_sm:
             # Debug logging
             if ax == "CAP" and capture_moves:
