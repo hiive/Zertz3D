@@ -329,13 +329,15 @@ class ZertzRenderer(ShowBase):
         61: {'center_pos': 'E5', 'cam_dist': 11, 'cam_height': 10}
     }
 
-    def __init__(self, board_layout, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False, show_moves=False):
+    def __init__(self, board_layout, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False, show_moves=False, update_callback=None, move_duration=0.666):
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
 
         self.show_moves = show_moves
-        self.highlight_sm = None  # Initialized later when game board is available
+        self.update_callback = update_callback
+        self.move_duration = move_duration
+        self.pending_frozen_positions = set()
 
         props = WindowProperties()
         # props.setSize(1364, 768)
@@ -420,7 +422,28 @@ class ZertzRenderer(ShowBase):
         # Setup camera after board is built so we can center on it
         self._setup_camera()
 
+        # Add renderer update task (sort=50, runs after game loop task at sort=49)
         self.task = self.taskMgr.add(self.update, 'zertzUpdate', sort=50)
+
+        # Setup game loop if callback was provided
+        self.game_loop_task = None
+        if self.update_callback is not None:
+            self._setup_game_loop()
+
+        # Initialize highlight state machine if show_moves is enabled
+        self.highlight_sm = MoveHighlightStateMachine(self) if self.show_moves else None
+
+    def _setup_game_loop(self):
+        """Setup the game loop task with specified duration.
+
+        Uses self.update_callback and self.move_duration set during initialization.
+        """
+        self.game_loop_task = self.taskMgr.doMethodLater(
+            self.move_duration,
+            self.update_callback,
+            'update_game',
+            sort=49
+        )
 
     def update(self, task):
         """Update all animations - both move and highlight types."""
@@ -1057,23 +1080,44 @@ class ZertzRenderer(ShowBase):
                 })
 
     def reset_board(self):
+        # 1. Clear animations FIRST (before resetting visuals)
+        while not self.animation_queue.empty():
+            self.animation_queue.get()
+        self.current_animations = []
+
+        # 2. Restore removed rings and make them visible again
         for b, pos in self.removed_bases:
             b.set_pos(pos)
+            b.show()  # Make visible again
         self.removed_bases.clear()
 
-        self._build_players_marble_pool()
+        # 3. Clear ALL ring visual state (materials, transparency, color scale)
+        for pos_str, base_piece in self.pos_to_base.items():
+            base_piece.model.clearMaterial()
+            base_piece.model.clearColorScale()
+            base_piece.model.clearTransparency()
 
+        # 4. Move marbles back to pool and clear their visual state
         for color, marbles in self.marbles_in_play.items():
             for marble, pos in marbles:
+                marble.model.clearMaterial()  # Clear any highlight materials
                 self.marble_pool[color].append(marble)
                 marble.set_scale(self.pool_marble_scale)
                 marble.set_pos(pos)
 
-        while not self.animation_queue.empty():
-            self.animation_queue.get()
+        # 5. Clear marbles_in_play dict (important - this accumulates otherwise!)
+        self.marbles_in_play = self._make_marble_dict()
 
-        self.current_animations = []
+        # 6. Clear pos_to_marble dict (CRITICAL - stale entries prevent highlights!)
+        self.pos_to_marble.clear()
 
+        # 7. Clear pending state variables
+        self.pending_frozen_positions = set()
+
+        # 89. Rebuild player pools
+        self._build_players_marble_pool()
+
+        # 9. Recreate highlight state machine
         if self.show_moves:
             self.highlight_sm = MoveHighlightStateMachine(self)
 

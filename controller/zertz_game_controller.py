@@ -13,11 +13,12 @@ from game.zertz_board import ZertzBoard
 
 class ZertzGameController:
 
-    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None, show_moves=False, show_coords=False, log_notation=False, blitz=False):
+    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False, headless=False, max_games=None, show_moves=False, show_coords=False, log_notation=False, blitz=False, move_duration=0.666):
         self.show_coords = show_coords
         self.headless = headless
         self.max_games = max_games  # None means play indefinitely
         self.show_moves = show_moves
+        self.move_duration = move_duration
 
         # Store action_dict for notation generation after action execution
         self.pending_action_dict = None
@@ -47,22 +48,20 @@ class ZertzGameController:
             t=5
         )
 
-        # Create renderer with detected board size (only if not headless)
-        board_layout = ZertzBoard.generate_standard_board_layout(self.session.rings)
-        self.renderer = None if headless else ZertzRenderer(rings=self.session.rings, board_layout=board_layout, show_coords=self.show_coords, show_moves=show_moves)
-
-        # Initialize renderer with game state
-        if self.renderer is not None:
-            self.renderer.reset_board()
-
         # Open log file for first game (if not in replay mode)
         if not self.session.is_replay_mode():
             self.logger.open_log_files(self.session.get_seed(), self.session.rings, self.session.blitz)
 
-        # Setup game loop
-        if not headless:
-            move_time = 0.666
-            self.task = self.renderer.taskMgr.doMethodLater(move_time, self.update_game, 'update_game', sort=49)
+        # Create renderer with detected board size (only if not headless)
+        board_layout = ZertzBoard.generate_standard_board_layout(self.session.rings)
+        self.renderer = None if headless else ZertzRenderer(
+            rings=self.session.rings,
+            board_layout=board_layout,
+            show_coords=self.show_coords,
+            show_moves=show_moves,
+            update_callback=self.update_game,
+            move_duration=self.move_duration
+        )
 
     def _close_log_file(self):
         """Close the current log file and append final game state."""
@@ -191,7 +190,7 @@ class ZertzGameController:
             placement_before, capture_before = self.session.game.get_valid_actions()
 
             # Convert arrays to strings BEFORE executing action (so board state is pre-action)
-            if self.renderer is not None and self.renderer.show_moves:
+            if self.show_moves:
                 placement_positions = self.session.game.get_placement_positions(placement_before)
                 capture_moves = self.session.game.get_capture_dicts(capture_before)
                 removal_map = self.session.game.get_removal_map(placement_before, ax, ay)
@@ -213,7 +212,7 @@ class ZertzGameController:
             frozen_position_strs = {pos_str for pos_str in frozen_position_strs if pos_str}
 
             # Pass everything to renderer (renderer decides whether to highlight)
-            if self.renderer is not None:
+            if self.renderer:
                 self.renderer.execute_action(player, action_dict, ax, ay, result,
                                             placement_positions, capture_moves, removal_map,
                                             task.delay_time, frozen_position_strs)

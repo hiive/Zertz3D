@@ -3,7 +3,6 @@
 import argparse
 from controller.zertz_game_controller import ZertzGameController
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Zertz 3D Game')
     parser.add_argument('--replay', type=str, help='Path to replay file (board size auto-detected)')
@@ -17,10 +16,11 @@ if __name__ == '__main__':
     parser.add_argument('--show-coords', action='store_true', help='Show coordinate labels on rings in 3D view')
     parser.add_argument('--log-notation', action='store_true', help='Log game moves using official Zèrtz notation')
     parser.add_argument('--blitz', action='store_true', help='Use blitz variant (37 rings only, fewer marbles, lower win thresholds)')
+    parser.add_argument('--move-duration', type=float, default=0.666, help='Duration between moves in seconds (default: 0.666)')
     args = parser.parse_args()
 
     game = ZertzGameController(rings=args.rings, replay_file=args.replay, seed=args.seed,
                                 log_to_file=args.log, partial_replay=args.partial, headless=args.headless,
                                 max_games=args.games, show_moves=args.show_moves, show_coords=args.show_coords,
-                                log_notation=args.log_notation, blitz=args.blitz)
+                                log_notation=args.log_notation, blitz=args.blitz, move_duration=args.move_duration)
     game.run()
