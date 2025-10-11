@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from game.zertz_game import ZertzGame
+from game.action_result import ActionResult
 
 
 # ============================================================================
@@ -321,9 +322,12 @@ def test_put_with_single_marble_isolation(game):
     }
 
     # Isolation result: single marble captured
-    isolation_result = [{'marble': 'w', 'pos': 'A1'}]
+    action_result = ActionResult(
+        captured_marbles=[{'marble': 'w', 'pos': 'A1'}],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     assert notation == 'Bd7,b2 x Wa1'
 
 
@@ -337,12 +341,15 @@ def test_put_with_multiple_marble_isolation(game):
     }
 
     # Isolation result: two marbles captured
-    isolation_result = [
-        {'marble': 'w', 'pos': 'A1'},
-        {'marble': 'w', 'pos': 'A2'}
-    ]
+    action_result = ActionResult(
+        captured_marbles=[
+            {'marble': 'w', 'pos': 'A1'},
+            {'marble': 'w', 'pos': 'A2'}
+        ],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     assert notation == 'Bd7,b2 x Wa1Wa2'
 
 
@@ -356,13 +363,16 @@ def test_put_with_mixed_color_isolation(game):
     }
 
     # Isolation result: different colored marbles
-    isolation_result = [
-        {'marble': 'w', 'pos': 'A1'},
-        {'marble': 'g', 'pos': 'B2'},
-        {'marble': 'b', 'pos': 'C1'}
-    ]
+    action_result = ActionResult(
+        captured_marbles=[
+            {'marble': 'w', 'pos': 'A1'},
+            {'marble': 'g', 'pos': 'B2'},
+            {'marble': 'b', 'pos': 'C1'}
+        ],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     assert notation == 'Ge5,c3 x Wa1Gb2Bc1'
 
 
@@ -376,9 +386,12 @@ def test_put_no_removal_with_isolation(game):
     }
 
     # Isolation result
-    isolation_result = [{'marble': 'b', 'pos': 'G1'}]
+    action_result = ActionResult(
+        captured_marbles=[{'marble': 'b', 'pos': 'G1'}],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     assert notation == 'Wd4 x Bg1'
 
 
@@ -392,9 +405,12 @@ def test_put_with_empty_isolation_list(game):
     }
 
     # Empty isolation list
-    isolation_result = []
+    action_result = ActionResult(
+        captured_marbles=[],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     assert notation == 'Wd4,b2'
     assert ' x ' not in notation
 
@@ -409,13 +425,16 @@ def test_put_with_none_marble_in_isolation(game):
     }
 
     # Isolation result: vacant ring (marble is None) should not appear in notation
-    isolation_result = [
-        {'marble': 'w', 'pos': 'A1'},
-        {'marble': None, 'pos': 'A2'},  # Vacant ring
-        {'marble': 'g', 'pos': 'B1'}
-    ]
+    action_result = ActionResult(
+        captured_marbles=[
+            {'marble': 'w', 'pos': 'A1'},
+            {'marble': None, 'pos': 'A2'},  # Vacant ring
+            {'marble': 'g', 'pos': 'B1'}
+        ],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     # Should only include marbles with actual colors
     assert notation == 'Bd7,b2 x Wa1Gb1'
 
@@ -430,12 +449,15 @@ def test_isolation_coordinates_lowercase(game):
     }
 
     # Isolation with uppercase coordinates (should be lowercased)
-    isolation_result = [
-        {'marble': 'w', 'pos': 'A1'},
-        {'marble': 'G', 'pos': 'B2'}
-    ]
+    action_result = ActionResult(
+        captured_marbles=[
+            {'marble': 'w', 'pos': 'A1'},
+            {'marble': 'G', 'pos': 'B2'}
+        ],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     # All positions should be lowercase
     assert 'a1' in notation.lower()
     assert 'b2' in notation.lower()
@@ -453,9 +475,12 @@ def test_capture_action_ignores_isolation(game):
     }
 
     # Isolation result should be ignored for captures
-    isolation_result = [{'marble': 'w', 'pos': 'A1'}]
+    action_result = ActionResult(
+        captured_marbles=[{'marble': 'w', 'pos': 'A1'}],
+        newly_frozen_positions=set()
+    )
 
-    notation = game.action_to_notation(action_dict, isolation_result)
+    notation = game.action_to_notation(action_dict, action_result)
     # Should be normal capture notation without isolation
     assert notation == 'x e3Wg3'
     assert ' x ' not in notation[1:]  # No second 'x' for isolation

@@ -47,53 +47,49 @@ class MoveHighlightStateMachine:
 
         # State tracking
         self.phase = None  # Current phase: 'placement_highlights', 'selected_placement', etc.
-        self.pending_action = None  # (ax, ay, player) tuple
+        self.pending_player = None  # Player making the move
         self.pending_action_dict = None  # Action dict
-        self.pending_result = None  # Result passed from controller
+        self.pending_result = None  # ActionResult object from game.take_action()
         self.placement_positions = None  # List of position strings for placement highlights
         self.capture_moves = None  # List of capture move dicts
-        self.removal_map = None  # Map of (marble_idx, dst) -> list of removable positions
-        self.frozen_positions = None  # Set of position strings that are newly frozen
+        self.removal_positions = None  # List of removable position strings
         self.task_delay_time = 0  # Animation duration from controller's task
 
     def is_active(self):
         """Check if the state machine is currently active."""
         return self.phase is not None
 
-    def start(self, ax, ay, player, action_dict, result, task_delay_time,
-             placement_positions=None, capture_moves=None, removal_map=None, frozen_positions=None):
+    def start(self, player, action_dict, action_result, task_delay_time,
+             placement_positions=None, capture_moves=None, removal_positions=None):
         """Start the highlighting sequence for an action.
 
         Args:
-            ax: Action type ("PUT", "CAP", or "PASS")
-            ay: Action tuple (or None for PASS)
             player: Player making the move
             action_dict: Action dictionary
-            result: Result from game.take_action() (already executed by controller)
+            action_result: ActionResult from game.take_action() (encapsulates captures and frozen positions)
             task_delay_time: Animation duration from controller's task
             placement_positions: List of position strings for placement highlights
             capture_moves: List of capture move dicts with pre-converted strings
-            removal_map: Dict mapping (marble_idx, dst) -> list of removable positions
-            frozen_positions: Set of position strings that are newly frozen
+            removal_positions: List of removable position strings
         """
-        self.pending_action = (ax, ay, player)
+        self.pending_player = player
         self.pending_action_dict = action_dict
-        self.pending_result = result
+        self.pending_result = action_result  # Store whole ActionResult object
         self.task_delay_time = task_delay_time
         self.placement_positions = placement_positions
         self.capture_moves = capture_moves
-        self.removal_map = removal_map
-        self.frozen_positions = frozen_positions
+        self.removal_positions = removal_positions
 
-        if ax == "PUT":
+        action_type = action_dict['action']
+        if action_type == "PUT":
             # Queue placement highlights and start the sequence
             self._queue_placement_highlights(placement_positions)
             self.phase = self.PHASE_PLACEMENT_HIGHLIGHTS
-        elif ax == "CAP":
+        elif action_type == "CAP":
             # Queue capture highlights and start the sequence
             self._queue_capture_highlights(capture_moves)
             self.phase = self.PHASE_CAPTURE_HIGHLIGHTS
-        elif ax == "PASS":
+        elif action_type == "PASS":
             # PASS has no visuals, action already executed by controller
             self.phase = None  # Done immediately (no highlight phases)
 
@@ -213,29 +209,21 @@ class MoveHighlightStateMachine:
 
     def _on_selected_placement_done(self, task):
         """Handle completion of selected placement highlight phase."""
-        ax, ay, player = self.pending_action
+        player = self.pending_player
         action_dict = self.pending_action_dict
 
         # Animate marble placement (action already executed by controller)
-        if ax == "PUT":
-            self.renderer.show_marble_placement(player, action_dict, self.task_delay_time)
+        self.renderer.show_marble_placement(player, action_dict, self.task_delay_time)
 
-            # Calculate marble placement animation duration (same calculation as in show_marble_placement)
-            marble_animation_duration = self.task_delay_time * 0.45
+        # Calculate marble placement animation duration (same calculation as in show_marble_placement)
+        marble_animation_duration = self.task_delay_time * 0.45
 
-            # Queue removal highlights AFTER marble placement animation completes
-            if self.removal_map is not None:
-                marble_idx, dst, rem = ay  # Unpack action tuple
-                key = (marble_idx, dst)
-                removal_positions = self.removal_map.get(key, [])
-                self._queue_removal_highlights(removal_positions, defer=marble_animation_duration)
+        # Queue removal highlights AFTER marble placement animation completes
+        if self.removal_positions:
+            self._queue_removal_highlights(self.removal_positions, defer=marble_animation_duration)
 
         # Move to removal highlights phase
-        if ax == "PUT":
-            self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
-        else:
-            # Shouldn't reach here for PUT actions
-            self.phase = None  # Done
+        self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
 
     def _on_removal_highlights_done(self):
         """Handle completion of removal highlights phase."""
@@ -257,8 +245,8 @@ class MoveHighlightStateMachine:
         action_dict = self.pending_action_dict
 
         # Now animate ring removal only (marble was already placed)
-        # Pass frozen positions to show_ring_removal
-        self.renderer.show_ring_removal(action_dict, self.task_delay_time, self.frozen_positions)
+        # Pass frozen positions from ActionResult to show_ring_removal
+        self.renderer.show_ring_removal(action_dict, self.task_delay_time, self.pending_result.newly_frozen_positions)
 
         # Wait for final move animations to complete
         self.phase = self.PHASE_ANIMATING
@@ -282,7 +270,7 @@ class MoveHighlightStateMachine:
 
     def _on_selected_capture_done(self, task):
         """Handle completion of selected capture highlight phase."""
-        ax, ay, player = self.pending_action
+        player = self.pending_player
         action_dict = self.pending_action_dict
 
         # Animate capture action (action already executed by controller)
@@ -293,9 +281,7 @@ class MoveHighlightStateMachine:
 
     def get_pending_player(self):
         """Get the player from the pending action."""
-        if self.pending_action:
-            return self.pending_action[2]
-        return None
+        return self.pending_player
 
     def get_pending_result(self):
         """Get the pending result after action execution."""
@@ -1150,39 +1136,36 @@ class ZertzRenderer(ShowBase):
             if result is not None or player is not None:
                 # Clear the pending values after retrieving them
                 self.highlight_sm.pending_result = None
-                self.highlight_sm.pending_action = None
+                self.highlight_sm.pending_player = None
                 return result, player
         return None, None
 
-    def execute_action(self, player, action_dict, ax, ay, result,
-                       placement_positions, capture_moves, removal_map, task_delay_time, frozen_position_strs=None):
+    def execute_action(self, player, action_dict, action_result,
+                       placement_positions, capture_moves, removal_positions, task_delay_time):
         """Execute an action with optional highlighting.
 
         Args:
             player: Player making the move
             action_dict: Action dictionary
-            ax: Action type
-            ay: Action tuple
-            result: Result from game.take_action() (already executed)
+            action_result: ActionResult from game.take_action() (encapsulates captures and frozen positions)
             placement_positions: List of placement position strings (from pre-action board)
             capture_moves: List of capture move dicts (from pre-action board)
-            removal_map: Dict mapping (marble_idx, dst) -> removable positions (from pre-action board)
+            removal_positions: List of removable position strings (from pre-action board)
             task_delay_time: Task delay time for animations
-            frozen_position_strs: Set of position strings that are now frozen (for fade animation)
         """
         if self.show_moves and self.highlight_sm:
             # Debug logging
-            if ax == "CAP" and capture_moves:
+            if action_dict['action'] == "CAP" and capture_moves:
                 print(f"[Renderer] Passing {len(capture_moves)} capture moves to state machine:")
                 for cm in capture_moves:
                     print(f"  - {cm['src']} -> {cm['dst']}")
 
-            # Start highlighting - pass frozen_positions to state machine
-            self.highlight_sm.start(ax, ay, player, action_dict, result, task_delay_time,
-                                   placement_positions, capture_moves, removal_map, frozen_position_strs)
+            # Start highlighting - pass action_result to state machine
+            self.highlight_sm.start(player, action_dict, action_result, task_delay_time,
+                                   placement_positions, capture_moves, removal_positions)
         else:
-            # Direct visualization without highlights - pass frozen_positions to show_action
-            self.show_action(player, action_dict, task_delay_time, frozen_position_strs)
+            # Direct visualization without highlights - extract frozen positions from action_result
+            self.show_action(player, action_dict, task_delay_time, action_result.newly_frozen_positions)
 
     def _apply_highlight(self, highlight_info):
         """Apply a highlight to the specified rings and/or marbles.

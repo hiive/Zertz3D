@@ -193,29 +193,20 @@ class ZertzGameController:
             if self.show_moves:
                 placement_positions = self.session.game.get_placement_positions(placement_before)
                 capture_moves = self.session.game.get_capture_dicts(capture_before)
-                removal_map = self.session.game.get_removal_map(placement_before, ax, ay)
+                removal_positions = self.session.game.get_removal_positions(placement_before, ax, ay)
             else:
                 placement_positions = None
                 capture_moves = None
-                removal_map = None
+                removal_positions = None
 
-            # Capture frozen positions BEFORE action
-            frozen_before = set(self.session.game.board.frozen_positions)
+            # Execute action (game now provides frozen positions diff - Recommendation 1)
+            action_result = self.session.game.take_action(ax, ay)
 
-            # Execute action
-            result = self.session.game.take_action(ax, ay)
-
-            # Get NEWLY frozen positions after action (for animation)
-            frozen_after = set(self.session.game.board.frozen_positions)
-            newly_frozen = frozen_after - frozen_before
-            frozen_position_strs = {self.session.game.board.index_to_str(pos) for pos in newly_frozen}
-            frozen_position_strs = {pos_str for pos_str in frozen_position_strs if pos_str}
-
-            # Pass everything to renderer (renderer decides whether to highlight)
+            # Pass action_result to renderer (no extraction needed - pass whole object)
             if self.renderer:
-                self.renderer.execute_action(player, action_dict, ax, ay, result,
-                                            placement_positions, capture_moves, removal_map,
-                                            task.delay_time, frozen_position_strs)
+                self.renderer.execute_action(player, action_dict, action_result,
+                                            placement_positions, capture_moves, removal_positions,
+                                            task.delay_time)
                 # Check if renderer started work (highlighting or animations)
                 if self.renderer.is_busy():
                     return task.again
@@ -223,8 +214,8 @@ class ZertzGameController:
         # Process result (common path for both state machine and direct execution)
         else:
             # If action caused isolation, update the buffered notation
-            if isinstance(result, list) and self.pending_action_dict is not None:
-                # Re-generate notation with isolation result
+            if result.is_isolation() and self.pending_action_dict is not None:
+                # Re-generate notation with ActionResult
                 notation_with_isolation = self.session.game.action_to_notation(self.pending_action_dict, result)
                 # Update the printed output (notation was already printed without isolation)
                 print(f'  (Isolation occurred: {notation_with_isolation})')
@@ -235,14 +226,14 @@ class ZertzGameController:
                 self.pending_action_dict = None
                 self.pending_player = None
 
-            if isinstance(result, list):
-                for removal in result:
+            if result.is_isolation():
+                for removal in result.captured_marbles:
                     if removal['marble'] is not None:
                         player.add_capture(removal['marble'])
                     if self.renderer is not None:
                         self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], task.delay_time)
-            else:
-                player.add_capture(result)
+            elif result.has_captures():
+                player.add_capture(result.captured_marbles)
 
         # Check game over
         game_over = self.session.game.get_game_ended()

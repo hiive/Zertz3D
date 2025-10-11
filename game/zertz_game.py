@@ -2,6 +2,7 @@ import numpy as np
 import copy
 
 from .zertz_board import ZertzBoard
+from .action_result import ActionResult
 
 
 # For full rules: http://www.gipf.com/zertz/rules/rules.html
@@ -435,7 +436,7 @@ class ZertzGame:
             }
         return action_str, action_dict
 
-    def action_to_notation(self, action_dict, isolation_result=None):
+    def action_to_notation(self, action_dict, action_result=None):
         """Convert action_dict to official Zèrtz notation.
 
         Notation format from http://www.gipf.com/zertz/notations/notation.html:
@@ -449,9 +450,7 @@ class ZertzGame:
 
         Args:
             action_dict: Dictionary with action details
-            isolation_result: Optional isolation result from take_action()
-                - Single marble: captured marble color (str)
-                - Multiple marbles: list of dicts [{'marble': 'w', 'pos': 'A1'}, ...]
+            action_result: Optional ActionResult object from take_action()
 
         Returns:
             str: Notation string
@@ -473,9 +472,9 @@ class ZertzGame:
                 notation = f"{marble}{dst}"
 
             # Add isolation captures if any
-            if isolation_result and isinstance(isolation_result, list):
+            if action_result and action_result.is_isolation():
                 isolated_parts = []
-                for removal in isolation_result:
+                for removal in action_result.captured_marbles:
                     if removal['marble']:
                         color = removal['marble'].upper()
                         pos = removal['pos'].lower()
@@ -538,8 +537,8 @@ class ZertzGame:
 
         return capture_moves
 
-    def get_removal_map(self, placement_array, action_type, action):
-        """Build map of removal positions for a specific PUT action.
+    def get_removal_positions(self, placement_array, action_type, action):
+        """Get list of removal positions for a specific PUT action.
 
         Args:
             placement_array: Placement array from get_valid_actions()
@@ -547,11 +546,11 @@ class ZertzGame:
             action: Action tuple (marble_idx, dst, rem)
 
         Returns:
-            Dict mapping (marble_idx, dst) -> list of removable position strings
-            Returns empty dict if action_type is not "PUT"
+            List of removable position strings
+            Returns empty list if action_type is not "PUT"
         """
         if action_type != "PUT":
-            return {}
+            return []
 
         marble_idx, dst, rem = action
         width = self.board.width
@@ -570,7 +569,7 @@ class ZertzGame:
                 if rem_str:
                     removable_positions.append(rem_str)
 
-        return {(marble_idx, dst): removable_positions}
+        return removable_positions
 
     def print_state(self):
         # Print the board state and supplies to the console
@@ -598,7 +597,7 @@ class ZertzGame:
             action: Action tuple (or None for PASS)
 
         Returns:
-            Result from board.take_action() (or None for PASS)
+            ActionResult: Encapsulates captured marbles and newly frozen positions
         """
         # Record the move for loop detection
         self.move_history.append((action_type, action))
@@ -606,7 +605,23 @@ class ZertzGame:
         if action_type == 'PASS':
             # Player passes (no valid moves), switch player
             self.board._next_player()
-            return None
+            return ActionResult(captured_marbles=None, newly_frozen_positions=set())
         else:
+            # Capture frozen positions BEFORE action (Recommendation 1)
+            frozen_before = set(self.board.frozen_positions)
+
             # Execute the action
-            return self.board.take_action(action, action_type)
+            captured = self.board.take_action(action, action_type)
+
+            # Get NEWLY frozen positions after action
+            frozen_after = set(self.board.frozen_positions)
+            newly_frozen = frozen_after - frozen_before
+
+            # Convert positions to strings
+            frozen_position_strs = {
+                self.board.index_to_str(pos)
+                for pos in newly_frozen
+                if self.board.index_to_str(pos)
+            }
+
+            return ActionResult(captured_marbles=captured, newly_frozen_positions=frozen_position_strs)
