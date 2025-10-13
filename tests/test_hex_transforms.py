@@ -91,14 +91,14 @@ class TestHexRotation:
         # Place a marble at start position
         y, x = board.str_to_index(start_pos)
         test_state = np.zeros_like(board.state)
-        test_state[0] = board.state[0]  # Copy rings
-        test_state[1, y, x] = 1  # Place marble
+        test_state[board.RING_LAYER] = board.state[board.RING_LAYER]  # Copy rings
+        test_state[board.MARBLE_TO_LAYER['w'], y, x] = 1  # Place white marble
 
         # Apply rotation
         rotated = board._transform_state_hex(test_state, rot60_k=k)
 
         # Find where the marble ended up
-        (end_y, end_x) = np.argwhere(rotated[1] == 1)[0]
+        (end_y, end_x) = np.argwhere(rotated[board.MARBLE_TO_LAYER['w']] == 1)[0]
         end_pos = board.index_to_str((end_y, end_x))
 
         assert end_pos == expected_pos, \
@@ -110,16 +110,16 @@ class TestHexRotation:
 
         # Place marbles at multiple positions
         test_state = np.zeros_like(small_board.state)
-        test_state[0] = small_board.state[0]
-        test_state[1, *small_board.str_to_index("A4")] = 1
-        test_state[2, *small_board.str_to_index("D4")] = 1
-        test_state[3, *small_board.str_to_index("G1")] = 1
+        test_state[small_board.RING_LAYER] = small_board.state[small_board.RING_LAYER]
+        test_state[small_board.MARBLE_TO_LAYER['w'], *small_board.str_to_index("A4")] = 1
+        test_state[small_board.MARBLE_TO_LAYER['g'], *small_board.str_to_index("D4")] = 1
+        test_state[small_board.MARBLE_TO_LAYER['b'], *small_board.str_to_index("G1")] = 1
 
         for k in range(6):
             rotated = small_board._transform_state_hex(test_state, rot60_k=k)
-            assert np.sum(rotated[1]) == 1, f"White marbles not preserved for k={k}"
-            assert np.sum(rotated[2]) == 1, f"Gray marbles not preserved for k={k}"
-            assert np.sum(rotated[3]) == 1, f"Black marbles not preserved for k={k}"
+            assert np.sum(rotated[small_board.MARBLE_TO_LAYER['w']]) == 1, f"White marbles not preserved for k={k}"
+            assert np.sum(rotated[small_board.MARBLE_TO_LAYER['g']]) == 1, f"Gray marbles not preserved for k={k}"
+            assert np.sum(rotated[small_board.MARBLE_TO_LAYER['b']]) == 1, f"Black marbles not preserved for k={k}"
 
 
 class TestHexMirror:
@@ -140,11 +140,11 @@ class TestHexMirror:
 
         y, x = board.str_to_index(start_pos)
         test_state = np.zeros_like(board.state)
-        test_state[0] = board.state[0]
-        test_state[1, y, x] = 1
+        test_state[board.RING_LAYER] = board.state[board.RING_LAYER]
+        test_state[board.MARBLE_TO_LAYER['w'], y, x] = 1
 
         mirrored = board._transform_state_hex(test_state, mirror=True)
-        (end_y, end_x) = np.argwhere(mirrored[1] == 1)[0]
+        (end_y, end_x) = np.argwhere(mirrored[board.MARBLE_TO_LAYER['w']] == 1)[0]
         end_pos = board.index_to_str((end_y, end_x))
 
         assert end_pos == expected_pos, \
@@ -475,7 +475,7 @@ class TestSymmetryPatterns:
         valid_positions = []
         for y in range(small_board.width):
             for x in range(small_board.width):
-                if small_board.state[0, y, x] == 1:  # Has ring
+                if small_board.state[small_board.RING_LAYER, y, x] == 1:  # Has ring
                     valid_positions.append((y, x))
 
         # Place random marbles

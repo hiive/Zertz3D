@@ -108,6 +108,15 @@ combined = concat([spatial_features, global_features])
 policy = PolicyHead(combined)
 ```
 
+## Recently Completed (2025-10-11)
+
+### ✅ Controller/Renderer Decoupling & Game Loop Extraction
+- Added `ZertzFactory` to assemble controller dependencies and renderers externally
+- Introduced `GameLoop` so controller delegates scheduling, usable for both Panda3D and headless modes
+- Renderers implement `attach_update_loop` to plug into Panda3D’s task manager; text renderer no-ops
+- Controller constructor now accepts `renderer_or_factory` union instead of constructing defaults
+- Shared interfaces export `IRendererFactory`; tests use injected text renderer instances
+
 ## Recently Completed (2025-10-09)
 
 ### ✅ Unified Animation and Highlight System
@@ -242,3 +251,8 @@ policy = PolicyHead(combined)
 - Updated visualization tool to flip Y-axis for correct display
 
 ## Future Enhancements
+- Extract highlight state machine into its own module with tests
+- Add unit coverage for `CompositeRenderer.attach_update_loop` and clarify multi-renderer main loop contract
+- Continue slimming `ZertzGameController` (e.g., extract post-action/logging helpers)
+- Document status reporter/TextRenderer defaults and provide a way to silence text output for service deployments
+- Allow `ZertzFactory` to opt out of the text renderer when running non-interactive builds

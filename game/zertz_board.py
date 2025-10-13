@@ -131,6 +131,7 @@ class ZertzBoard:
     RING_LAYER = 0
     MARBLE_LAYERS = slice(1, 4)     # White, gray, black marble layers (current state)
     BOARD_LAYERS = slice(0, 4)      # Rings + all marbles (current state)
+    LAYERS_PER_TIMESTEP = 4         # Number of layers per timestep (ring + 3 marble types)
 
 
     @staticmethod
@@ -412,8 +413,12 @@ class ZertzBoard:
     def take_action(self, action, action_type):
         # Input: action is an index into the action space matrix
         #        action_type is 'PUT' or 'CAP'
-        # Push back the previous t states and copy the most recent state to the top 4 layers
-        self.state[0: 4 * self.t] = np.concatenate([self.state[0:4], self.state[0: 4 * (self.t - 1)]], axis=0)
+        # Push back the previous t states and copy the most recent state to the top layers
+        layers_per_step = self.LAYERS_PER_TIMESTEP
+        self.state[0: layers_per_step * self.t] = np.concatenate(
+            [self.state[self.BOARD_LAYERS], self.state[0: layers_per_step * (self.t - 1)]],
+            axis=0
+        )
 
         if action_type == 'PUT':
             return self.take_placement_action(action)

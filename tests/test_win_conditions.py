@@ -7,14 +7,13 @@ Tests that the game correctly detects wins in various scenarios:
 """
 
 import pytest
-import numpy as np
 import sys
 from pathlib import Path
 
 # Add parent directory to path to import game modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from game.zertz_game import ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN, TIE
+from game.zertz_game import ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN, TIE #todo handle other conditions
 from game.zertz_board import ZertzBoard
 
 

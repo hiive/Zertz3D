@@ -36,7 +36,6 @@ class MoveHighlightStateMachine:
 
         Args:
             renderer: ZertzRenderer instance
-            game: ZertzGame instance (used only for read-only operations like get_valid_actions)
         """
         self.renderer = renderer
         self.highlight_durations = {
