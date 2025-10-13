@@ -6,7 +6,7 @@ Formats valid moves and game state information for display.
 import numpy as np
 
 
-class ActionTextRenderer:
+class ActionTextFormatter:
     """Formats valid moves and game state for display."""
 
     def format_valid_actions(self, game, player):

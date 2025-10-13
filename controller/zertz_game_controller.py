@@ -7,7 +7,7 @@ from __future__ import annotations
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
 from controller.replay_loader import ReplayLoader
 from controller.game_logger import GameLogger
-from controller.action_text_renderer import ActionTextRenderer
+from controller.action_text_formatter import ActionTextFormatter
 from controller.game_session import GameSession
 from controller.game_loop import GameLoop
 from shared.interfaces import IRenderer, IRendererFactory
@@ -30,7 +30,7 @@ class ZertzGameController:
 
         # Initialize logger and move formatter
         self.logger = GameLogger(log_to_file=log_to_file, log_notation=log_notation, status_reporter=self._report)
-        self.move_formatter = ActionTextRenderer()
+        self.move_formatter = ActionTextFormatter()
 
         # Load replay first to detect board size and variant if needed
         replay_actions = None
