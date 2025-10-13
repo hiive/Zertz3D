@@ -3,6 +3,7 @@ import copy
 
 from .zertz_board import ZertzBoard
 from .action_result import ActionResult
+from .render_data import RenderData
 
 
 # For full rules: http://www.gipf.com/zertz/rules/rules.html
@@ -570,6 +571,45 @@ class ZertzGame:
                     removable_positions.append(rem_str)
 
         return removable_positions
+
+    def get_render_data(self, action_type, action, show_highlights=False):
+        """Get all rendering data for an action in one call.
+
+        This method encapsulates all data transformations needed by the renderer,
+        eliminating the need for the controller to perform transformations or
+        check renderer state.
+
+        Args:
+            action_type: Action type ('PUT', 'CAP', or 'PASS')
+            action: Action tuple (or None for PASS)
+            show_highlights: Whether to include highlight data for valid moves
+
+        Returns:
+            RenderData: Value object containing action_dict and optional highlight data
+
+        Architecture: Part of Recommendation 1 from architecture_report4.md
+        """
+        # Get the action dictionary
+        _, action_dict = self.action_to_str(action_type, action)
+
+        # If highlights not requested, return minimal data
+        if not show_highlights:
+            return RenderData(action_dict)
+
+        # Get valid actions for highlighting (before the action is executed)
+        placement_array, capture_array = self.get_valid_actions()
+
+        # Convert arrays to renderer-friendly formats
+        placement_positions = self.get_placement_positions(placement_array)
+        capture_moves = self.get_capture_dicts(capture_array)
+        removal_positions = self.get_removal_positions(placement_array, action_type, action)
+
+        return RenderData(
+            action_dict=action_dict,
+            placement_positions=placement_positions,
+            capture_moves=capture_moves,
+            removal_positions=removal_positions
+        )
 
     def print_state(self):
         # Print the board state and supplies to the console

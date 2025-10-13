@@ -186,27 +186,16 @@ class ZertzGameController:
             if self.renderer and self.renderer.is_busy():
                 return task.again
 
-            # Get valid actions BEFORE executing (for highlighting)
-            placement_before, capture_before = self.session.game.get_valid_actions()
+            # Get render data BEFORE executing action (so board state is pre-action)
+            # This encapsulates all data transformations in the game layer (Recommendation 1)
+            render_data = self.session.game.get_render_data(ax, ay, self.show_moves)
 
-            # Convert arrays to strings BEFORE executing action (so board state is pre-action)
-            if self.show_moves:
-                placement_positions = self.session.game.get_placement_positions(placement_before)
-                capture_moves = self.session.game.get_capture_dicts(capture_before)
-                removal_positions = self.session.game.get_removal_positions(placement_before, ax, ay)
-            else:
-                placement_positions = None
-                capture_moves = None
-                removal_positions = None
-
-            # Execute action (game now provides frozen positions diff - Recommendation 1)
+            # Execute action (game now provides frozen positions diff)
             action_result = self.session.game.take_action(ax, ay)
 
-            # Pass action_result to renderer (no extraction needed - pass whole object)
+            # Pass render_data and action_result to renderer
             if self.renderer:
-                self.renderer.execute_action(player, action_dict, action_result,
-                                            placement_positions, capture_moves, removal_positions,
-                                            task.delay_time)
+                self.renderer.execute_action(player, render_data, action_result, task.delay_time)
                 # Check if renderer started work (highlighting or animations)
                 if self.renderer.is_busy():
                     return task.again

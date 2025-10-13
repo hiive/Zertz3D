@@ -12,6 +12,7 @@ from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, Wi
 
 from renderer.water_node import WaterNode
 from renderer.zertz_models import BasePiece, SkyBox, make_marble
+from game.render_data import RenderData
 
 logger = logging.getLogger(__name__)
 
@@ -59,35 +60,31 @@ class MoveHighlightStateMachine:
         """Check if the state machine is currently active."""
         return self.phase is not None
 
-    def start(self, player, action_dict, action_result, task_delay_time,
-             placement_positions=None, capture_moves=None, removal_positions=None):
+    def start(self, player, render_data, action_result, task_delay_time):
         """Start the highlighting sequence for an action.
 
         Args:
             player: Player making the move
-            action_dict: Action dictionary
+            render_data: RenderData value object with action_dict and highlight data
             action_result: ActionResult from game.take_action() (encapsulates captures and frozen positions)
             task_delay_time: Animation duration from controller's task
-            placement_positions: List of position strings for placement highlights
-            capture_moves: List of capture move dicts with pre-converted strings
-            removal_positions: List of removable position strings
         """
         self.pending_player = player
-        self.pending_action_dict = action_dict
+        self.pending_action_dict = render_data.action_dict
         self.pending_result = action_result  # Store whole ActionResult object
         self.task_delay_time = task_delay_time
-        self.placement_positions = placement_positions
-        self.capture_moves = capture_moves
-        self.removal_positions = removal_positions
+        self.placement_positions = render_data.placement_positions
+        self.capture_moves = render_data.capture_moves
+        self.removal_positions = render_data.removal_positions
 
-        action_type = action_dict['action']
+        action_type = render_data.action_dict['action']
         if action_type == "PUT":
             # Queue placement highlights and start the sequence
-            self._queue_placement_highlights(placement_positions)
+            self._queue_placement_highlights(render_data.placement_positions)
             self.phase = self.PHASE_PLACEMENT_HIGHLIGHTS
         elif action_type == "CAP":
             # Queue capture highlights and start the sequence
-            self._queue_capture_highlights(capture_moves)
+            self._queue_capture_highlights(render_data.capture_moves)
             self.phase = self.PHASE_CAPTURE_HIGHLIGHTS
         elif action_type == "PASS":
             # PASS has no visuals, action already executed by controller
@@ -274,7 +271,9 @@ class MoveHighlightStateMachine:
         action_dict = self.pending_action_dict
 
         # Animate capture action (action already executed by controller)
-        self.renderer.show_action(player, action_dict, self.task_delay_time)
+        # Create minimal RenderData with just the action_dict
+        render_data = RenderData(action_dict)
+        self.renderer.show_action(player, render_data, self.task_delay_time, self.pending_result)
 
         # Wait for final move animations to complete
         self.phase = self.PHASE_ANIMATING
@@ -1011,7 +1010,19 @@ class ZertzRenderer(ShowBase):
 
                 self.removed_bases.append((base_piece, base_pos))
 
-    def show_action(self, player, action_dict, action_duration=0, frozen_positions=None):
+    def show_action(self, player, render_data, action_duration=0, action_result=None):
+        """Visualize an action without highlights.
+
+        Args:
+            player: Player making the move
+            render_data: RenderData value object containing action_dict
+            action_duration: Animation duration
+            action_result: ActionResult containing frozen positions (optional)
+        """
+        # Extract data from value objects
+        action_dict = render_data.action_dict
+        frozen_positions = action_result.newly_frozen_positions if action_result else None
+
         # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}
         # Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'G2', 'dst': 'E2', 'capture': 'b'}
         # Player 1: {'action': 'PASS'}
@@ -1140,32 +1151,29 @@ class ZertzRenderer(ShowBase):
                 return result, player
         return None, None
 
-    def execute_action(self, player, action_dict, action_result,
-                       placement_positions, capture_moves, removal_positions, task_delay_time):
+    def execute_action(self, player, render_data, action_result, task_delay_time):
         """Execute an action with optional highlighting.
 
         Args:
             player: Player making the move
-            action_dict: Action dictionary
+            render_data: RenderData value object containing action_dict and optional highlight data
             action_result: ActionResult from game.take_action() (encapsulates captures and frozen positions)
-            placement_positions: List of placement position strings (from pre-action board)
-            capture_moves: List of capture move dicts (from pre-action board)
-            removal_positions: List of removable position strings (from pre-action board)
             task_delay_time: Task delay time for animations
+
+        Architecture: Part of Recommendation 1 from architecture_report4.md
         """
         if self.show_moves and self.highlight_sm:
             # Debug logging
-            if action_dict['action'] == "CAP" and capture_moves:
-                print(f"[Renderer] Passing {len(capture_moves)} capture moves to state machine:")
-                for cm in capture_moves:
+            if render_data.action_dict['action'] == "CAP" and render_data.capture_moves:
+                print(f"[Renderer] Passing {len(render_data.capture_moves)} capture moves to state machine:")
+                for cm in render_data.capture_moves:
                     print(f"  - {cm['src']} -> {cm['dst']}")
 
-            # Start highlighting - pass action_result to state machine
-            self.highlight_sm.start(player, action_dict, action_result, task_delay_time,
-                                   placement_positions, capture_moves, removal_positions)
+            # Start highlighting - pass render_data and action_result to state machine
+            self.highlight_sm.start(player, render_data, action_result, task_delay_time)
         else:
-            # Direct visualization without highlights - extract frozen positions from action_result
-            self.show_action(player, action_dict, task_delay_time, action_result.newly_frozen_positions)
+            # Direct visualization without highlights
+            self.show_action(player, render_data, task_delay_time, action_result)
 
     def _apply_highlight(self, highlight_info):
         """Apply a highlight to the specified rings and/or marbles.
