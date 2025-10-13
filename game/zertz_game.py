@@ -3,7 +3,7 @@ import copy
 
 from .zertz_board import ZertzBoard
 from .action_result import ActionResult
-from .render_data import RenderData
+from shared.render_data import RenderData
 
 
 # For full rules: http://www.gipf.com/zertz/rules/rules.html
@@ -611,23 +611,21 @@ class ZertzGame:
             removal_positions=removal_positions
         )
 
-    def print_state(self):
-        # Print the board state and supplies to the console
-        #   0 - empty space
-        #   1 - ring
-        #   2 - white marble
-        #   3 - gray marble
-        #   4 - black marble
-        print("---------------")
-        print("Board state:")
-        print(self.board.state[self.board.RING_LAYER] +
-              self.board.state[self.board.MARBLE_TO_LAYER['w']] +
-              self.board.state[self.board.MARBLE_TO_LAYER['g']] * 2 +
-              self.board.state[self.board.MARBLE_TO_LAYER['b']] * 3)
-        print("---------------")
-        print("Marble supply:")
-        print(self.board.global_state[self.board.SUPPLY_SLICE])
-        print("---------------")
+    def print_state(self, reporter=None):
+        """Emit the board state and supplies via provided reporter."""
+        if reporter is None:
+            reporter = print
+
+        reporter("---------------")
+        reporter("Board state:")
+        reporter(self.board.state[self.board.RING_LAYER] +
+                 self.board.state[self.board.MARBLE_TO_LAYER['w']] +
+                 self.board.state[self.board.MARBLE_TO_LAYER['g']] * 2 +
+                 self.board.state[self.board.MARBLE_TO_LAYER['b']] * 3)
+        reporter("---------------")
+        reporter("Marble supply:")
+        reporter(self.board.global_state[self.board.SUPPLY_SLICE])
+        reporter("---------------")
 
     def take_action(self, action_type, action):
         """Execute an action and record move for loop detection.

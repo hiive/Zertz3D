@@ -3,11 +3,13 @@
 Handles logging game actions and notation to files.
 """
 
+from typing import Callable
+
 
 class GameLogger:
     """Handles logging to files (actions + notation)."""
 
-    def __init__(self, log_to_file=False, log_notation=False):
+    def __init__(self, log_to_file=False, log_notation=False, status_reporter: Callable[[str], None] | None = None):
         """Initialize the game logger.
 
         Args:
@@ -20,7 +22,7 @@ class GameLogger:
         self.log_filename = None
         self.notation_file = None
         self.notation_filename = None
-        self.pending_notation = None  # Buffer for notation that might get updated with isolation
+        self._status_reporter: Callable[[str], None] | None = status_reporter
 
     def open_log_files(self, seed, rings, blitz=False):
         """Open new log files for the current game.
@@ -40,7 +42,7 @@ class GameLogger:
             if blitz:
                 self.log_file.write("# Variant: Blitz\n")
             self.log_file.write("#\n")
-            print(f"Logging game to: {self.log_filename}")
+            self._report(f"Logging game to: {self.log_filename}")
 
         if self.log_notation_enabled:
             self.notation_filename = f"zertzlog{variant}_{seed}_notation.txt"
@@ -48,7 +50,7 @@ class GameLogger:
             # First line: rings and variant
             variant_text = " Blitz" if blitz else ""
             self.notation_file.write(f"{rings}{variant_text}\n")
-            print(f"Logging notation to: {self.notation_filename}")
+            self._report(f"Logging notation to: {self.notation_filename}")
 
     def close_log_files(self, game):
         """Close the current log files and append final game state.
@@ -71,16 +73,12 @@ class GameLogger:
             self.log_file.write("# ---------------\n")
             self.log_file.close()
             self.log_file = None
-            print(f"Game log saved to: {self.log_filename}")
+            self._report(f"Game log saved to: {self.log_filename}")
 
         if self.notation_file is not None:
-            # Write any buffered notation before closing
-            if self.pending_notation is not None:
-                self.notation_file.write(f"{self.pending_notation}\n")
-                self.pending_notation = None
             self.notation_file.close()
             self.notation_file = None
-            print(f"Notation log saved to: {self.notation_filename}")
+            self._report(f"Notation log saved to: {self.notation_filename}")
 
     def log_action(self, player_num, action_dict):
         """Log an action to the file if logging is enabled.
@@ -103,27 +101,14 @@ class GameLogger:
             self.notation_file.write(f"{notation}\n")
             self.notation_file.flush()
 
-    def buffer_notation(self, notation):
-        """Buffer notation that might be updated with isolation results.
+    def set_status_reporter(self, reporter: Callable[[str], None] | None) -> None:
+        """Set or update the status reporter callback."""
+        self._status_reporter = reporter
 
-        Args:
-            notation: Notation string to buffer
-        """
-        # First, write any previously buffered notation
-        if self.pending_notation is not None:
-            self.log_notation(self.pending_notation)
-        self.pending_notation = notation
-
-    def update_buffered_notation(self, notation):
-        """Update the buffered notation (e.g., when isolation occurs).
-
-        Args:
-            notation: Updated notation string
-        """
-        self.pending_notation = notation
-
-    def flush_buffered_notation(self):
-        """Write any buffered notation to file."""
-        if self.pending_notation is not None:
-            self.log_notation(self.pending_notation)
-            self.pending_notation = None
+    def _report(self, message: str | None) -> None:
+        if message is None:
+            return
+        if self._status_reporter is not None:
+            self._status_reporter(message)
+        else:
+            print(message)

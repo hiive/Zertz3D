@@ -1,9 +1,11 @@
 """Main entry point for Zertz 3D game."""
 
 import argparse
-from controller.zertz_game_controller import ZertzGameController
 
-if __name__ == '__main__':
+from factory import ZertzFactory
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description='Zertz 3D Game')
     parser.add_argument('--replay', type=str, help='Path to replay file (board size auto-detected)')
     parser.add_argument('--rings', type=int, default=37, help='Number of rings on the board (default: 37, ignored if --replay is used)')
@@ -19,8 +21,23 @@ if __name__ == '__main__':
     parser.add_argument('--move-duration', type=float, default=0.666, help='Duration between moves in seconds (default: 0.666)')
     args = parser.parse_args()
 
-    game = ZertzGameController(rings=args.rings, replay_file=args.replay, seed=args.seed,
-                                log_to_file=args.log, partial_replay=args.partial, headless=args.headless,
-                                max_games=args.games, show_moves=args.show_moves, show_coords=args.show_coords,
-                                log_notation=args.log_notation, blitz=args.blitz, move_duration=args.move_duration)
-    game.run()
+    factory = ZertzFactory()
+    controller = factory.create_controller(
+        rings=args.rings,
+        replay_file=args.replay,
+        seed=args.seed,
+        log_to_file=args.log,
+        partial_replay=args.partial,
+        headless=args.headless,
+        max_games=args.games,
+        show_moves=args.show_moves,
+        show_coords=args.show_coords,
+        log_notation=args.log_notation,
+        blitz=args.blitz,
+        move_duration=args.move_duration,
+    )
+    controller.run()
+
+
+if __name__ == '__main__':
+    main()

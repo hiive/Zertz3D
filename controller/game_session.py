@@ -6,6 +6,7 @@ Manages a single game's lifecycle including board state, players, and seed manag
 import random
 import time
 import hashlib
+from typing import Callable
 import numpy as np
 
 from game.zertz_game import (ZertzGame, STANDARD_MARBLES, BLITZ_MARBLES,
@@ -16,7 +17,8 @@ from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer
 class GameSession:
     """Manages a single game's lifecycle (board state, players, current game)."""
 
-    def __init__(self, rings=37, blitz=False, seed=None, replay_actions=None, partial_replay=False, t=5):
+    def __init__(self, rings=37, blitz=False, seed=None, replay_actions=None,
+                 partial_replay=False, t=5, status_reporter: Callable[[str], None] | None = None):
         """Initialize a game session.
 
         Args:
@@ -30,6 +32,7 @@ class GameSession:
         self.rings = rings
         self.blitz = blitz
         self.t = t
+        self._status_reporter: Callable[[str], None] | None = status_reporter
 
         # Set marbles and win conditions based on variant
         if blitz:
@@ -71,7 +74,7 @@ class GameSession:
         Args:
             seed: Random seed value
         """
-        print(f"-- Setting Seed: {seed}")
+        self._report(f"-- Setting Seed: {seed}")
         np.random.seed(seed)
         random.seed(seed)
 
@@ -95,7 +98,7 @@ class GameSession:
         This creates a new game instance and players.
         """
         variant_text = " (BLITZ)" if self.blitz else ""
-        print(f"** New game{variant_text} **")
+        self._report(f"** New game{variant_text} **")
 
         # Generate new seed for non-replay games (only after the first game)
         if not self.replay_mode and self.current_seed is not None and self.game is not None:
@@ -107,7 +110,7 @@ class GameSession:
 
         # Create players based on mode
         if self.replay_mode:
-            print("-- Replay Mode --")
+            self._report("-- Replay Mode --")
             player1_actions, player2_actions = self.replay_actions
             self.player1 = ReplayZertzPlayer(self.game, 1, player1_actions)
             self.player2 = ReplayZertzPlayer(self.game, 2, player2_actions)
@@ -136,7 +139,7 @@ class GameSession:
         if not self.partial_replay:
             raise ValueError("Cannot switch to random play when partial_replay is False")
 
-        print("Replay finished - continuing with random play")
+        self._report("Replay finished - continuing with random play")
         self.player1 = RandomZertzPlayer(self.game, 1)
         self.player2 = RandomZertzPlayer(self.game, 2)
 
@@ -177,3 +180,15 @@ class GameSession:
             int: Number of games played
         """
         return self.games_played
+
+    def set_status_reporter(self, reporter: Callable[[str], None] | None) -> None:
+        """Set or update the status reporter callback."""
+        self._status_reporter = reporter
+
+    def _report(self, message: str | None) -> None:
+        if message is None:
+            return
+        if self._status_reporter is not None:
+            self._status_reporter(message)
+        else:
+            print(message)

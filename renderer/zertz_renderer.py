@@ -3,16 +3,18 @@ import math
 import sys
 
 from queue import SimpleQueue, Empty
+from typing import Callable, Any
 
 import numpy as np
 import simplepbr
 from direct.showbase.ShowBase import ShowBase
+from direct.task import Task
 
 from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material, TransparencyAttrib, TextNode
 
 from renderer.water_node import WaterNode
 from renderer.zertz_models import BasePiece, SkyBox, make_marble
-from game.render_data import RenderData
+from shared.render_data import RenderData
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,6 @@ class MoveHighlightStateMachine:
         self.phase = None  # Current phase: 'placement_highlights', 'selected_placement', etc.
         self.pending_player = None  # Player making the move
         self.pending_action_dict = None  # Action dict
-        self.pending_result = None  # ActionResult object from game.take_action()
         self.placement_positions = None  # List of position strings for placement highlights
         self.capture_moves = None  # List of capture move dicts
         self.removal_positions = None  # List of removable position strings
@@ -60,18 +61,16 @@ class MoveHighlightStateMachine:
         """Check if the state machine is currently active."""
         return self.phase is not None
 
-    def start(self, player, render_data, action_result, task_delay_time):
+    def start(self, player, render_data, task_delay_time):
         """Start the highlighting sequence for an action.
 
         Args:
             player: Player making the move
             render_data: RenderData value object with action_dict and highlight data
-            action_result: ActionResult from game.take_action() (encapsulates captures and frozen positions)
             task_delay_time: Animation duration from controller's task
         """
         self.pending_player = player
         self.pending_action_dict = render_data.action_dict
-        self.pending_result = action_result  # Store whole ActionResult object
         self.task_delay_time = task_delay_time
         self.placement_positions = render_data.placement_positions
         self.capture_moves = render_data.capture_moves
@@ -242,8 +241,10 @@ class MoveHighlightStateMachine:
         action_dict = self.pending_action_dict
 
         # Now animate ring removal only (marble was already placed)
-        # Pass frozen positions from ActionResult to show_ring_removal
-        self.renderer.show_ring_removal(action_dict, self.task_delay_time, self.pending_result.newly_frozen_positions)
+        # Pass frozen positions from current ActionResult to show_ring_removal
+        action_result = self.renderer.current_action_result
+        newly_frozen = action_result.newly_frozen_positions if action_result else None
+        self.renderer.show_ring_removal(action_dict, self.task_delay_time, newly_frozen)
 
         # Wait for final move animations to complete
         self.phase = self.PHASE_ANIMATING
@@ -273,22 +274,11 @@ class MoveHighlightStateMachine:
         # Animate capture action (action already executed by controller)
         # Create minimal RenderData with just the action_dict
         render_data = RenderData(action_dict)
-        self.renderer.show_action(player, render_data, self.task_delay_time, self.pending_result)
+        self.renderer.show_action(player, render_data, self.task_delay_time, self.renderer.current_action_result)
 
         # Wait for final move animations to complete
         self.phase = self.PHASE_ANIMATING
 
-    def get_pending_player(self):
-        """Get the player from the pending action."""
-        return self.pending_player
-
-    def get_pending_result(self):
-        """Get the pending result after action execution."""
-        return self.pending_result
-
-    def get_pending_action_dict(self):
-        """Get the pending action dictionary."""
-        return self.pending_action_dict
 
 
 class ZertzRenderer(ShowBase):
@@ -343,6 +333,7 @@ class ZertzRenderer(ShowBase):
         self.pos_array = None
         self.show_coords = show_coords
         self._animation_id_counter = 0  # For generating unique IDs
+        self._action_context = None  # Tracks in-flight action for completion callbacks
 
         self.x_base_size = self.BASE_SIZE_X
         self.y_base_size = self.BASE_SIZE_Y
@@ -420,6 +411,17 @@ class ZertzRenderer(ShowBase):
 
         # Initialize highlight state machine if show_moves is enabled
         self.highlight_sm = MoveHighlightStateMachine(self) if self.show_moves else None
+
+    def attach_update_loop(self, update_fn: Callable[[], bool], interval: float) -> bool:
+        delay = max(interval, 0.0)
+
+        def _task(task):
+            if update_fn():
+                return Task.done
+            return Task.again
+
+        self.taskMgr.doMethodLater(delay, _task, 'zertzGameLoop')
+        return True
 
     def _setup_game_loop(self):
         """Setup the game loop task with specified duration.
@@ -615,6 +617,7 @@ class ZertzRenderer(ShowBase):
         for anim_item in to_remove:
             self.current_animations.remove(anim_item)
 
+        self._complete_action_if_ready()
         return task.cont
 
     def get_current_pos(self, anim_factor, dst, src, jump=True):
@@ -1123,6 +1126,7 @@ class ZertzRenderer(ShowBase):
         # 8. Recreate highlight state machine
         if self.show_moves:
             self.highlight_sm = MoveHighlightStateMachine(self)
+        self._action_context = None
 
     def is_busy(self):
         """Check if renderer is busy with highlights or animations.
@@ -1134,24 +1138,14 @@ class ZertzRenderer(ShowBase):
             return True
         return self.is_animation_active()
 
-    def get_pending_action_result(self):
-        """Get result and player from completed highlight state machine.
-
-        Returns:
-            Tuple of (result, player) if state machine just finished, (None, None) otherwise
-        """
-        if self.highlight_sm and not self.highlight_sm.is_active():
-            # Check if there's a pending result (state machine just finished)
-            result = self.highlight_sm.get_pending_result()
-            player = self.highlight_sm.get_pending_player()
-            if result is not None or player is not None:
-                # Clear the pending values after retrieving them
-                self.highlight_sm.pending_result = None
-                self.highlight_sm.pending_player = None
-                return result, player
-        return None, None
-
-    def execute_action(self, player, render_data, action_result, task_delay_time):
+    def execute_action(
+        self,
+        player: Any,
+        render_data: RenderData,
+        action_result: Any,
+        task_delay_time: float,
+        on_complete: Callable[[Any, Any], None] | None,
+    ) -> None:
         """Execute an action with optional highlighting.
 
         Args:
@@ -1159,9 +1153,10 @@ class ZertzRenderer(ShowBase):
             render_data: RenderData value object containing action_dict and optional highlight data
             action_result: ActionResult from game.take_action() (encapsulates captures and frozen positions)
             task_delay_time: Task delay time for animations
-
-        Architecture: Part of Recommendation 1 from architecture_report4.md
+            on_complete: Callback invoked when all animations/highlights finish
         """
+        self._set_action_context(player, render_data, action_result, task_delay_time, on_complete)
+
         if self.show_moves and self.highlight_sm:
             # Debug logging
             if render_data.action_dict['action'] == "CAP" and render_data.capture_moves:
@@ -1170,10 +1165,13 @@ class ZertzRenderer(ShowBase):
                     print(f"  - {cm['src']} -> {cm['dst']}")
 
             # Start highlighting - pass render_data and action_result to state machine
-            self.highlight_sm.start(player, render_data, action_result, task_delay_time)
+            self.highlight_sm.start(player, render_data, task_delay_time)
         else:
             # Direct visualization without highlights
             self.show_action(player, render_data, task_delay_time, action_result)
+
+        # If no animations or highlights were queued, complete immediately
+        self._complete_action_if_ready()
 
     def _apply_highlight(self, highlight_info):
         """Apply a highlight to the specified rings and/or marbles.
@@ -1297,3 +1295,57 @@ class ZertzRenderer(ShowBase):
     def is_animation_active(self):
         """Check if any animations (move or highlight) are active or queued."""
         return len(self.current_animations) > 0 or not self.animation_queue.empty()
+
+    @property
+    def current_action_result(self):
+        """Return the in-flight action result (if any)."""
+        if self._action_context:
+            return self._action_context['action_result']
+        return None
+
+    def _set_action_context(
+        self,
+        player: Any,
+        render_data: RenderData,
+        action_result: Any,
+        task_delay_time: float,
+        on_complete: Callable[[Any, Any], None] | None,
+    ) -> None:
+        """Store state for the current action until animations complete."""
+        if self._action_context is not None:
+            logger.warning("Renderer action context replaced before completion; forcing completion.")
+            self._complete_action()
+
+        self._action_context = {
+            'player': player,
+            'render_data': render_data,
+            'action_result': action_result,
+            'task_delay_time': task_delay_time,
+            'on_complete': on_complete,
+        }
+
+    def _complete_action_if_ready(self) -> None:
+        """Invoke completion callback when highlights and animations finish."""
+        if self._action_context is None:
+            return
+        if self.highlight_sm and self.highlight_sm.is_active():
+            return
+        if self.is_animation_active():
+            return
+        self._complete_action()
+
+    def _complete_action(self) -> None:
+        """Call the completion callback (if any) and clear context."""
+        if self._action_context is None:
+            return
+
+        context = self._action_context
+        self._action_context = None
+
+        callback = context.get('on_complete')
+        if callback:
+            callback(context['player'], context['action_result'])
+
+    def report_status(self, message: str) -> None:
+        """Handle textual status reports for compatibility with composite renderers."""
+        logger.info(message)

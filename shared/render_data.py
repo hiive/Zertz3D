@@ -2,9 +2,7 @@
 
 This class encapsulates all data needed by the renderer to visualize a game action,
 including the action itself and optional highlight data. It eliminates the need
-for the controller to perform data transformations or check renderer state.
-
-Architecture: Part of Recommendation 1 from architecture_report4.md
+for higher-level components to perform data transformations or inspect renderer state.
 """
 
 
@@ -12,8 +10,8 @@ class RenderData:
     """Encapsulates all rendering data for a game action.
 
     This value object provides a clean interface between the game and renderer layers,
-    eliminating the need for the controller to:
-    - Check renderer state (show_moves flag)
+    eliminating the need for orchestrators to:
+    - Check renderer configuration (like show_moves)
     - Perform data transformations (array to string conversions)
     - Call multiple separate methods to gather rendering data
 
@@ -55,8 +53,8 @@ class RenderData:
         highlights = ""
         if self.has_highlights():
             highlights = (f", placements={len(self.placement_positions)}, "
-                         f"captures={len(self.capture_moves)}, "
-                         f"removals={len(self.removal_positions)}")
+                          f"captures={len(self.capture_moves)}, "
+                          f"removals={len(self.removal_positions)}")
         return f"RenderData(action={action_type}{highlights})"
 
     def has_highlights(self):
@@ -65,7 +63,9 @@ class RenderData:
         Returns:
             bool: True if any highlight data is present
         """
-        return self.has_placement_highlights() or self.has_capture_highlights() or self.has_removal_highlights()
+        return (self.has_placement_highlights() or
+                self.has_capture_highlights() or
+                self.has_removal_highlights())
 
     def has_placement_highlights(self):
         """Check if placement highlights are available.

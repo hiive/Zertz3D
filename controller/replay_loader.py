@@ -5,6 +5,7 @@ and variant detection.
 """
 
 import ast
+from typing import Callable
 from game.zertz_board import ZertzBoard
 from game.zertz_game import (BLITZ_MARBLES, BLITZ_WIN_CONDITIONS,
                              STANDARD_MARBLES, STANDARD_WIN_CONDITIONS)
@@ -13,7 +14,7 @@ from game.zertz_game import (BLITZ_MARBLES, BLITZ_WIN_CONDITIONS,
 class ReplayLoader:
     """Loads and parses replay files for Zertz games."""
 
-    def __init__(self, replay_file, blitz=False):
+    def __init__(self, replay_file, blitz=False, status_reporter: Callable[[str], None] | None = None):
         """Initialize the replay loader.
 
         Args:
@@ -26,6 +27,7 @@ class ReplayLoader:
         self.detected_blitz = False
         self.marbles = None
         self.win_condition = None
+        self._status_reporter: Callable[[str], None] | None = status_reporter
 
     def load(self):
         """Load replay actions from the file.
@@ -37,7 +39,7 @@ class ReplayLoader:
             Sets self.detected_rings, self.detected_blitz, self.marbles,
             and self.win_condition based on file contents.
         """
-        print(f"Loading replay from: {self.replay_file}")
+        self._report(f"Loading replay from: {self.replay_file}")
         player1_actions = []
         player2_actions = []
         all_actions = []
@@ -69,19 +71,19 @@ class ReplayLoader:
 
         # Detect board size from coordinates
         self.detected_rings = self._detect_board_size(all_actions)
-        print(f"Detected board size: {self.detected_rings} rings")
+        self._report(f"Detected board size: {self.detected_rings} rings")
 
         # Determine final variant (file takes precedence over command line)
         if self.detected_blitz:
-            print("Detected blitz variant from replay file")
+            self._report("Detected blitz variant from replay file")
             if self.blitz:
-                print("  (--blitz flag also specified)")
+                self._report("  (--blitz flag also specified)")
             else:
-                print("  (automatically enabling blitz mode)")
+                self._report("  (automatically enabling blitz mode)")
             self.blitz = True
         elif self.blitz:
-            print("Warning: --blitz flag specified but replay file is standard mode")
-            print("         Using blitz rules anyway")
+            self._report("Warning: --blitz flag specified but replay file is standard mode")
+            self._report("         Using blitz rules anyway")
 
         # Always set marbles and win_condition based on final variant
         if self.blitz:
@@ -91,8 +93,8 @@ class ReplayLoader:
             self.marbles = STANDARD_MARBLES
             self.win_condition = STANDARD_WIN_CONDITIONS
 
-        print(f"Loaded {len(player1_actions)} actions for Player 1")
-        print(f"Loaded {len(player2_actions)} actions for Player 2")
+        self._report(f"Loaded {len(player1_actions)} actions for Player 1")
+        self._report(f"Loaded {len(player2_actions)} actions for Player 2")
         return player1_actions, player2_actions
 
     def _detect_board_size(self, all_actions):
@@ -128,3 +130,15 @@ class ReplayLoader:
         else:
             # J or beyond = 61 ring board
             return ZertzBoard.LARGE_BOARD_61
+
+    def set_status_reporter(self, reporter: Callable[[str], None] | None) -> None:
+        """Update status reporter after initialization."""
+        self._status_reporter = reporter
+
+    def _report(self, message: str | None) -> None:
+        if message is None:
+            return
+        if self._status_reporter is not None:
+            self._status_reporter(message)
+        else:
+            print(message)
