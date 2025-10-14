@@ -222,25 +222,26 @@ class TestAllBoardSizes:
     def test_axial_map_sizes(self, request, board_fixture):
         """Test that axial maps have correct number of positions."""
         board = request.getfixturevalue(board_fixture)
-        board._build_axial_maps()
+        board._ensure_positions_built()
 
-        assert len(board._yx_to_ax) == board.rings, \
-            f"Expected {board.rings} positions in yx_to_ax, got {len(board._yx_to_ax)}"
-        assert len(board._ax_to_yx) == board.rings, \
-            f"Expected {board.rings} positions in ax_to_yx, got {len(board._ax_to_yx)}"
+        positions = [board.position_from_label(label) for label in board._positions_by_label.keys()]
+        assert len(positions) == board.rings, \
+            f"Expected {board.rings} positions, got {len(positions)}"
 
     @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
     def test_center_near_origin(self, request, board_fixture):
         """Test that the center position maps near origin (scaled by coord_scale)."""
         board = request.getfixturevalue(board_fixture)
-        board._build_axial_maps()
+        board._ensure_positions_built()
 
         # Find position closest to board center
         center_y, center_x = board.width // 2, board.width // 2
         min_dist = float('inf')
         center_pos = None
 
-        for (y, x), (q, r) in board._yx_to_ax.items():
+        for pos in board._positions.values():
+            y, x = pos.yx
+            q, r = pos.axial
             dist = abs(y - center_y) + abs(x - center_x)
             if dist < min_dist:
                 min_dist = dist

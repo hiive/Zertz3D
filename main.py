@@ -14,7 +14,7 @@ def main() -> None:
     parser.add_argument('--partial', action='store_true', help='Continue with random play after replay ends (only with --replay)')
     parser.add_argument('--headless', action='store_true', help='Run without 3D renderer')
     parser.add_argument('--games', type=int, help='Number of games to play (default: play indefinitely)')
-    parser.add_argument('--show-moves', action='store_true', help='Show valid moves before each turn')
+    parser.add_argument('--highlight-choices', action='store_true', help='Highlight valid moves and actions before each turn')
     parser.add_argument('--show-coords', action='store_true', help='Show coordinate labels on rings in 3D view')
     parser.add_argument('--log-notation', action='store_true', help='Log game moves using official Zèrtz notation')
     parser.add_argument('--blitz', action='store_true', help='Use blitz variant (37 rings only, fewer marbles, lower win thresholds)')
@@ -30,7 +30,7 @@ def main() -> None:
         partial_replay=args.partial,
         headless=args.headless,
         max_games=args.games,
-        show_moves=args.show_moves,
+        highlight_choices=args.highlight_choices,
         show_coords=args.show_coords,
         log_notation=args.log_notation,
         blitz=args.blitz,

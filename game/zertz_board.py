@@ -1,6 +1,8 @@
 from collections import deque
 import numpy as np
 
+from game.zertz_position import ZertzPosition, ZertzPositionCollection
+
 
 class ZertzBoard:
     # The zertz board is a hexagon and looks like this:
@@ -236,6 +238,9 @@ class ZertzBoard:
         self.board_layout = None
         self.frozen_positions = set()  # Set of (y, x) tuples for frozen isolated regions
 
+        # Position cache manager (built lazily)
+        self.positions = ZertzPositionCollection(self)
+
         if clone is not None:
             self.rings = clone.rings
             self.width = clone.width
@@ -327,6 +332,7 @@ class ZertzBoard:
             # Player captured marbles start at 0 (indices 3-8)
             # Current player starts at 0 (index 9)
 
+        # Coordinate maps are built lazily via PositionCollection
     @staticmethod
     def get_middle_ring(src, dst):
         # Return the (y, x) index of the ring between src and dst
@@ -971,142 +977,95 @@ class ZertzBoard:
 
         return translated
 
+    def _compute_label(self, index: tuple[int, int]) -> str:
+        y, x = index
+        if self.letter_layout is not None:
+            label = self.letter_layout[y][x]
+            if label:
+                return label
+        letter = chr(x + 65)
+        mid = self.width // 2
+        offset = max(mid - x, 0)
+        number = (self.width - y) - offset
+        return f"{letter}{number}"
+
+    def _ensure_positions_built(self) -> None:
+        self.positions.ensure()
+
+    def _label_to_yx(self, index_str: str) -> tuple[int, int]:
+        self._ensure_positions_built()
+        pos = self.positions.get_by_label(index_str)
+        if pos is None:
+            raise ValueError(f"Coordinate '{index_str}' not found in board layout")
+        return pos.yx
+
+    def _yx_to_label(self, index: tuple[int, int]) -> str:
+        self._ensure_positions_built()
+        pos = self.positions.get_by_yx(index)
+        return pos.label if pos else ''
+
+    @property
+    def _positions(self):
+        return self.positions.by_yx
+
+    @property
+    def _positions_by_label(self):
+        return self.positions.by_label
+
+    @property
+    def _positions_by_axial(self):
+        return self.positions.by_axial
+
     def str_to_index(self, index_str):
         """
         Convert a coordinate string like 'A1' (bottom numbering) to array indices (y, x).
         In this official layout, row numbers count upward from the bottom of the board.
         """
-        # Handle custom layouts first
-        if self.flattened_letters is not None:
-            try:
-                flat_index = np.where(self.flattened_letters == index_str)[0][0]
-                y = flat_index // self.width
-                x = flat_index % self.width
-                return y, x
-            except IndexError:
-                raise ValueError(f"Coordinate '{index_str}' not found in board layout")
-
-        # Split into components
-        letter = index_str[0].upper()
-        number = int(index_str[1:])
-
-        x = ord(letter) - 65  # ord('A') == 65
-        mid = self.width // 2
-        offset = max(mid - x, 0)
-
-        # Flip numbering: A1 is bottom, so y increases upward
-        y = (self.width - number) - offset
-        return y, x
+        return self._label_to_yx(index_str)
 
     def index_to_str(self, index):
-        """
-        Convert array indices (y, x) to ZÈRTZ coordinates like 'A1' (bottom numbering).
-        """
         y, x = index
-
         if not self._is_inbounds(index):
             raise IndexError(f"Position ({y}, {x}) is out of bounds")
-
+        pos = self.position_from_yx(index)
         if self.state[self.RING_LAYER, y, x] == 0:
             return ''
+        return pos.label
 
-        if self.flattened_letters is not None:
-            ix = y * self.width + x
-            if ix >= len(self.flattened_letters):
-                raise IndexError(
-                    f"Position ({y}, {x}) -> index {ix} is out of bounds "
-                    f"for board with {len(self.flattened_letters)} positions")
-            return self.flattened_letters[ix]
+    def position_from_yx(self, index: tuple[int, int]) -> ZertzPosition:
+        self._ensure_positions_built()
+        pos = self.positions.get_by_yx(index)
+        if pos is None:
+            raise ValueError(f"Position {index} is not a valid ring coordinate")
+        return pos
 
-        letter = chr(x + 65)
-        mid = self.width // 2
-        offset = max(mid - x, 0)
+    def position_from_label(self, label: str) -> ZertzPosition:
+        self._ensure_positions_built()
+        pos = self.positions.get_by_label(label)
+        if pos is None:
+            raise ValueError(f"Coordinate '{label}' not found in board layout")
+        return pos
 
-        # Flip numbering: bottom = 1
-        number = str((self.width - y) - offset)
-        return letter + number
+    def position_from_axial(self, axial: tuple[int, int]) -> ZertzPosition:
+        self._ensure_positions_built()
+        pos = self.positions.get_by_axial(axial)
+        if pos is None:
+            raise ValueError(f"Axial coordinate {axial} is not on this board")
+        return pos
+
 
     # =========================  AXIAL COORDINATES  =========================
 
     def _build_axial_maps(self):
-        """Map valid (y,x) <-> centered axial (q, r) where neighbors match DIRECTIONS.
+        self._ensure_positions_built()
 
-        Uses the standard pointy-top hex axial coordinate system:
-          q = x - center
-          r = y - x
+    @property
+    def _yx_to_ax(self):
+        return self.positions.yx_to_ax
 
-        For all boards, the center is calculated as the geometric center in Cartesian space.
-
-        For D3 symmetry boards (48-ring), we use tripled coordinates to maintain integer
-        arithmetic for 120° rotations since the geometric center falls between rings.
-
-        For D6 symmetry boards (37/61-ring), we use regular coordinates since the
-        geometric center coincides with the central ring.
-        """
-        if hasattr(self, "_axial_ready") and self._axial_ready:
-            return
-        assert self.board_layout is not None, "board_layout must be built first"
-
-        yx_to_ax = {}
-        ax_to_yx = {}
-
-        # Only map existing rings
-        ys, xs = np.where(self.board_layout)
-
-        # Standard pointy-top hex conversion (same for all board sizes)
-        c = self.width // 2
-        size = 1.0
-        sqrt3 = np.sqrt(3)
-
-        # First pass: convert all positions to axial, then to Cartesian
-        positions = []
-        for y, x in zip(ys, xs):
-            # yx to axial (standard formula)
-            q = x - c
-            r = y - x
-
-            # axial to Cartesian (pointy-top)
-            xc = size * sqrt3 * (q + r / 2.0)
-            yc = size * 1.5 * r
-
-            positions.append((y, x, q, r, xc, yc))
-
-        # Calculate geometric center in Cartesian space
-        xc_center = sum(p[4] for p in positions) / len(positions)
-        yc_center = sum(p[5] for p in positions) / len(positions)
-
-        # Convert geometric center back to axial
-        q_center = (sqrt3 / 3.0) * xc_center - (1.0 / 3.0) * yc_center
-        r_center = (2.0 / 3.0) * yc_center
-
-        # Second pass: center all coordinates
-        if self.rings == self.MEDIUM_BOARD_48:
-            # D3 symmetry: triple coordinates for integer arithmetic
-            for y, x, q, r, xc, yc in positions:
-                q_centered = q - q_center
-                r_centered = r - r_center
-
-                q3 = round(3 * q_centered)
-                r3 = round(3 * r_centered)
-
-                yx_to_ax[(y, x)] = (q3, r3)
-                ax_to_yx[(q3, r3)] = (y, x)
-
-            self._coord_scale = 3  # Using tripled coords
-        else:
-            # D6 symmetry: use regular coordinates
-            for y, x, q, r, xc, yc in positions:
-                q_centered = round(q - q_center)
-                r_centered = round(r - r_center)
-
-                yx_to_ax[(y, x)] = (q_centered, r_centered)
-                ax_to_yx[(q_centered, r_centered)] = (y, x)
-
-            self._coord_scale = 1  # Regular coords
-
-        self._yx_to_ax = yx_to_ax
-        self._ax_to_yx = ax_to_yx
-        self._axial_ready = True
+    @property
+    def _ax_to_yx(self):
+        return self.positions.ax_to_yx
 
     @staticmethod
     def _ax_rot60(q, r, k=1):

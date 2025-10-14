@@ -396,13 +396,15 @@ class ZertzGame:
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
 
             put_index = (put // self.board.width, put % self.board.width)
-            put_str = self.board.index_to_str(put_index)
+            put_pos = self.board.position_from_yx(put_index)
+            put_str = put_pos.label
 
             if rem == self.board.width ** 2:
                 rem_str = ''
             else:
                 rem_index = rem // self.board.width, rem % self.board.width
-                rem_str = self.board.index_to_str(rem_index)
+                rem_pos = self.board.position_from_yx(rem_index)
+                rem_str = rem_pos.label
             action_str = "{} {} {} {}".format(
                 action_type, marble_type, put_str, rem_str).rstrip()
             action_dict = {
@@ -416,14 +418,14 @@ class ZertzGame:
             direction, y, x = action
             src = (y, x)
             src_marble = self.board.get_marble_type_at(src)
-            src_str = self.board.index_to_str(src)
+            src_str = self.board.position_from_yx(src).label
 
             dy, dx = self.board.DIRECTIONS[direction]
             cap = (y + dy, x + dx)
             cap_marble = self.board.get_marble_type_at(cap)
-            cap_str = self.board.index_to_str(cap)
+            cap_str = self.board.position_from_yx(cap).label
             dst = self.board.get_jump_destination(src, cap)
-            dst_str = self.board.index_to_str(dst)
+            dst_str = self.board.position_from_yx(dst).label
 
             action_str = "{} {} {} {} {}".format(
                 action_type, src_marble, src_str, cap_marble, dst_str)
@@ -511,9 +513,9 @@ class ZertzGame:
         for dst_idx in dest_indices:
             dst_y = dst_idx // self.board.width
             dst_x = dst_idx % self.board.width
-            pos_str = self.board.index_to_str((dst_y, dst_x))
-            if pos_str:
-                placement_positions.append(pos_str)
+            pos = self.board.position_from_yx((dst_y, dst_x))
+            if self.board.state[self.board.RING_LAYER, dst_y, dst_x]:
+                placement_positions.append(pos.label)
 
         return placement_positions
 
@@ -566,9 +568,9 @@ class ZertzGame:
             if rem_idx != width ** 2 and rem_idx != dst:
                 rem_y = rem_idx // width
                 rem_x = rem_idx % width
-                rem_str = self.board.index_to_str((rem_y, rem_x))
-                if rem_str:
-                    removable_positions.append(rem_str)
+                if self.board.state[self.board.RING_LAYER, rem_y, rem_x]:
+                    rem_pos = self.board.position_from_yx((rem_y, rem_x))
+                    removable_positions.append(rem_pos.label)
 
         return removable_positions
 

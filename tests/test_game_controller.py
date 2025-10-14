@@ -54,7 +54,7 @@ class TestGameControllerHeadless:
                 rings=37,
                 seed=seed,
                 max_games=1,
-                show_moves=False,
+                highlight_choices=False,
                 show_coords=False,
                 log_to_file=False,
                 renderer_or_factory=None  # Headless mode
@@ -114,7 +114,7 @@ class TestGameControllerHeadless:
                 rings=37,
                 seed=seed,
                 max_games=2,  # Allow 2 games, but should stop after 2
-                show_moves=False,
+                highlight_choices=False,
                 renderer_or_factory=None
             )
 
@@ -147,7 +147,7 @@ class TestGameControllerHeadless:
                 rings=37,
                 seed=seed,
                 max_games=1,
-                show_moves=False,
+                highlight_choices=False,
                 renderer_or_factory=None
             )
 
@@ -172,7 +172,7 @@ class TestGameControllerHeadless:
             rings=37,
             seed=seed,
             max_games=3,
-            show_moves=False,
+            highlight_choices=False,
             renderer_or_factory=None,
             log_to_file=False
         )

@@ -72,9 +72,8 @@ class ActionTextFormatter:
                     cap_pos = action_dict['cap']
                     lines.append(f"  - CAP {marble} {src} -> {dst} capturing {captured} at {cap_pos}")
                 except (IndexError, KeyError):
-                    # Fallback to basic info if conversion fails
-                    src_str = game.board.index_to_str((y, x))
-                    lines.append(f"  - Jump from {src_str} (direction {direction})")
+                    src_pos = game.board.position_from_yx((y, x))
+                    lines.append(f"  - Jump from {src_pos.label} (direction {direction})")
 
             if len(capture_positions) > 10:
                 lines.append(f"  ... and {len(capture_positions) - 10} more")
@@ -104,7 +103,7 @@ class ActionTextFormatter:
                 marble = marble_types[marble_idx]
                 dst_y = dst // game.board.width
                 dst_x = dst % game.board.width
-                dst_str = game.board.index_to_str((dst_y, dst_x))
+                dst_str = game.board.position_from_yx((dst_y, dst_x)).label
 
                 key = (marble, dst_str)
                 if key not in placements:
@@ -113,7 +112,7 @@ class ActionTextFormatter:
                 if rem != game.board.width ** 2:
                     rem_y = rem // game.board.width
                     rem_x = rem % game.board.width
-                    rem_str = game.board.index_to_str((rem_y, rem_x))
+                    rem_str = game.board.position_from_yx((rem_y, rem_x)).label
                     placements[key].append(rem_str)
                     removals_set.add(rem_str)
 

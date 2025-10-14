@@ -17,12 +17,12 @@ class ZertzGameController:
     ANIMATION_DURATION_RATIO = 60.0/100.0 # 1% of 60fps
 
     def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False,
-                 max_games=None, show_moves=False, show_coords=False, log_notation=False,
+                 max_games=None, highlight_choices=False, show_coords=False, log_notation=False,
                  blitz=False, move_duration=0.666,
                  renderer_or_factory: IRenderer | IRendererFactory | None = None):
         self.show_coords = show_coords
         self.max_games = max_games  # None means play indefinitely
-        self.show_moves = show_moves
+        self.highlight_choices = highlight_choices
         self.move_duration = move_duration
         self.animation_duration = move_duration * self.ANIMATION_DURATION_RATIO
 
@@ -156,7 +156,7 @@ class ZertzGameController:
                 raise
 
         # Display valid moves if enabled
-        if self.show_moves:
+        if self.highlight_choices:
             self._display_valid_moves(player)
 
         # Convert action to string and log
@@ -172,7 +172,7 @@ class ZertzGameController:
 
         # Get render data BEFORE executing action (so board state is pre-action)
         # This encapsulates all data transformations in the game layer (Recommendation 1)
-        render_data = self.session.game.get_render_data(ax, ay, self.show_moves)
+        render_data = self.session.game.get_render_data(ax, ay, self.highlight_choices)
 
         # Execute action FIRST to get action_result
         action_result = self.session.game.take_action(ax, ay)

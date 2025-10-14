@@ -247,7 +247,7 @@ class ActionVisualizationSequencer:
         # Queue isolation highlight and freeze animation for newly frozen rings
         action_result = self.renderer.current_action_result
         newly_frozen = action_result.newly_frozen_positions if action_result else None
-        if newly_frozen and self.renderer.show_moves:
+        if newly_frozen and self.renderer.highlight_choices:
             # Calculate timing: isolation highlight starts when ring removal completes
             removal_defer = self.task_delay_time
 
@@ -333,12 +333,12 @@ class ZertzRenderer(ShowBase):
         61: {'center_pos': 'E5', 'cam_dist': 11, 'cam_height': 10}
     }
 
-    def __init__(self, board_layout, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False, show_moves=False, update_callback=None, move_duration=0.666):
+    def __init__(self, board_layout, white_marbles=6, grey_marbles=8, black_marbles=10, rings=37, show_coords=False, highlight_choices=False, update_callback=None, move_duration=0.666):
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
 
-        self.show_moves = show_moves
+        self.highlight_choices = highlight_choices
         self.update_callback = update_callback
         self.move_duration = move_duration
 
@@ -434,8 +434,8 @@ class ZertzRenderer(ShowBase):
         if self.update_callback is not None:
             self._setup_game_loop()
 
-        # Initialize highlight state machine if show_moves is enabled
-        self.action_visualization_sequencer = ActionVisualizationSequencer(self) if self.show_moves else None
+        # Initialize highlight state machine if highlight_choices is enabled
+        self.action_visualization_sequencer = ActionVisualizationSequencer(self) if self.highlight_choices else None
 
     def attach_update_loop(self, update_fn: Callable[[], bool], interval: float) -> bool:
         delay = max(interval, 0.0)
@@ -1144,7 +1144,7 @@ class ZertzRenderer(ShowBase):
         self._build_players_marble_pool()
 
         # 8. Recreate highlight state machine
-        if self.show_moves:
+        if self.highlight_choices:
             self.action_visualization_sequencer = ActionVisualizationSequencer(self)
         self._action_context = None
 
@@ -1177,7 +1177,7 @@ class ZertzRenderer(ShowBase):
         """
         self._set_action_context(player, render_data, action_result, task_delay_time, on_complete)
 
-        if self.show_moves and self.action_visualization_sequencer:
+        if self.highlight_choices and self.action_visualization_sequencer:
             # Debug logging
             if render_data.action_dict['action'] == "CAP" and render_data.capture_moves:
                 print(f"[Renderer] Passing {len(render_data.capture_moves)} capture moves to state machine:")
