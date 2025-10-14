@@ -10,12 +10,13 @@ Tests that the game controller correctly handles:
 
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 # Add parent directory to path to import game modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from controller.zertz_game_controller import ZertzGameController
+from game.action_result import ActionResult
 
 
 # ============================================================================
@@ -181,3 +182,17 @@ class TestGameControllerHeadless:
         assert controller.session.get_games_played() == 3, (
             "Game counter should increment exactly once per game"
         )
+
+    def test_completion_queue_uses_action_processor(self):
+        """Ensure completion queue delegates to action processor helper."""
+        controller = ZertzGameController(rings=37, highlight_choices=False, renderer_or_factory=None)
+        processor = Mock()
+        controller.action_processor = processor
+
+        player = Mock()
+        result = ActionResult(captured_marbles='w')
+
+        controller._handle_action_completion(player, result)
+        controller._process_completion_queue(delay_time=0.5)
+
+        processor.process.assert_called_once_with(player, result, 0.5)

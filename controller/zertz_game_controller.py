@@ -8,6 +8,7 @@ from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
 from controller.replay_loader import ReplayLoader
 from controller.game_logger import GameLogger
 from controller.action_text_formatter import ActionTextFormatter
+from controller.action_processor import ActionProcessor
 from controller.game_session import GameSession
 from controller.game_loop import GameLoop
 from shared.interfaces import IRenderer, IRendererFactory
@@ -67,6 +68,7 @@ class ZertzGameController:
         else:
             raise TypeError("renderer_or_factory must be an IRenderer, IRendererFactory, or None")
 
+        self.action_processor = ActionProcessor(self.renderer)
         self._game_loop = GameLoop(self, self.renderer, self.move_duration)
 
         # Ensure dependent components use shared status reporter
@@ -199,17 +201,6 @@ class ZertzGameController:
         self._process_completion_queue(self.animation_duration)
         return self._check_game_status(task)
 
-    def _process_action_result(self, player, result, delay_time):
-        """Apply post-animation effects for a completed action."""
-        if result.is_isolation():
-            for removal in result.captured_marbles:
-                if removal['marble'] is not None:
-                    player.add_capture(removal['marble'])
-                if self.renderer is not None:
-                    self.renderer.show_isolated_removal(player, removal['pos'], removal['marble'], delay_time)
-        elif result.has_captures():
-            player.add_capture(result.captured_marbles)
-
     def _handle_action_completion(self, player, action_result):
         """Renderer callback invoked when all visuals for an action are complete."""
         self.waiting_for_renderer = False
@@ -224,7 +215,7 @@ class ZertzGameController:
         processed = False
         while self._completion_queue:
             player, result = self._completion_queue.pop(0)
-            self._process_action_result(player, result, delay_time)
+            self.action_processor.process(player, result, delay_time)
             processed = True
         return processed
 
