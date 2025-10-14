@@ -164,7 +164,6 @@ class ActionVisualizationSequencer:
         """
         # Skip highlighting if only one capture available
         if capture_moves and len(capture_moves) == 1:
-            print(f"[StateMachine] Skipping capture highlights - only 1 capture available")
             return
 
         # Group captures by source position
@@ -178,15 +177,12 @@ class ActionVisualizationSequencer:
             if dst_str:
                 captures_by_source[src_str].add(dst_str)
 
-        print(f"[StateMachine] Queueing capture highlights: {len(capture_moves)} total captures, {len(captures_by_source)} source groups")
-
         # Queue highlights sequentially - each group displays one after another
         capture_duration = self.highlight_durations[self.PHASE_CAPTURE_HIGHLIGHTS]
         defer_time = 0
         for src_str, destinations in captures_by_source.items():
             # Highlight the source marble and all its possible destinations
             highlight_rings = [src_str] + list(destinations)
-            print(f"[StateMachine]   Group: src={src_str}, destinations={list(destinations)}, defer={defer_time}")
             self.renderer.queue_highlight(
                 highlight_rings,
                 capture_duration,
@@ -903,6 +899,43 @@ class ZertzRenderer(ShowBase):
 
         self.render.setLight(a_node)
 
+    def _animate_marble_to_capture_pool(self, captured_marble, src_coords, player, marble_color, action_duration):
+        """Animate a captured marble moving to player's capture pool.
+
+        Args:
+            captured_marble: The marble entity to animate
+            src_coords: Source coordinates (where the marble is coming from)
+            player: Player capturing the marble
+            marble_color: Color of the captured marble ('w', 'g', or 'b')
+            action_duration: Animation duration (0 for instant positioning)
+        """
+        # Add to player's captured pool
+        capture_pool = self.player_pools[player.n][marble_color]
+        capture_pool_length = sum([len(k) for k in self.player_pools[player.n].values()])
+        capture_pool.append(captured_marble)
+
+        # Clamp pool length if needed
+        if capture_pool_length >= len(self.player_pool_coords[player.n]):
+            if capture_pool_length > len(self.player_pool_coords[player.n]):
+                logger.error(f"Capture pool length ({capture_pool_length}) exceeds available coords ({len(self.player_pool_coords[player.n])}) for player {player.n}")
+            capture_pool_length = len(self.player_pool_coords[player.n]) - 1
+
+        player_pool_coords = self.player_pool_coords[player.n][capture_pool_length]
+
+        # Either instantly position or animate to capture pool
+        if action_duration == 0:
+            captured_marble.set_pos(player_pool_coords)
+            captured_marble.set_scale(self.captured_marble_scale)
+        else:
+            self.animation_queue.put({
+                'entity': captured_marble,
+                'src': src_coords,
+                'dst': player_pool_coords,
+                'scale': self.captured_marble_scale,
+                'duration': action_duration,
+                'defer': action_duration
+            })
+
     def show_isolated_removal(self, player, pos, marble_color, action_duration=0):
         """Animate removal of an isolated ring (with or without marble).
 
@@ -930,29 +963,7 @@ class ZertzRenderer(ShowBase):
         if marble_color is not None and pos in self.pos_to_marble:
             captured_marble = self.pos_to_marble.pop(pos)
             src_coords = captured_marble.get_pos()
-
-            # Add to player's captured pool
-            capture_pool = self.player_pools[player.n][marble_color]
-            capture_pool_length = sum([len(k) for k in self.player_pools[player.n].values()])
-            capture_pool.append(captured_marble)
-
-            if capture_pool_length >= len(self.player_pool_coords[player.n]):
-                capture_pool_length = len(self.player_pool_coords[player.n]) - 1
-
-            player_pool_coords = self.player_pool_coords[player.n][capture_pool_length]
-
-            if action_duration == 0:
-                captured_marble.set_pos(player_pool_coords)
-                captured_marble.set_scale(self.captured_marble_scale)
-            else:
-                self.animation_queue.put({
-                    'entity': captured_marble,
-                    'src': src_coords,
-                    'dst': player_pool_coords,
-                    'scale': self.captured_marble_scale,
-                    'duration': action_duration,
-                    'defer': action_duration
-                })
+            self._animate_marble_to_capture_pool(captured_marble, src_coords, player, marble_color, action_duration)
 
     def update_frozen_regions(self, frozen_position_strs):
         """Apply visual fade effect to rings in frozen isolated regions.
@@ -1086,27 +1097,8 @@ class ZertzRenderer(ShowBase):
                     'defer': 0
                 })
 
-            # captured_marble.hide()
-            capture_pool = self.player_pools[player.n][captured_marble_color]
-            capture_pool_length = sum([len(k) for k in self.player_pools[player.n].values()])
-            capture_pool.append(captured_marble)
-            # print(capture_pool_length, self.player_pools[player.n])
-            if capture_pool_length >= len(self.player_pool_coords[player.n]):
-                logger.error(f"Capture pool length ({capture_pool_length}) exceeds available coords ({len(self.player_pool_coords[player.n])}) for player {player.n}")
-                capture_pool_length = len(self.player_pool_coords[player.n]) - 1
-            player_pool_coords = self.player_pool_coords[player.n][capture_pool_length]
-            if action_duration == 0:
-                captured_marble.set_pos(player_pool_coords)
-                captured_marble.set_scale(self.captured_marble_scale)
-            else:
-                self.animation_queue.put({
-                    'entity': captured_marble,
-                    'src': cap_coords,
-                    'dst': player_pool_coords,
-                    'scale': self.captured_marble_scale,
-                    'duration': action_duration,
-                    'defer': action_duration
-                })
+            # Animate captured marble to player's pool
+            self._animate_marble_to_capture_pool(captured_marble, cap_coords, player, captured_marble_color, action_duration)
 
     def reset_board(self):
         # 1. Clear animations FIRST (before resetting visuals)
@@ -1178,12 +1170,6 @@ class ZertzRenderer(ShowBase):
         self._set_action_context(player, render_data, action_result, task_delay_time, on_complete)
 
         if self.highlight_choices and self.action_visualization_sequencer:
-            # Debug logging
-            if render_data.action_dict['action'] == "CAP" and render_data.capture_moves:
-                print(f"[Renderer] Passing {len(render_data.capture_moves)} capture moves to state machine:")
-                for cm in render_data.capture_moves:
-                    print(f"  - {cm['src']} -> {cm['dst']}")
-
             # Start highlighting - pass render_data and action_result to state machine
             self.action_visualization_sequencer.start(player, render_data, task_delay_time)
         else:

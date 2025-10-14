@@ -8,18 +8,14 @@ Tests that the game controller correctly handles:
 - Winner display formatting
 """
 
-import pytest
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch
-from io import StringIO
+from unittest.mock import patch
 
 # Add parent directory to path to import game modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from controller.zertz_game_controller import ZertzGameController
-from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
-from game.zertz_board import ZertzBoard
 
 
 # ============================================================================
