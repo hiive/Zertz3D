@@ -275,7 +275,7 @@ class TestMirrorAction:
         expected_rem_flat = small_board._2d_to_flat(*expected_rem_idx)
 
         # Check that the mirrored action is set at the expected position
-        assert mirrored[1, expected_put_flat, expected_rem_flat] == True
+        assert mirrored[1, expected_put_flat, expected_rem_flat]
 
 
 class TestRotateAction:
@@ -325,7 +325,7 @@ class TestRotateAction:
         expected_rem_flat = small_board._2d_to_flat(*expected_rem_idx)
 
         # Check that the rotated action is set at the expected position
-        assert rotated[2, expected_put_flat, expected_rem_flat] == True
+        assert rotated[2, expected_put_flat, expected_rem_flat]
 
 
 # ============================================================================
@@ -387,13 +387,13 @@ class TestBoardMethods:
     def test_is_inbounds(self, board):
         """Test boundary checking for all board positions."""
         # Valid corner positions
-        assert board._is_inbounds((0, 0)) == True
-        assert board._is_inbounds((board.width - 1, board.width - 1)) == True
+        assert board._is_inbounds((0, 0))
+        assert board._is_inbounds((board.width - 1, board.width - 1))
 
         # Out of bounds positions
-        assert board._is_inbounds((board.width, board.width)) == False
-        assert board._is_inbounds((-1, 0)) == False
-        assert board._is_inbounds((0, -1)) == False
+        assert not board._is_inbounds((board.width, board.width))
+        assert not board._is_inbounds((-1, 0))
+        assert not board._is_inbounds((0, -1))
 
     # Note: test_get_regions is covered in test_isolated_regions.py
     # Note: test_take_placement_action and test_take_capture_action are covered extensively in other test files

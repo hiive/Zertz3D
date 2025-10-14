@@ -35,8 +35,8 @@ class RandomZertzPlayer(ZertzPlayer):
         """
         p_actions, c_actions = self.game.get_valid_actions()
 
-        c1, c2, c3 = (c_actions == True).nonzero()
-        p1, p2, p3 = (p_actions == True).nonzero()
+        c1, c2, c3 = c_actions.nonzero()
+        p1, p2, p3 = p_actions.nonzero()
 
         # Determine action type
         if c1.size > 0:

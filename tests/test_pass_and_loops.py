@@ -54,8 +54,8 @@ class TestPassingAndLoops:
         game.take_action('PASS', None)
 
         # Game should be over
-        assert game._is_game_over() == True
-        assert game._both_players_immobilized() == True
+        assert game._is_game_over()
+        assert game._both_players_immobilized()
 
     def test_immobilization_tie_when_no_winner(self):
         """Game should end in tie when both players immobilized with no winner."""
@@ -110,7 +110,7 @@ class TestPassingAndLoops:
         game.take_action('PASS', None)
 
         # Game should not be over
-        assert game._is_game_over() == False
+        assert not game._is_game_over()
         assert game.get_game_ended() is None
 
     def test_loop_detection_with_2_pairs(self):
@@ -132,8 +132,8 @@ class TestPassingAndLoops:
         game.move_history.append(('PUT', (0, 13, 23)))
 
         # Loop should be detected
-        assert game._has_move_loop() == True
-        assert game._is_game_over() == True
+        assert game._has_move_loop()
+        assert game._is_game_over()
 
     def test_loop_detection_results_in_tie(self):
         """Loop detection should result in a tie."""
@@ -158,7 +158,7 @@ class TestPassingAndLoops:
             game.move_history.append(('PUT', (0, i, i+1)))
 
         # Loop should not be detected
-        assert game._has_move_loop() == False
+        assert not game._has_move_loop()
 
     def test_loop_not_detected_with_different_moves(self):
         """Loop should not be detected if moves don't match."""
@@ -169,7 +169,7 @@ class TestPassingAndLoops:
             game.move_history.append(('PUT', (0, i, i+1)))
 
         # Loop should not be detected
-        assert game._has_move_loop() == False
+        assert not game._has_move_loop()
 
     def test_pass_in_loop_sequence(self):
         """PASS actions should be included in loop detection."""
@@ -190,7 +190,7 @@ class TestPassingAndLoops:
         game.move_history.append(('PUT', (1, 11, 21)))
 
         # Loop should be detected
-        assert game._has_move_loop() == True
+        assert game._has_move_loop()
 
     def test_game_ended_returns_none_when_not_over(self):
         """get_game_ended should return None when game is not over."""
@@ -278,7 +278,7 @@ class TestPassingAndLoops:
         game.move_history.append(('PUT', (1, 11, 21)))
 
         # Loop should be detected with k=1
-        assert game._has_move_loop() == True
+        assert game._has_move_loop()
 
         # Reset and test k=3 (need 12 moves)
         game.loop_detection_pairs = 3
@@ -297,4 +297,4 @@ class TestPassingAndLoops:
         game.move_history.extend(pattern)
 
         # Loop should be detected with k=3
-        assert game._has_move_loop() == True
+        assert game._has_move_loop()

@@ -68,7 +68,7 @@ class TestGeometricRingRemoval:
         original = small_board._is_removable(a4_pos)
         geometric = small_board._is_removable_geometric(a4_pos)
 
-        assert original == geometric == True, \
+        assert original == geometric is True, \
             f"A4 should be removable: original={original}, geometric={geometric}"
 
     def test_center_ring_not_removable_on_full_board(self, small_board):
@@ -78,7 +78,7 @@ class TestGeometricRingRemoval:
         original = small_board._is_removable(d4_pos)
         geometric = small_board._is_removable_geometric(d4_pos)
 
-        assert original == geometric == False, \
+        assert original == geometric is False, \
             f"D4 should not be removable: original={original}, geometric={geometric}"
 
     def test_ring_with_marble_not_removable(self, small_board):
@@ -97,7 +97,7 @@ class TestGeometricRingRemoval:
         original = small_board._is_removable(a4_pos)
         geometric = small_board._is_removable_geometric(a4_pos)
 
-        assert original == geometric == False, \
+        assert original == geometric is False, \
             f"A4 with marble should not be removable: original={original}, geometric={geometric}"
 
     @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])

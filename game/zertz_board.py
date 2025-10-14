@@ -318,7 +318,7 @@ class ZertzBoard:
                     ub = min(self.width, middle + i + 1)
                     self.state[self.RING_LAYER, lb:ub, i] = 1
             else:
-                self.state[self.RING_LAYER, self.board_layout == True] = 1
+                self.state[self.RING_LAYER, self.board_layout] = 1
 
             # Set the number of each type of marble available in the supply
             #   default: 6x white, 8x gray, 10x black

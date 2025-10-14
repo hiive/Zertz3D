@@ -198,7 +198,7 @@ class TestFrozenRegionProperties:
         # Check no placement action targets G1
         for marble_type in range(3):
             for rem_idx in range(placement_moves.shape[2]):
-                assert placement_moves[marble_type, g1_flat, rem_idx] == False, \
+                assert not placement_moves[marble_type, g1_flat, rem_idx], \
                     "Frozen ring G1 should not be placeable"
 
 

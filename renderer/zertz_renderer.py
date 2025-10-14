@@ -654,7 +654,7 @@ class ZertzRenderer(ShowBase):
 
         xy_dist = np.sqrt(dsx*dsx + dsy*dsy)
         zc_scale = 1.25
-        zc = 0 if (jump == False or xy_dist == 0) else np.log(xy_dist) * np.sin(anim_factor * math.pi) * zc_scale
+        zc = 0 if (not jump or xy_dist == 0) else np.log(xy_dist) * np.sin(anim_factor * math.pi) * zc_scale
         z = sz + (dz - sz) * anim_factor
         return x, y, z + zc
 
@@ -740,8 +740,8 @@ class ZertzRenderer(ShowBase):
         last_letter = self.letters[-1]
 
         # Find the highest row for each corner
-        top_left_positions = [pos for pos in self.pos_to_coords.keys() if pos.startswith(first_letter)]
-        top_right_positions = [pos for pos in self.pos_to_coords.keys() if pos.startswith(last_letter)]
+        [pos for pos in self.pos_to_coords.keys() if pos.startswith(first_letter)]
+        [pos for pos in self.pos_to_coords.keys() if pos.startswith(last_letter)]
 
         # Get positions with max number (top of board)
         # Rightmost non-empty value in the first row
@@ -1056,7 +1056,6 @@ class ZertzRenderer(ShowBase):
         """
         # Extract data from value objects
         action_dict = render_data.action_dict
-        frozen_positions = action_result.newly_frozen_positions if action_result else None
 
         # Player 2: {'action': 'PUT', 'marble': 'g',              'dst': 'G2', 'remove': 'D0'}
         # Player 1: {'action': 'CAP', 'marble': 'g', 'src': 'G2', 'dst': 'E2', 'capture': 'b'}
@@ -1067,7 +1066,7 @@ class ZertzRenderer(ShowBase):
         if action == 'PASS':
             return
 
-        action_marble_color = action_dict['marble']
+        action_dict['marble']
         dst = action_dict['dst']
         dst_coords = self.pos_to_coords[dst]
 

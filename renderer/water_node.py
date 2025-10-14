@@ -182,8 +182,8 @@ class WaterNode:
         self.waterNP.setShaderInput('k_reflection_viewproj', mat_reflection_proj)
 
         # Debugging: Print camera positions
-        main_cam_pos = main_cam_np.getPos(self.renderer.render)
-        reflection_cam_pos = self.water_cam_np.getPos(self.renderer.render)
+        # main_cam_pos = main_cam_np.getPos(self.renderer.render)
+        # reflection_cam_pos = self.water_cam_np.getPos(self.renderer.render)
         #print(f"Main Camera Position: {main_cam_pos}")
         #print(f"Reflection Camera Position: {reflection_cam_pos}")
         return task.cont
