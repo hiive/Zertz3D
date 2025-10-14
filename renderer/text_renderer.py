@@ -17,6 +17,7 @@ class TextRenderer(IRenderer):
 
     def run(self) -> None:
         """No-op run loop for text renderer."""
+        pass
 
     def reset_board(self) -> None:
         self.report_status("Board reset.")

@@ -31,6 +31,10 @@ class ActionVisualizationSequencer:
     PHASE_SELECTED_CAPTURE = 'selected_capture'
     PHASE_ANIMATING = 'animating'  # Waiting for final move animations to complete
 
+    # Highlight and animation durations (seconds)
+    ISOLATION_HIGHLIGHT_DURATION = 0.5  # Yellow flash for newly frozen rings
+    FREEZE_FADE_DURATION = 0.3          # Fade to alpha 0.7 for frozen rings
+
     def __init__(self, renderer):
         """Initialize the state machine.
 
@@ -210,12 +214,10 @@ class ActionVisualizationSequencer:
         # Animate marble placement (action already executed by controller)
         self.renderer.show_marble_placement(player, action_dict, self.task_delay_time)
 
-        # Calculate marble placement animation duration (same calculation as in show_marble_placement)
-        marble_animation_duration = self.task_delay_time * 0.45
-
         # Queue removal highlights AFTER marble placement animation completes
+        # task_delay_time already contains the animation duration from controller
         if self.removal_positions:
-            self._queue_removal_highlights(self.removal_positions, defer=marble_animation_duration)
+            self._queue_removal_highlights(self.removal_positions, defer=self.task_delay_time)
 
         # Move to removal highlights phase
         self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
@@ -240,10 +242,32 @@ class ActionVisualizationSequencer:
         action_dict = self.pending_action_dict
 
         # Now animate ring removal only (marble was already placed)
-        # Pass frozen positions from current ActionResult to show_ring_removal
+        self.renderer.show_ring_removal(action_dict, self.task_delay_time)
+
+        # Queue isolation highlight and freeze animation for newly frozen rings
         action_result = self.renderer.current_action_result
         newly_frozen = action_result.newly_frozen_positions if action_result else None
-        self.renderer.show_ring_removal(action_dict, self.task_delay_time, newly_frozen)
+        if newly_frozen and self.renderer.show_moves:
+            # Calculate timing: isolation highlight starts when ring removal completes
+            removal_defer = self.task_delay_time
+
+            # 1. Flash yellow highlight
+            self.renderer.queue_highlight(
+                list(newly_frozen),
+                self.ISOLATION_HIGHLIGHT_DURATION,
+                color=self.renderer.ISOLATION_HIGHLIGHT_COLOR,
+                emission=self.renderer.ISOLATION_HIGHLIGHT_EMISSION,
+                defer=removal_defer
+            )
+
+            # 2. Fade to alpha 0.7 (starts after yellow flash)
+            freeze_defer = removal_defer + self.ISOLATION_HIGHLIGHT_DURATION
+            self.renderer.animation_queue.put({
+                'type': 'freeze',
+                'positions': list(newly_frozen),
+                'duration': self.FREEZE_FADE_DURATION,
+                'defer': freeze_defer
+            })
 
         # Wait for final move animations to complete
         self.phase = self.PHASE_ANIMATING
@@ -499,6 +523,9 @@ class ZertzRenderer(ShowBase):
                         entity.set_scale(dst_scale)
                     if dst is not None:
                         entity.set_pos(dst)
+                    else:
+                        # dst=None means this is a removal animation - hide the entity
+                        entity.hide()
                 elif anim_type == 'highlight':
                     # Clear highlight
                     self._clear_highlight(anim_item)
@@ -877,9 +904,11 @@ class ZertzRenderer(ShowBase):
         self.render.setLight(a_node)
 
     def show_isolated_removal(self, player, pos, marble_color, action_duration=0):
-        """Animate removal of an isolated ring (with or without marble)."""
-        action_duration *= 0.45
+        """Animate removal of an isolated ring (with or without marble).
 
+        Args:
+            action_duration: Animation duration (already scaled by controller)
+        """
         # Remove the ring base piece
         if pos in self.pos_to_base:
             base_piece = self.pos_to_base[pos]
@@ -941,11 +970,14 @@ class ZertzRenderer(ShowBase):
                 base_piece.model.setTransparency(TransparencyAttrib.MAlpha)  # Enable alpha transparency
 
     def show_marble_placement(self, player, action_dict, action_duration=0):
-        """Place a marble on the board (PUT action only, no ring removal)."""
+        """Place a marble on the board (PUT action only, no ring removal).
+
+        Args:
+            action_duration: Animation duration
+        """
         action_marble_color = action_dict['marble']
         dst = action_dict['dst']
         dst_coords = self.pos_to_coords[dst]
-        action_duration *= 0.45
 
         # add marble from pool
         pool = self.marble_pool[action_marble_color]
@@ -974,15 +1006,13 @@ class ZertzRenderer(ShowBase):
             })
         self.pos_to_marble[dst] = put_marble
 
-    def show_ring_removal(self, action_dict, action_duration=0, frozen_positions=None):
+    def show_ring_removal(self, action_dict, action_duration=0):
         """Remove a ring from the board (PUT action only).
 
         Args:
             action_dict: Action dictionary with 'remove' key
-            action_duration: Animation duration
-            frozen_positions: Set of position strings that are newly frozen (for animation)
+            action_duration: Animation duration (already scaled by controller)
         """
-        action_duration *= 0.45
         base_piece_id = action_dict['remove']
         if base_piece_id != '':
             if base_piece_id in self.pos_to_base:
@@ -1001,33 +1031,6 @@ class ZertzRenderer(ShowBase):
                         'duration': action_duration,
                         'defer': removal_defer
                     })
-
-                    # Queue yellow isolation highlight and freeze animation for newly frozen rings
-                    if frozen_positions:
-                        isolation_highlight_duration = 0.4  # Yellow flash warning
-                        freeze_duration = 0.3  # Quick fade to alpha 0.7
-
-                        # 1. Flash yellow highlight (only if show_moves is enabled)
-                        if self.show_moves:
-                            self.queue_highlight(
-                                list(frozen_positions),
-                                isolation_highlight_duration,
-                                color=self.ISOLATION_HIGHLIGHT_COLOR,
-                                emission=self.ISOLATION_HIGHLIGHT_EMISSION,
-                                defer=removal_defer
-                            )
-                            # 2. Fade to alpha 0.7 (starts after yellow flash)
-                            freeze_defer = removal_defer + isolation_highlight_duration
-                        else:
-                            # No highlight, fade starts immediately with ring removal
-                            freeze_defer = removal_defer
-
-                        self.animation_queue.put({
-                            'type': 'freeze',
-                            'positions': list(frozen_positions),
-                            'duration': freeze_duration,
-                            'defer': freeze_defer
-                        })
 
                 self.removed_bases.append((base_piece, base_pos))
 
@@ -1056,12 +1059,11 @@ class ZertzRenderer(ShowBase):
         action_marble_color = action_dict['marble']
         dst = action_dict['dst']
         dst_coords = self.pos_to_coords[dst]
-        action_duration *= 0.45
 
         if action == 'PUT':
-            # Call the split methods
-            self.show_marble_placement(player, action_dict, action_duration / 0.45)  # Undo the scaling since the methods apply it
-            self.show_ring_removal(action_dict, action_duration / 0.45, frozen_positions)
+            # Call the split methods (duration already scaled by controller)
+            self.show_marble_placement(player, action_dict, action_duration)
+            self.show_ring_removal(action_dict, action_duration)
 
         elif action == 'CAP':
             src = action_dict['src']

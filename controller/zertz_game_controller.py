@@ -13,6 +13,8 @@ from controller.game_loop import GameLoop
 from shared.interfaces import IRenderer, IRendererFactory
 
 class ZertzGameController:
+    # Fraction of move_duration used for animations (leaves buffer before next turn)
+    ANIMATION_DURATION_RATIO = 60.0/100.0 # 1% of 60fps
 
     def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False,
                  max_games=None, show_moves=False, show_coords=False, log_notation=False,
@@ -22,6 +24,7 @@ class ZertzGameController:
         self.max_games = max_games  # None means play indefinitely
         self.show_moves = show_moves
         self.move_duration = move_duration
+        self.animation_duration = move_duration * self.ANIMATION_DURATION_RATIO
 
         # Renderer state tracking
         self.renderer = None
@@ -59,6 +62,8 @@ class ZertzGameController:
             self.renderer = renderer_or_factory
         elif isinstance(renderer_or_factory, IRendererFactory):
             self.renderer = renderer_or_factory(self)
+        elif renderer_or_factory is None:
+            pass
         else:
             raise TypeError("renderer_or_factory must be an IRenderer, IRendererFactory, or None")
 
@@ -125,7 +130,7 @@ class ZertzGameController:
             return task.again
 
         # Process completed renderer actions (if any) before taking new actions
-        self._process_completion_queue(task.delay_time)
+        self._process_completion_queue(self.animation_duration)
 
         # Always check game status after processing completions (game may have ended)
         status = self._check_game_status(task)
@@ -182,16 +187,16 @@ class ZertzGameController:
         # Dispatch to renderer (if present) and wait for callback
         if self.renderer:
             self.waiting_for_renderer = True
-            self.renderer.execute_action(player, render_data, action_result, task.delay_time, self._handle_action_completion)
+            self.renderer.execute_action(player, render_data, action_result, self.animation_duration, self._handle_action_completion)
             if self.waiting_for_renderer:
                 return task.again
             # If callback was synchronous, process completions and check status immediately
-            self._process_completion_queue(task.delay_time)
+            self._process_completion_queue(self.animation_duration)
             return self._check_game_status(task)
 
         # Headless mode: process action completion immediately
         self._handle_action_completion(player, action_result)
-        self._process_completion_queue(task.delay_time)
+        self._process_completion_queue(self.animation_duration)
         return self._check_game_status(task)
 
     def _process_action_result(self, player, result, delay_time):
