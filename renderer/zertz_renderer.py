@@ -19,8 +19,8 @@ from shared.render_data import RenderData
 logger = logging.getLogger(__name__)
 
 
-class MoveHighlightStateMachine:
-    """Manages the multi-phase highlighting sequence for showing moves."""
+class ActionVisualizationSequencer:
+    """Manages the multiphase highlighting sequence for showing moves."""
 
     # Phase constants
     PHASE_PLACEMENT_HIGHLIGHTS = 'placement_highlights'
@@ -299,6 +299,8 @@ class ZertzRenderer(ShowBase):
     CAPTURE_HIGHLIGHT_EMISSION = LVector4(0.0, 0.0, 0.08, 1)    # Subtle blue glow
     SELECTED_CAPTURE_HIGHLIGHT_COLOR = LVector4(0.39, 0.58, 0.93, 1)      # Cornflower blue
     SELECTED_CAPTURE_HIGHLIGHT_EMISSION = LVector4(0.08, 0.12, 0.19, 1)   # Cornflower blue glow
+    ISOLATION_HIGHLIGHT_COLOR = LVector4(0.8, 0.8, 0.0, 1)      # Bright yellow
+    ISOLATION_HIGHLIGHT_EMISSION = LVector4(0.16, 0.16, 0.0, 1)  # Yellow glow
 
     # Camera configuration per board size
     CAMERA_CONFIG = {
@@ -409,7 +411,7 @@ class ZertzRenderer(ShowBase):
             self._setup_game_loop()
 
         # Initialize highlight state machine if show_moves is enabled
-        self.highlight_sm = MoveHighlightStateMachine(self) if self.show_moves else None
+        self.action_visualization_sequencer = ActionVisualizationSequencer(self) if self.show_moves else None
 
     def attach_update_loop(self, update_fn: Callable[[], bool], interval: float) -> bool:
         delay = max(interval, 0.0)
@@ -438,8 +440,8 @@ class ZertzRenderer(ShowBase):
         """Update all animations - both move and highlight types."""
 
         # Update state machine if active
-        if self.highlight_sm and self.highlight_sm.is_active():
-            self.highlight_sm.update(task)
+        if self.action_visualization_sequencer and self.action_visualization_sequencer.is_active():
+            self.action_visualization_sequencer.update(task)
 
         # Process animation queue - add new animations
         while not self.animation_queue.empty():
@@ -1000,19 +1002,36 @@ class ZertzRenderer(ShowBase):
                         'defer': removal_defer
                     })
 
-                    # Queue freeze animation right after ring starts moving (so it happens during removal)
+                    # Queue yellow isolation highlight and freeze animation for newly frozen rings
                     if frozen_positions:
-                        freeze_duration = 0.3  # Quick fade
+                        isolation_highlight_duration = 0.4  # Yellow flash warning
+                        freeze_duration = 0.3  # Quick fade to alpha 0.7
+
+                        # 1. Flash yellow highlight (only if show_moves is enabled)
+                        if self.show_moves:
+                            self.queue_highlight(
+                                list(frozen_positions),
+                                isolation_highlight_duration,
+                                color=self.ISOLATION_HIGHLIGHT_COLOR,
+                                emission=self.ISOLATION_HIGHLIGHT_EMISSION,
+                                defer=removal_defer
+                            )
+                            # 2. Fade to alpha 0.7 (starts after yellow flash)
+                            freeze_defer = removal_defer + isolation_highlight_duration
+                        else:
+                            # No highlight, fade starts immediately with ring removal
+                            freeze_defer = removal_defer
+
                         self.animation_queue.put({
                             'type': 'freeze',
                             'positions': list(frozen_positions),
                             'duration': freeze_duration,
-                            'defer': removal_defer  # Start at same time as removal
+                            'defer': freeze_defer
                         })
 
                 self.removed_bases.append((base_piece, base_pos))
 
-    def show_action(self, player, render_data, action_duration=0, action_result=None):
+    def show_action(self, player, render_data, action_duration=0., action_result=None):
         """Visualize an action without highlights.
 
         Args:
@@ -1124,7 +1143,7 @@ class ZertzRenderer(ShowBase):
 
         # 8. Recreate highlight state machine
         if self.show_moves:
-            self.highlight_sm = MoveHighlightStateMachine(self)
+            self.action_visualization_sequencer = ActionVisualizationSequencer(self)
         self._action_context = None
 
     def is_busy(self):
@@ -1133,7 +1152,7 @@ class ZertzRenderer(ShowBase):
         Returns:
             True if state machine is active or animations are running
         """
-        if self.highlight_sm and self.highlight_sm.is_active():
+        if self.action_visualization_sequencer and self.action_visualization_sequencer.is_active():
             return True
         return self.is_animation_active()
 
@@ -1156,7 +1175,7 @@ class ZertzRenderer(ShowBase):
         """
         self._set_action_context(player, render_data, action_result, task_delay_time, on_complete)
 
-        if self.show_moves and self.highlight_sm:
+        if self.show_moves and self.action_visualization_sequencer:
             # Debug logging
             if render_data.action_dict['action'] == "CAP" and render_data.capture_moves:
                 print(f"[Renderer] Passing {len(render_data.capture_moves)} capture moves to state machine:")
@@ -1164,7 +1183,7 @@ class ZertzRenderer(ShowBase):
                     print(f"  - {cm['src']} -> {cm['dst']}")
 
             # Start highlighting - pass render_data and action_result to state machine
-            self.highlight_sm.start(player, render_data, task_delay_time)
+            self.action_visualization_sequencer.start(player, render_data, task_delay_time)
         else:
             # Direct visualization without highlights
             self.show_action(player, render_data, task_delay_time, action_result)
@@ -1327,7 +1346,7 @@ class ZertzRenderer(ShowBase):
         """Invoke completion callback when highlights and animations finish."""
         if self._action_context is None:
             return
-        if self.highlight_sm and self.highlight_sm.is_active():
+        if self.action_visualization_sequencer and self.action_visualization_sequencer.is_active():
             return
         if self.is_animation_active():
             return

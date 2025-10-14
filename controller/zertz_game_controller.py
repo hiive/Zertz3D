@@ -24,9 +24,10 @@ class ZertzGameController:
         self.move_duration = move_duration
 
         # Renderer state tracking
-        self.renderer: IRenderer | None = None
+        self.renderer = None
         self.waiting_for_renderer = False
         self._completion_queue = []
+        self._game_ending_processed = False  # Track if current game ending has been processed
 
         # Initialize logger and move formatter
         self.logger = GameLogger(log_to_file=log_to_file, log_notation=log_notation, status_reporter=self._report)
@@ -53,7 +54,7 @@ class ZertzGameController:
             status_reporter=self._report
         )
 
-        self.renderer = None
+
         if isinstance(renderer_or_factory, IRenderer):
             self.renderer = renderer_or_factory
         elif isinstance(renderer_or_factory, IRendererFactory):
@@ -87,13 +88,16 @@ class ZertzGameController:
         self.logger.log_notation(notation)
 
     def run(self):
-        self._game_loop = GameLoop(self, self.renderer, self.move_duration)
+        # self._game_loop = GameLoop(self, self.renderer, self.move_duration)
         self._game_loop.run()
 
     def _reset_board(self):
         """Reset the board for a new game."""
         # Close previous log file if it exists
         self._close_log_file()
+
+        # Reset game ending flag for new game
+        self._game_ending_processed = False
 
         # Reset game session (creates new game instance and players)
         self.session.reset_game()
@@ -121,8 +125,12 @@ class ZertzGameController:
             return task.again
 
         # Process completed renderer actions (if any) before taking new actions
-        if self._process_completion_queue(task.delay_time):
-            return self._check_game_status(task)
+        self._process_completion_queue(task.delay_time)
+
+        # Always check game status after processing completions (game may have ended)
+        status = self._check_game_status(task)
+        if status == task.done:
+            return task.done
 
         # Get next action from current player
         player = self.session.get_current_player()
@@ -177,8 +185,9 @@ class ZertzGameController:
             self.renderer.execute_action(player, render_data, action_result, task.delay_time, self._handle_action_completion)
             if self.waiting_for_renderer:
                 return task.again
-            processed = self._process_completion_queue(task.delay_time)
-            return self._check_game_status(task) if processed else task.again
+            # If callback was synchronous, process completions and check status immediately
+            self._process_completion_queue(task.delay_time)
+            return self._check_game_status(task)
 
         # Headless mode: process action completion immediately
         self._handle_action_completion(player, action_result)
@@ -215,16 +224,46 @@ class ZertzGameController:
         return processed
 
     def _check_game_status(self, task):
-        """Evaluate current game status and handle transitions."""
+        """Check if game is over and handle the ending if needed.
+
+        Returns:
+            task.done if game should stop, task.again if game should continue
+        """
         game_over = self.session.game.get_game_ended()
         if game_over is None:
             return task.again
+
+        # Game is over - handle the ending (prints winner, increments counter, etc.)
+        return self._handle_game_ending(game_over, task)
+
+    def _handle_game_ending(self, game_over, task):
+        """Handle game ending with side effects (print winner, increment counter, etc.).
+
+        This method is idempotent - calling it multiple times for the same game
+        has no additional effect (prevents duplicate output in graphical mode).
+
+        Args:
+            game_over: Game result (PLAYER_1_WIN, PLAYER_2_WIN, or TIE)
+            task: Task object for returning status
+
+        Returns:
+            task.done if should exit, task.again if should continue with next game
+        """
+        # If we've already handled this game's ending, just return done
+        # (prevents duplicate output when callbacks cause multiple calls)
+        if self._game_ending_processed:
+            return task.done
+
+        # Mark that we're handling this game's ending
+        self._game_ending_processed = True
 
         winner = game_over if game_over in [PLAYER_1_WIN, PLAYER_2_WIN] else None
 
         self._report("")
         if winner:
-            self._report(f'Winner: Player {winner}')
+            # Convert winner constant to player number for display
+            player_num = 1 if winner == PLAYER_1_WIN else 2
+            self._report(f'Winner: Player {player_num}')
         else:
             self._report('Game ended in a tie')
         self.session.game.print_state(self._report)
