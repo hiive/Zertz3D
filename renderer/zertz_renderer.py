@@ -1,5 +1,6 @@
 import logging
 import math
+import random
 import sys
 
 from queue import SimpleQueue, Empty
@@ -9,11 +10,12 @@ import numpy as np
 import simplepbr
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
-
-from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material, TransparencyAttrib, TextNode
+from panda3d.core import AmbientLight, LVector4, BitMask32, DirectionalLight, WindowProperties, loadPrcFileData, Material, TransparencyAttrib, TextNode, NodePath
 
 from renderer.water_node import WaterNode
 from renderer.zertz_models import BasePiece, SkyBox, make_marble
+from renderer.outline_manager import OutlineManager
+from shared.constants import MARBLE_TYPES, SUPPLY_CONTEXT_MAP
 from shared.render_data import RenderData
 
 logger = logging.getLogger(__name__)
@@ -321,6 +323,23 @@ class ZertzRenderer(ShowBase):
     SELECTED_CAPTURE_HIGHLIGHT_EMISSION = LVector4(0.08, 0.12, 0.19, 1)   # Cornflower blue glow
     ISOLATION_HIGHLIGHT_COLOR = LVector4(0.8, 0.8, 0.0, 1)      # Bright yellow
     ISOLATION_HIGHLIGHT_EMISSION = LVector4(0.16, 0.16, 0.0, 1)  # Yellow glow
+    OUTLINE_THICKNESS = 0.015
+    OUTLINE_THRESHOLD = 0.2
+    OUTLINE_DILATE = 3.0
+    OUTLINE_BLUR_RADIUS = 1.5
+    # Local copies keep renderer-specific tweaks isolated from shared constants.
+    #todo check if these are read only usages. Can we freeze the source constants?
+    MARBLE_ORDER = tuple(MARBLE_TYPES)
+    SUPPLY_HIGHLIGHT_CONTEXTS = dict(SUPPLY_CONTEXT_MAP)
+    CONTEXT_STYLES = {
+        'placement': (PLACEMENT_HIGHLIGHT_COLOR, PLACEMENT_HIGHLIGHT_EMISSION),
+        'removal': (REMOVABLE_HIGHLIGHT_COLOR, REMOVABLE_HIGHLIGHT_EMISSION),
+        'capture_sources': (CAPTURE_HIGHLIGHT_COLOR, CAPTURE_HIGHLIGHT_EMISSION),
+        'capture_destinations': (SELECTED_CAPTURE_HIGHLIGHT_COLOR, SELECTED_CAPTURE_HIGHLIGHT_EMISSION),
+        SUPPLY_CONTEXT_MAP['w']: (LVector4(0.85, 0.85, 0.85, 1.0), LVector4(0.18, 0.18, 0.18, 1.0)),
+        SUPPLY_CONTEXT_MAP['g']: (LVector4(0.65, 0.65, 0.65, 1.0), LVector4(0.14, 0.14, 0.14, 1.0)),
+        SUPPLY_CONTEXT_MAP['b']: (LVector4(0.35, 0.35, 0.35, 1.0), LVector4(0.08, 0.08, 0.08, 1.0)),
+    }
 
     # Camera configuration per board size
     CAMERA_CONFIG = {
@@ -348,6 +367,7 @@ class ZertzRenderer(ShowBase):
         self.current_animations = []  # List of active animation items (both moves and highlights)
         self.pos_to_base = {}
         self.pos_to_marble = {}
+        self._marble_registry: dict[int, Any] = {}
         self.removed_bases = []
         self.pos_to_coords = {}
         self.pos_to_label = {}  # Maps position strings to text labels
@@ -390,6 +410,7 @@ class ZertzRenderer(ShowBase):
         self.pipeline = simplepbr.init()
         self.pipeline.enable_shadows = True
         self.pipeline.use_330 = True
+        self._context_highlights: dict[str, dict] = {}
 
         self.accept('escape', sys.exit)  # Escape quits
         self.accept('aspectRatioChanged', self._setup_water)
@@ -432,6 +453,8 @@ class ZertzRenderer(ShowBase):
 
         # Initialize highlight state machine if highlight_choices is enabled
         self.action_visualization_sequencer = ActionVisualizationSequencer(self) if self.highlight_choices else None
+        self.outline_manager = OutlineManager()
+        self._debug_outline_nodes: set[NodePath] = set()
 
     def attach_update_loop(self, update_fn: Callable[[], bool], interval: float) -> bool:
         delay = max(interval, 0.0)
@@ -666,6 +689,7 @@ class ZertzRenderer(ShowBase):
             mb.set_scale(self.pool_marble_scale)
             mb.set_pos((xx, y, z))
             self.marble_pool[color].append(mb)
+            self._marble_registry[id(mb)] = mb
             xx += x_off
 
     def _make_marble_dict(self):
@@ -675,6 +699,7 @@ class ZertzRenderer(ShowBase):
         if self.marble_pool is not None:
             for _, marbles in self.marble_pool.items():
                 for marble in marbles:
+                    self._marble_registry.pop(id(marble), None)
                     marble.removeNode()
         self.marble_pool = self._make_marble_dict()
         self.marbles_in_play = self._make_marble_dict()
@@ -946,6 +971,8 @@ class ZertzRenderer(ShowBase):
         if pos in self.pos_to_base:
             base_piece = self.pos_to_base[pos]
             base_pos = base_piece.get_pos()
+            self.outline_manager.disable_outline(base_piece.model)
+            self._debug_outline_nodes.discard(base_piece.model)
             if action_duration == 0:
                 base_piece.hide()
             else:
@@ -963,6 +990,8 @@ class ZertzRenderer(ShowBase):
         if marble_color is not None and pos in self.pos_to_marble:
             captured_marble = self.pos_to_marble.pop(pos)
             src_coords = captured_marble.get_pos()
+            self.outline_manager.disable_outline(captured_marble.model)
+            self._debug_outline_nodes.discard(captured_marble.model)
             self._animate_marble_to_capture_pool(captured_marble, src_coords, player, marble_color, action_duration)
 
     def update_frozen_regions(self, frozen_position_strs):
@@ -1104,6 +1133,9 @@ class ZertzRenderer(ShowBase):
         while not self.animation_queue.empty():
             self.animation_queue.get()
         self.current_animations = []
+        self.outline_manager.clear_all()
+        self._debug_outline_nodes.clear()
+        self.clear_context_highlights()
 
         # 2. Restore removed rings and make them visible again
         for b, pos in self.removed_bases:
@@ -1122,6 +1154,7 @@ class ZertzRenderer(ShowBase):
             for marble, pos in marbles:
                 marble.model.clearMaterial()  # Clear any highlight materials
                 self.marble_pool[color].append(marble)
+                self._marble_registry[id(marble)] = marble
                 marble.set_scale(self.pool_marble_scale)
                 marble.set_pos(pos)
 
@@ -1189,9 +1222,10 @@ class ZertzRenderer(ShowBase):
         entities_list = highlight_info.get('entities', [])
         color = highlight_info.get('color', self.PLACEMENT_HIGHLIGHT_COLOR)
         emission = highlight_info.get('emission', self.PLACEMENT_HIGHLIGHT_EMISSION)
-
         # Store original materials and what type was highlighted
         original_materials = {}
+        use_outline = highlight_info.get('outline', False)
+        outline_nodes = highlight_info.setdefault('outline_nodes', set()) if use_outline else set()
 
         for pos_str in entities_list:
             # Try to highlight marble first, then ring
@@ -1206,9 +1240,19 @@ class ZertzRenderer(ShowBase):
                 # Highlight the ring at this position
                 entity = self.pos_to_base[pos_str]
                 entity_type = 'ring'
+            elif isinstance(pos_str, str) and pos_str.startswith("pool:"):
+                try:
+                    marble_id = int(pos_str.split(":", 1)[1])
+                except (IndexError, ValueError):
+                    marble_id = None
+                if marble_id is not None:
+                    entity = self._marble_registry.get(marble_id)
+                    if entity is not None:
+                        entity_type = 'pool_marble'
 
             if entity is not None:
-                original_mat = entity.model.getMaterial()
+                model = entity.model if hasattr(entity, "model") else entity
+                original_mat = model.getMaterial()
 
                 # Store original material properties for blending
                 if original_mat is not None:
@@ -1231,11 +1275,22 @@ class ZertzRenderer(ShowBase):
                     original_metallic,
                     original_roughness
                 )
+                if use_outline:
+                    outline_nodes.add(model)
 
         # Store original materials and target colors for later blending
         highlight_info['original_materials'] = original_materials
         highlight_info['target_color'] = color
         highlight_info['target_emission'] = emission
+        if use_outline:
+            for node in list(outline_nodes):
+                self.outline_manager.enable_outline(
+                    node,
+                    color,
+                    self.OUTLINE_THICKNESS,
+                    self.OUTLINE_THRESHOLD,
+                    self.OUTLINE_DILATE,
+                )
 
     def _clear_highlight(self, highlight_info):
         """Clear a highlight and restore original materials.
@@ -1254,12 +1309,26 @@ class ZertzRenderer(ShowBase):
                 entity = self.pos_to_marble[pos_str]
             elif entity_type == 'ring' and pos_str in self.pos_to_base:
                 entity = self.pos_to_base[pos_str]
+            elif entity_type == 'pool_marble':
+                try:
+                    marble_id = int(pos_str.split(":", 1)[1])
+                except (IndexError, ValueError):
+                    marble_id = None
+                if marble_id is not None:
+                    entity = self._marble_registry.get(marble_id)
 
             if entity is not None:
+                model = entity.model if hasattr(entity, "model") else entity
                 if original_mat is not None:
-                    entity.model.setMaterial(original_mat, 1)
+                    model.setMaterial(original_mat, 1)
                 else:
-                    entity.model.clearMaterial()
+                    model.clearMaterial()
+
+        for node in highlight_info.get('outline_nodes', set()):
+            self.outline_manager.disable_outline(node)
+        highlight_info['outline_nodes'] = set()
+
+
 
     def queue_animation(self, anim_type='move', defer=0, **kwargs):
         """Add an animation to the unified queue.
@@ -1278,7 +1347,7 @@ class ZertzRenderer(ShowBase):
         }
         self.animation_queue.put(anim_item)
 
-    def queue_highlight(self, rings, duration, color=None, emission=None, defer=0):
+    def queue_highlight(self, rings, duration, color=None, emission=None, defer=0, outline=False):
         """Add a highlight to the queue.
 
         Args:
@@ -1294,12 +1363,256 @@ class ZertzRenderer(ShowBase):
             entities=rings,
             duration=duration,
             color=color if color is not None else self.PLACEMENT_HIGHLIGHT_COLOR,
-            emission=emission if emission is not None else self.PLACEMENT_HIGHLIGHT_EMISSION
+            emission=emission if emission is not None else self.PLACEMENT_HIGHLIGHT_EMISSION,
+            outline=outline,
         )
 
     def is_animation_active(self):
         """Check if any animations (move or highlight) are active or queued."""
         return len(self.current_animations) > 0 or not self.animation_queue.empty()
+
+    def debug_outline_random(self, ring_count=3, marble_count=3, pool_marble_count=3, color=None):
+        """Utility to outline random rings/marbles for manual inspection."""
+        color_vec = color or LVector4(1.0, 0.0, 1.0, 1.0)
+        self.debug_clear_outlines()
+
+        ring_positions = list(self.pos_to_base.keys())
+        if ring_positions and ring_count > 0:
+            sample = random.sample(ring_positions, min(ring_count, len(ring_positions)))
+            for pos in sample:
+                entity = self.pos_to_base.get(pos)
+                if entity:
+                    self.outline_manager.enable_outline(
+                        entity.model,
+                        color_vec,
+                        self.OUTLINE_THICKNESS,
+                        self.OUTLINE_THRESHOLD,
+                        self.OUTLINE_DILATE,
+                    )
+                    self._debug_outline_nodes.add(entity.model)
+
+        active_marbles = [marble for group in self.marbles_in_play.values() for marble, _ in group]
+        if active_marbles and marble_count > 0:
+            sample = random.sample(active_marbles, min(marble_count, len(active_marbles)))
+            for marble in sample:
+                self.outline_manager.enable_outline(
+                    marble.model,
+                    color_vec,
+                    self.OUTLINE_THICKNESS,
+                    self.OUTLINE_THRESHOLD,
+                    self.OUTLINE_DILATE,
+                )
+                self._debug_outline_nodes.add(marble.model)
+
+        pool_marbles = [marble for group in self.marble_pool.values() for marble in group]
+        if pool_marbles and pool_marble_count > 0:
+            sample = random.sample(pool_marbles, min(pool_marble_count, len(pool_marbles)))
+            for marble in sample:
+                self.outline_manager.enable_outline(
+                    marble.model,
+                    color_vec,
+                    self.OUTLINE_THICKNESS,
+                    self.OUTLINE_THRESHOLD,
+                    self.OUTLINE_DILATE,
+                )
+                self._debug_outline_nodes.add(marble.model)
+
+    def debug_clear_outlines(self) -> None:
+        for node in list(self._debug_outline_nodes):
+            self.outline_manager.disable_outline(node)
+        self._debug_outline_nodes.clear()
+
+    @staticmethod
+    def _pool_key(marble: Any) -> str:
+        return f"pool:{id(marble)}"
+
+    def _pool_highlight_keys(self, color: str) -> list[str]:
+        marbles = self.marble_pool.get(color, []) if self.marble_pool else []
+        return [self._pool_key(marble) for marble in marbles if marble is not None]
+
+    def _clear_supply_highlights(self) -> None:
+        for context in self.SUPPLY_HIGHLIGHT_CONTEXTS.values():
+            self.clear_highlight_context(context)
+
+    def _apply_supply_highlights(self, valid_color_indices: set[int]) -> None:
+        for idx, color in enumerate(self.MARBLE_ORDER):
+            context = self.SUPPLY_HIGHLIGHT_CONTEXTS[color]
+            if idx in valid_color_indices:
+                positions = self._pool_highlight_keys(color)
+                if positions:
+                    self.highlight_context(context, positions)
+                    continue
+            self.clear_highlight_context(context)
+
+    def apply_context_masks(self, board, placement_mask, capture_mask) -> None:
+        """Translate action masks into highlight sets for the current board."""
+        width = board.width
+
+        if placement_mask is None or capture_mask is None:
+            self.clear_highlight_context()
+            self._clear_supply_highlights()
+            return
+
+        if np.any(capture_mask):
+            capture_sources: set[str] = set()
+            capture_destinations: set[str] = set()
+            for direction in range(capture_mask.shape[0]):
+                ys, xs = np.where(capture_mask[direction])
+                for y, x in zip(ys, xs):
+                    label_src = board.index_to_str((y, x))
+                    if label_src:
+                        capture_sources.add(label_src)
+                    dy, dx = board.DIRECTIONS[direction]
+                    cap_index = (y + dy, x + dx)
+                    dst_index = board.get_jump_destination((y, x), cap_index)
+                    if dst_index is None:
+                        continue
+                    dst_y, dst_x = dst_index
+                    if 0 <= dst_y < width and 0 <= dst_x < width and board.state[board.RING_LAYER, dst_y, dst_x] == 1:
+                        label_dst = board.index_to_str(dst_index)
+                        if label_dst:
+                            capture_destinations.add(label_dst)
+
+            if capture_sources:
+                self.highlight_context('capture_sources', capture_sources)
+            else:
+                self.clear_highlight_context('capture_sources')
+
+            if capture_destinations:
+                self.highlight_context('capture_destinations', capture_destinations)
+            else:
+                self.clear_highlight_context('capture_destinations')
+
+            self.clear_highlight_context('placement')
+            self.clear_highlight_context('removal')
+            self._clear_supply_highlights()
+            return
+
+        placement_rings: set[str] = set()
+        removal_rings: set[str] = set()
+        valid_colors: set[int] = set()
+
+        for marble_idx in range(placement_mask.shape[0]):
+            put_indices, rem_indices = np.where(placement_mask[marble_idx])
+            if put_indices.size > 0:
+                valid_colors.add(marble_idx)
+            for put, rem in zip(put_indices, rem_indices):
+                put_y, put_x = divmod(put, width)
+                label_put = board.index_to_str((put_y, put_x))
+                if label_put:
+                    placement_rings.add(label_put)
+                if rem != width ** 2:
+                    rem_y, rem_x = divmod(rem, width)
+                    label_rem = board.index_to_str((rem_y, rem_x))
+                    if label_rem:
+                        removal_rings.add(label_rem)
+
+        if placement_rings:
+            self.highlight_context('placement', placement_rings)
+        else:
+            self.clear_highlight_context('placement')
+
+        if removal_rings:
+            self.highlight_context('removal', removal_rings)
+        else:
+            self.clear_highlight_context('removal')
+
+        self._apply_supply_highlights(valid_colors)
+        self.clear_highlight_context('capture_sources')
+        self.clear_highlight_context('capture_destinations')
+
+    def set_context_highlights(
+        self,
+        context: str,
+        positions: list[str] | set[str],
+        color: LVector4 | None = None,
+        emission: LVector4 | None = None,
+    ) -> None:
+        """Apply persistent highlights for a named context (no outline)."""
+        self.clear_context_highlights(context)
+        if not positions:
+            return
+
+        resolved_color, resolved_emission = self._resolve_context_style(context, color, emission)
+
+        highlight_info = {
+            'entities': list(positions),
+            'duration': 0.0,
+            'start_time': 0.0,
+            'color': resolved_color,
+            'emission': resolved_emission,
+        }
+        self._context_highlights[context] = highlight_info
+        self._apply_highlight(highlight_info)
+
+    def clear_context_highlights(self, context: str | None = None) -> None:
+        """Clear context highlights for a specific context or all contexts."""
+        if context is None:
+            contexts = list(self._context_highlights.keys())
+        else:
+            contexts = [context] if context in self._context_highlights else []
+
+        for ctx in contexts:
+            info = self._context_highlights.pop(ctx, None)
+            if info:
+                self._clear_highlight(info)
+
+    def highlight_context(self, context: str, positions: set[str] | list[str]) -> None:
+        color, emission = self._resolve_context_style(context, None, None)
+        self.set_context_highlights(context, positions, color, emission)
+
+    def clear_highlight_context(self, context: str | None = None) -> None:
+        self.clear_context_highlights(context)
+
+    def _resolve_context_style(
+        self,
+        context: str,
+        color: LVector4 | None,
+        emission: LVector4 | None,
+    ) -> tuple[LVector4, LVector4]:
+        if color is not None and emission is not None:
+            return color, emission
+        default_color, default_emission = self.CONTEXT_STYLES.get(
+            context,
+            (self.PLACEMENT_HIGHLIGHT_COLOR, self.PLACEMENT_HIGHLIGHT_EMISSION),
+        )
+        return color or default_color, emission or default_emission
+
+    def debug_highlight_random_white(self, ring_count=3, marble_count=3, duration=1.5):
+        """Queue a white highlight (with outline) on random rings/marbles."""
+        positions: list[str] = []
+
+        ring_positions = list(self.pos_to_base.keys())
+        if ring_positions and ring_count > 0:
+            positions.extend(random.sample(ring_positions, min(ring_count, len(ring_positions))))
+
+        marble_positions = list(self.pos_to_marble.keys())
+        pooled = []
+        for color, marbles in self.marble_pool.items():
+            for marble in marbles:
+                pooled.append((color, marble))
+
+        if marble_positions and marble_count > 0:
+            positions.extend(random.sample(marble_positions, min(marble_count, len(marble_positions))))
+        remaining = marble_count - len([p for p in positions if p in self.pos_to_marble])
+        if remaining > 0 and pooled:
+            sample = random.sample(pooled, min(remaining, len(pooled)))
+            for color, marble in sample:
+                positions.append(self._pool_key(marble))
+
+        if not positions:
+            logger.info("debug_highlight_random_white: no positions available")
+            return
+
+        color = LVector4(1.0, 1.0, 1.0, 1.0)
+        emission = LVector4(0.2, 0.2, 0.2, 1.0)
+        self.queue_highlight(
+            positions,
+            duration,
+            color=color,
+            emission=emission,
+            outline=True,
+        )
 
     @property
     def current_action_result(self):

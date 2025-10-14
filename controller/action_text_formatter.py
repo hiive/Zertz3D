@@ -5,6 +5,8 @@ Formats valid moves and game state information for display.
 
 import numpy as np
 
+from shared.constants import MARBLE_TYPES
+
 
 class ActionTextFormatter:
     """Formats valid moves and game state for display."""
@@ -95,12 +97,11 @@ class ActionTextFormatter:
 
         if len(placement_positions) > 0:
             # Group by (marble, destination) to find unique placement positions
-            marble_types = ['w', 'g', 'b']
             placements = {}  # {(marble, dst_str): [list of removal positions]}
             removals_set = set()  # Track all possible removals
 
             for marble_idx, dst, rem in placement_positions:
-                marble = marble_types[marble_idx]
+                marble = MARBLE_TYPES[marble_idx]
                 dst_y = dst // game.board.width
                 dst_x = dst % game.board.width
                 dst_str = game.board.position_from_yx((dst_y, dst_x)).label

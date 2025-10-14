@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument('--log-notation', action='store_true', help='Log game moves using official Zèrtz notation')
     parser.add_argument('--blitz', action='store_true', help='Use blitz variant (37 rings only, fewer marbles, lower win thresholds)')
     parser.add_argument('--move-duration', type=float, default=0.5, help='Duration between moves in seconds (default: 0.666)')
+    parser.add_argument('--human', action='store_true', help='Control player 1 manually (requires interactive renderer)')
     args = parser.parse_args()
 
     factory = ZertzFactory()
@@ -35,6 +36,7 @@ def main() -> None:
         log_notation=args.log_notation,
         blitz=args.blitz,
         move_duration=args.move_duration,
+        human_players=(1,) if args.human else None,
     )
     controller.run()
 

@@ -47,3 +47,19 @@ class TextRenderer(IRenderer):
 
     def attach_update_loop(self, update_fn: Callable[[], bool], interval: float) -> bool:
         return False
+
+    # Context highlighting is a no-op for the text renderer
+    def set_context_highlights(self, context, positions, color=None, emission=None) -> None:
+        pass
+
+    def clear_context_highlights(self, context=None) -> None:
+        pass
+
+    def highlight_context(self, context, positions) -> None:
+        pass
+
+    def clear_highlight_context(self, context=None) -> None:
+        pass
+
+    def apply_context_masks(self, board, placement_mask, capture_mask) -> None:
+        pass

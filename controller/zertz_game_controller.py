@@ -4,6 +4,8 @@ Manages game loop, player actions, renderer updates, and game state.
 """
 from __future__ import annotations
 
+import numpy as np
+
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
 from controller.replay_loader import ReplayLoader
 from controller.game_logger import GameLogger
@@ -20,7 +22,8 @@ class ZertzGameController:
     def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False,
                  max_games=None, highlight_choices=False, show_coords=False, log_notation=False,
                  blitz=False, move_duration=0.666,
-                 renderer_or_factory: IRenderer | IRendererFactory | None = None):
+                 renderer_or_factory: IRenderer | IRendererFactory | None = None,
+                 human_players: tuple[int, ...] | None = None):
         self.show_coords = show_coords
         self.max_games = max_games  # None means play indefinitely
         self.highlight_choices = highlight_choices
@@ -55,7 +58,8 @@ class ZertzGameController:
             replay_actions=replay_actions,
             partial_replay=partial_replay,
             t=5,
-            status_reporter=self._report
+            status_reporter=self._report,
+            human_players=human_players,
         )
 
 
@@ -126,6 +130,25 @@ class ZertzGameController:
         formatted_moves = self.move_formatter.format_valid_actions(self.session.game, player)
         self._report(formatted_moves)
 
+    def _resolve_player_context(self, player, placement_mask, capture_mask):
+        # Determine the logical phase name based on available masks
+        if np.any(capture_mask):
+            context = 'capture'
+        elif np.any(placement_mask):
+            context = 'placement'
+        else:
+            context = 'idle'
+        player.on_turn_start(context, placement_mask, capture_mask)
+
+    def _update_context_highlights(self, player, placement_mask, capture_mask):
+        if not self.highlight_choices or not self.renderer:
+            return
+
+        self.renderer.clear_highlight_context()
+        self._resolve_player_context(player, placement_mask, capture_mask)
+
+        self.renderer.apply_context_masks(self.session.game.board, placement_mask, capture_mask)
+
     def update_game(self, task):
         # Wait for renderer callback before continuing
         if self.waiting_for_renderer:
@@ -142,6 +165,10 @@ class ZertzGameController:
         # Get next action from current player
         player = self.session.get_current_player()
 
+        if self.highlight_choices and self.renderer:
+            placement_mask, capture_mask = self.session.game.get_valid_actions()
+            self._update_context_highlights(player, placement_mask, capture_mask)
+
         try:
             ax, ay = player.get_action()
         except ValueError as e:
@@ -157,7 +184,12 @@ class ZertzGameController:
             else:
                 raise
 
-        # Display valid moves if enabled
+        # Clear context highlights once an action is chosen
+        if self.highlight_choices and self.renderer:
+            self.renderer.clear_highlight_context()
+            player.clear_context()
+
+        # Display valid moves if enabled (text-only)
         if self.highlight_choices:
             self._display_valid_moves(player)
 

@@ -33,6 +33,7 @@ class ZertzFactory:
         log_notation: bool = False,
         blitz: bool = False,
         move_duration: float = 0.666,
+        human_players: tuple[int, ...] | None = None,
     ) -> ZertzGameController:
         """Create a fully-wired ZertzGameController with appropriate renderers."""
 
@@ -41,8 +42,7 @@ class ZertzFactory:
 
             if not headless:
                 board_layout = ZertzBoard.generate_standard_board_layout(controller.session.rings)
-                renderers.append(
-                    ZertzRenderer(
+                renderer = ZertzRenderer(
                         rings=controller.session.rings,
                         board_layout=board_layout,
                         show_coords=controller.show_coords,
@@ -50,7 +50,7 @@ class ZertzFactory:
                         update_callback=controller.update_game,
                         move_duration=controller.move_duration,
                     )
-                )
+                renderers.append(renderer)
 
             text_renderer = TextRenderer(stream=self._text_stream)
             renderers.append(text_renderer)
@@ -72,4 +72,5 @@ class ZertzFactory:
             blitz=blitz,
             move_duration=move_duration,
             renderer_or_factory=renderer_factory,
+            human_players=human_players,
         )

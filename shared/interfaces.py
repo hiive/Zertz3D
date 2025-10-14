@@ -39,6 +39,21 @@ class IRenderer(Protocol):
     def report_status(self, message: str) -> None:
         ...
 
+    def set_context_highlights(self, context: str, positions: list[str] | set[str], color: Any | None = None, emission: Any | None = None) -> None:
+        ...
+
+    def clear_context_highlights(self, context: str | None = None) -> None:
+        ...
+
+    def highlight_context(self, context: str, positions: list[str] | set[str]) -> None:
+        ...
+
+    def clear_highlight_context(self, context: str | None = None) -> None:
+        ...
+
+    def apply_context_masks(self, board: Any, placement_mask: Any, capture_mask: Any) -> None:
+        ...
+
 
 @runtime_checkable
 class IRendererFactory(Protocol):

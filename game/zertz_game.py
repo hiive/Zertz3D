@@ -1,9 +1,10 @@
-import numpy as np
 import copy
+import numpy as np
 
 from .zertz_board import ZertzBoard
 from .action_result import ActionResult
 from shared.render_data import RenderData
+from shared.constants import MARBLE_TYPES
 
 
 # For full rules: http://www.gipf.com/zertz/rules/rules.html
@@ -203,13 +204,11 @@ class ZertzGame:
         4. Both players immobilized (consecutive passes)
         5. Move loop detected (last 2 pairs == preceding 2 pairs)
         """
-        marble_types = ['w', 'g', 'b']
-
         # Check if any player's captured marbles are enough to satisfy a win condition
         for win_con in self.win_con:
             # Build the list of required marble amounts
             required = np.zeros(3)
-            for i, marble_type in enumerate(marble_types):
+            for i, marble_type in enumerate(MARBLE_TYPES):
                 if marble_type in win_con:
                     required[i] = win_con[marble_type]
 
@@ -277,8 +276,7 @@ class ZertzGame:
                 # Check each win condition
                 for win_con in self.win_con:
                     required = np.zeros(3)
-                    marble_types = ['w', 'g', 'b']
-                    for i, marble_type in enumerate(marble_types):
+                    for i, marble_type in enumerate(MARBLE_TYPES):
                         if marble_type in win_con:
                             required[i] = win_con[marble_type]
 

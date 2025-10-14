@@ -11,14 +11,15 @@ import numpy as np
 
 from game.zertz_game import (ZertzGame, STANDARD_MARBLES, BLITZ_MARBLES,
                              STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS)
-from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer
+from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer, HumanZertzPlayer
 
 
 class GameSession:
     """Manages a single game's lifecycle (board state, players, current game)."""
 
     def __init__(self, rings=37, blitz=False, seed=None, replay_actions=None,
-                 partial_replay=False, t=5, status_reporter: Callable[[str], None] | None = None):
+                 partial_replay=False, t=5, status_reporter: Callable[[str], None] | None = None,
+                 human_players: tuple[int, ...] | None = None):
         """Initialize a game session.
 
         Args:
@@ -50,6 +51,7 @@ class GameSession:
         self.replay_mode = replay_actions is not None
         self.partial_replay = partial_replay
         self.replay_actions = replay_actions
+        self.human_players = set(human_players or ())
 
         # Seed management
         self.current_seed = None
@@ -115,8 +117,14 @@ class GameSession:
             self.player1 = ReplayZertzPlayer(self.game, 1, player1_actions)
             self.player2 = ReplayZertzPlayer(self.game, 2, player2_actions)
         else:
-            self.player1 = RandomZertzPlayer(self.game, 1)
-            self.player2 = RandomZertzPlayer(self.game, 2)
+            if 1 in self.human_players:
+                self.player1 = HumanZertzPlayer(self.game, 1)
+            else:
+                self.player1 = RandomZertzPlayer(self.game, 1)
+            if 2 in self.human_players:
+                self.player2 = HumanZertzPlayer(self.game, 2)
+            else:
+                self.player2 = RandomZertzPlayer(self.game, 2)
 
     def get_current_player(self):
         """Get the player whose turn it is.
@@ -140,8 +148,14 @@ class GameSession:
             raise ValueError("Cannot switch to random play when partial_replay is False")
 
         self._report("Replay finished - continuing with random play")
-        self.player1 = RandomZertzPlayer(self.game, 1)
-        self.player2 = RandomZertzPlayer(self.game, 2)
+        if 1 in self.human_players:
+            self.player1 = HumanZertzPlayer(self.game, 1)
+        else:
+            self.player1 = RandomZertzPlayer(self.game, 1)
+        if 2 in self.human_players:
+            self.player2 = HumanZertzPlayer(self.game, 2)
+        else:
+            self.player2 = RandomZertzPlayer(self.game, 2)
 
         # Preserve captured marbles
         if current_player.n == 1:
