@@ -639,6 +639,11 @@ class TestSpiralMirror:
             white_positions = np.argwhere(mirrored[1] == 1)
             mirrored_positions = [small_board.index_to_str(tuple(pos)) for pos in white_positions]
 
+            # Compute expected mirror target of F4 using axial transformation
+            f4_axial = small_board.position_from_label("F4").axial
+            mirrored_axial = small_board._ax_mirror_q_axis(*f4_axial)
+            expected_label = small_board.position_from_axial(mirrored_axial).label
+
             # For a proper mirror, the pattern should be reflected
             # The exact positions depend on which axis the mirror uses
             # But it should NOT be the same as any rotation
@@ -646,6 +651,13 @@ class TestSpiralMirror:
                 rotated = small_board._transform_state_hex(base, rot60_k=k)
                 assert not np.array_equal(mirrored, rotated), \
                     f"Mirror result matches {k * 60}° rotation - not a true reflection!"
+
+            assert not np.array_equal(mirrored, base), \
+                "Mirror result is identical to original pattern; reflection failed"
+            assert expected_label in mirrored_positions, \
+                f"Expected mirrored arrow tip at {expected_label}, got {mirrored_positions}"
+            assert "F4" not in mirrored_positions, \
+                "Original arrow tip still present after mirror; pattern did not reflect"
 
     def test_spiral_chirality_changes_under_mirror(self, small_board):
         """
@@ -685,16 +697,17 @@ class TestSpiralMirror:
                         break
             return sequence
 
-        original_sequence = get_spiral_sequence(base)
-
         # Apply mirror
         mirrored = small_board._transform_state_hex(base, mirror=True)
+        mirrored_sequence = get_spiral_sequence(mirrored)
+        original_sequence = get_spiral_sequence(base)
 
         # The mirrored spiral should have different chirality
         # We can't easily check the exact sequence without knowing the mirror axis,
         # but we can verify it's different from all rotations
+        assert mirrored_sequence != original_sequence, \
+            "Mirror did not change spiral chirality (sequence identical)"
 
-        all_rotations_same_chirality = True
         for k in range(1, 6):
             rotated = small_board._transform_state_hex(base, rot60_k=k)
             # Rotations preserve chirality, so if mirror equals any rotation,

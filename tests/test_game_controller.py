@@ -38,8 +38,6 @@ class TestGameControllerHeadless:
 
         # Capture console output to verify correct winner display
         output_lines = []
-        original_print = print
-
         def capture_print(*args, **kwargs):
             """Capture print statements."""
             output_lines.append(' '.join(str(arg) for arg in args))
