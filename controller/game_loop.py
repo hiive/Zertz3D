@@ -21,7 +21,9 @@ class _LoopTask:
 class GameLoop:
     """Drives the controller update cycle independent of renderer mode."""
 
-    def __init__(self, controller, renderer: IRenderer | None, move_duration: float) -> None:
+    def __init__(
+        self, controller, renderer: IRenderer | None, move_duration: float
+    ) -> None:
         self._controller = controller
         self._renderer = renderer
         self._move_duration = move_duration
@@ -31,7 +33,9 @@ class GameLoop:
 
         if self._renderer:
             try:
-                if self._renderer.attach_update_loop(lambda: self._tick(self._move_duration), self._move_duration):
+                if self._renderer.attach_update_loop(
+                    lambda: self._tick(self._move_duration), self._move_duration
+                ):
                     self._renderer.run()
                     return
             except AttributeError:

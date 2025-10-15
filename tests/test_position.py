@@ -13,43 +13,43 @@ def small_board():
 
 
 def test_position_from_label_center(small_board):
-    pos = small_board.position_from_label('D4')
+    pos = small_board.position_from_label("D4")
     assert pos.yx == (3, 3)
-    assert pos.label == 'D4'
+    assert pos.label == "D4"
     assert pos.axial == (0, 0)
     assert pos.cartesian[0] == pytest.approx(0.0, abs=1e-6)
     assert pos.cartesian[1] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_position_roundtrip_string_and_axial(small_board):
-    label = 'A1'
+    label = "A1"
     pos = small_board.position_from_label(label)
     assert small_board.position_from_yx(pos.yx).label == label
     assert small_board.position_from_axial(pos.axial).label == label
 
 
 def test_position_available_after_ring_removed(small_board):
-    pos = small_board.position_from_label('D4')
+    pos = small_board.position_from_label("D4")
     small_board.state[small_board.RING_LAYER, pos.y, pos.x] = 0
     # index_to_str returns '' for removed rings, but Position retains label
-    assert small_board.index_to_str(pos.yx) == ''
+    assert small_board.index_to_str(pos.yx) == ""
     new_pos = small_board.position_from_yx(pos.yx)
-    assert new_pos.label == 'D4'
+    assert new_pos.label == "D4"
 
 
 def test_position_from_axial_roundtrip(small_board):
-    center = small_board.position_from_label('D4')
+    center = small_board.position_from_label("D4")
     axial = center.axial
     pos = small_board.position_from_axial(axial)
     assert pos.yx == center.yx
-    assert pos.label == 'D4'
+    assert pos.label == "D4"
 
 
 def test_position_collection_lazy_build_and_size(small_board):
     collection = small_board.positions
     assert collection._built is False
 
-    pos = collection.get_by_label('D4')
+    pos = collection.get_by_label("D4")
     assert collection._built is True
     assert pos.yx == (3, 3)
     assert len(collection.by_label) == small_board.rings
@@ -60,20 +60,20 @@ def test_position_collection_lazy_build_and_size(small_board):
 def test_position_collection_invalidate_rebuilds(small_board):
     collection = small_board.positions
     original = collection.get_by_yx((3, 3))
-    assert original.label == 'D4'
+    assert original.label == "D4"
 
     collection.invalidate()
     assert collection._built is False
 
     rebuilt = collection.get_by_yx((3, 3))
     assert collection._built is True
-    assert rebuilt.label == 'D4'
+    assert rebuilt.label == "D4"
     assert rebuilt is not original
 
 
 def test_position_collection_axial_and_cartesian_helpers(small_board):
     collection = small_board.positions
-    center = collection.get_by_label('D4')
+    center = collection.get_by_label("D4")
 
     axial = collection.axial_for_yx(center.yx)
     cart = collection.cartesian_for_yx(center.yx)
@@ -83,13 +83,13 @@ def test_position_collection_axial_and_cartesian_helpers(small_board):
 
 
 def test_position_collection_rebuilds_on_clone(small_board):
-    original_center = small_board.position_from_label('D4')
+    original_center = small_board.position_from_label("D4")
     assert small_board.positions._built is True
 
     clone = ZertzBoard(clone=small_board)
     assert clone.positions._built is False
 
-    clone_center = clone.position_from_label('D4')
+    clone_center = clone.position_from_label("D4")
     assert clone.positions._built is True
 
     assert clone_center is not original_center
@@ -99,7 +99,10 @@ def test_position_collection_rebuilds_on_clone(small_board):
     assert clone._coord_scale == pytest.approx(small_board._coord_scale)
 
     clone.state[clone.RING_LAYER, clone_center.y, clone_center.x] = 0
-    assert small_board.state[small_board.RING_LAYER, original_center.y, original_center.x] == 1
+    assert (
+        small_board.state[small_board.RING_LAYER, original_center.y, original_center.x]
+        == 1
+    )
 
 
 def test_clone_all_coordinate_lookups_work():
@@ -107,7 +110,7 @@ def test_clone_all_coordinate_lookups_work():
     original = ZertzBoard(rings=37)
 
     # Access positions to build cache
-    orig_d4 = original.position_from_label('D4')
+    orig_d4 = original.position_from_label("D4")
     orig_axial = orig_d4.axial
     orig_cart = orig_d4.cartesian
 
@@ -115,24 +118,24 @@ def test_clone_all_coordinate_lookups_work():
     clone = ZertzBoard(clone=original)
 
     # Test lookup by label
-    clone_d4_by_label = clone.position_from_label('D4')
-    assert clone_d4_by_label.label == 'D4'
+    clone_d4_by_label = clone.position_from_label("D4")
+    assert clone_d4_by_label.label == "D4"
     assert clone_d4_by_label.yx == orig_d4.yx
     assert clone_d4_by_label.board is clone
 
     # Test lookup by yx
     clone_d4_by_yx = clone.position_from_yx(orig_d4.yx)
-    assert clone_d4_by_yx.label == 'D4'
+    assert clone_d4_by_yx.label == "D4"
     assert clone_d4_by_yx.yx == orig_d4.yx
 
     # Test lookup by axial
     clone_d4_by_axial = clone.position_from_axial(orig_axial)
-    assert clone_d4_by_axial.label == 'D4'
+    assert clone_d4_by_axial.label == "D4"
     assert clone_d4_by_axial.axial == orig_axial
 
     # Test helper methods
     assert clone.positions.axial_for_yx(orig_d4.yx) == orig_axial
-    assert clone.positions.label_for_yx(orig_d4.yx) == 'D4'
+    assert clone.positions.label_for_yx(orig_d4.yx) == "D4"
     cart_clone = clone.positions.cartesian_for_yx(orig_d4.yx)
     assert cart_clone[0] == pytest.approx(orig_cart[0], abs=1e-6)
     assert cart_clone[1] == pytest.approx(orig_cart[1], abs=1e-6)
@@ -143,14 +146,14 @@ def test_clone_position_dictionaries_are_independent():
     original = ZertzBoard(rings=37)
 
     # Build original's cache
-    original.position_from_label('D4')
+    original.position_from_label("D4")
     orig_by_label_len = len(original.positions.by_label)
     orig_by_yx_len = len(original.positions.by_yx)
     orig_by_axial_len = len(original.positions.by_axial)
 
     # Clone and build clone's cache
     clone = ZertzBoard(clone=original)
-    clone.position_from_label('D4')
+    clone.position_from_label("D4")
 
     # Verify dictionaries have same size but are different objects
     assert len(clone.positions.by_label) == orig_by_label_len
@@ -194,18 +197,18 @@ def test_multiple_rounds_of_cloning():
     gen0 = ZertzBoard(rings=37)
 
     # Build gen0's cache
-    gen0_d4 = gen0.position_from_label('D4')
+    gen0_d4 = gen0.position_from_label("D4")
     gen0_axial = gen0_d4.axial
 
     # Clone to gen1
     gen1 = ZertzBoard(clone=gen0)
-    gen1_d4 = gen1.position_from_label('D4')
+    gen1_d4 = gen1.position_from_label("D4")
     assert gen1_d4.axial == gen0_axial
     assert gen1_d4.board is gen1
 
     # Clone to gen2
     gen2 = ZertzBoard(clone=gen1)
-    gen2_d4 = gen2.position_from_label('D4')
+    gen2_d4 = gen2.position_from_label("D4")
     assert gen2_d4.axial == gen0_axial
     assert gen2_d4.board is gen2
 
@@ -220,7 +223,7 @@ def test_clone_after_state_modifications():
     original = ZertzBoard(rings=37)
 
     # Build cache and get a position
-    d4 = original.position_from_label('D4')
+    d4 = original.position_from_label("D4")
     d4_yx = d4.yx
 
     # Modify the original board's state (remove the ring at D4)
@@ -231,7 +234,7 @@ def test_clone_after_state_modifications():
 
     # Position collection should still work on clone
     # The position cache is based on initial ring layout, not current state
-    clone_d4 = clone.position_from_label('D4')
+    clone_d4 = clone.position_from_label("D4")
     assert clone_d4.yx == d4_yx
 
     # Verify state was copied correctly
@@ -247,7 +250,7 @@ def test_clone_yx_to_ax_and_ax_to_yx_mappings():
     original = ZertzBoard(rings=37)
 
     # Build cache
-    d4 = original.position_from_label('D4')
+    d4 = original.position_from_label("D4")
     d4_yx = d4.yx
     d4_axial = d4.axial
 

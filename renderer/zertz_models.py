@@ -3,6 +3,7 @@ import random
 
 from panda3d.core import TextureAttrib, AmbientLight, BitMask32
 
+
 class _BaseModel(ABC):
     def __init__(self, renderer, model_name, color=(1.0, 1.0, 1.0, 1.0)):
         self.renderer = renderer
@@ -29,6 +30,13 @@ class _BaseModel(ABC):
             self.model.removeNode()
             self.model = None
 
+    def _set_collide_mask(self, mask):
+        if self.model is None:
+            return
+        self.model.setCollideMask(mask)
+        for node in self.model.findAllMatches("**"):
+            node.setCollideMask(mask)
+
     def add(self):
         if self.model is not None:
             return
@@ -38,6 +46,7 @@ class _BaseModel(ABC):
         # self.model.setScale(0.3)
         self.model.setScale(0.305)
         self.model.reparentTo(self.renderer.render)
+        self._set_collide_mask(BitMask32.allOff())
 
     def show(self):
         if self.model is not None:
@@ -50,11 +59,11 @@ class _BaseModel(ABC):
 
 class SkyBox(_BaseModel):
     def __init__(self, renderer):
-        model_name = 'models/skybox.bam'
+        model_name = "models/skybox.bam"
         super().__init__(renderer, model_name)
         self.model.setScale(16)  # Increased from 16 to zoom out
         self.model.setTwoSided(True)
-        #self.model.setP(self.model, 8)
+        # self.model.setP(self.model, 8)
         self.model.setH(self.model, 15)
         self.model.setPos((0, 0, 4.9))
         self.model.setDepthWrite(False)
@@ -67,11 +76,11 @@ class SkyBox(_BaseModel):
 
 
 def make_marble(renderer, color):
-    if color == 'w':
+    if color == "w":
         return WhiteBallModel(renderer)
-    elif color == 'b':
+    elif color == "b":
         return BlackBallModel(renderer)
-    elif color == 'g':
+    elif color == "g":
         return GrayBallModel(renderer)
     return None
 
@@ -86,6 +95,7 @@ class _BallBase(_BaseModel):
         self.rng = random.Random()
         self._set_random_hpr()
         self.z_offset = 0.25
+        self._set_collide_mask(BitMask32.bit(1))
 
     def _set_random_hpr(self):
         h = self.rng.uniform(0, 360)
@@ -143,6 +153,7 @@ class BasePiece(_BaseModel):
 
         super().__init__(renderer, model_name, color)
         self.model.setP(self.model, 180)
+        self._set_collide_mask(BitMask32.bit(1))
         # self.model.flattenStrong()
 
     def set_pos(self, coord):

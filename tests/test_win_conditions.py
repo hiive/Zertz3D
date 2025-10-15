@@ -23,6 +23,7 @@ from game.zertz_board import ZertzBoard
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def game():
     """Create a fresh game for each test."""
@@ -33,9 +34,9 @@ def game():
 # Win Condition Tests
 # ============================================================================
 
+
 class TestWinConditions:
     """Test win condition detection in various scenarios."""
-
 
     def test_win_during_chain_capture(self):
         """Test that win is detected during a chain capture sequence.
@@ -65,13 +66,13 @@ class TestWinConditions:
         # C3 (white) → D4 (black) → E5 (empty) → F5 (black) → G5 (empty)
         # After capturing first black: 5+1=6 blacks → WIN!
 
-        c3_idx = board.str_to_index('C3')
-        d4_idx = board.str_to_index('D4')
-        e5_idx = board.str_to_index('E5')
-        f5_idx = board.str_to_index('F5')
+        c3_idx = board.str_to_index("C3")
+        d4_idx = board.str_to_index("D4")
+        e5_idx = board.str_to_index("E5")
+        f5_idx = board.str_to_index("F5")
 
-        white_layer = board.MARBLE_TO_LAYER['w']
-        black_layer = board.MARBLE_TO_LAYER['b']
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        black_layer = board.MARBLE_TO_LAYER["b"]
 
         board.state[white_layer][c3_idx] = 1
         board.state[black_layer][d4_idx] = 1
@@ -91,7 +92,7 @@ class TestWinConditions:
                 break
 
         # Take the capture action
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # After capture, Player 1 should have 6 blacks → WIN!
         assert board.global_state[board.P1_CAP_B] == 6, "Player 1 should have 6 blacks"
@@ -129,17 +130,17 @@ class TestWinConditions:
         #   To-isolate: C1-D2-D1 (triangle) connected to main via D3
         # Removing D3 will isolate C1-D2-D1
 
-        d4_idx = board.str_to_index('D4')
-        d5_idx = board.str_to_index('D5')
-        e4_idx = board.str_to_index('E4')
-        d3_idx = board.str_to_index('D3')  # Connection ring (will be removed)
-        c1_idx = board.str_to_index('C1')
-        d2_idx = board.str_to_index('D2')
-        d1_idx = board.str_to_index('D1')
+        d4_idx = board.str_to_index("D4")
+        d5_idx = board.str_to_index("D5")
+        e4_idx = board.str_to_index("E4")
+        d3_idx = board.str_to_index("D3")  # Connection ring (will be removed)
+        c1_idx = board.str_to_index("C1")
+        d2_idx = board.str_to_index("D2")
+        d1_idx = board.str_to_index("D1")
 
-        white_layer = board.MARBLE_TO_LAYER['w']
-        gray_layer = board.MARBLE_TO_LAYER['g']
-        black_layer = board.MARBLE_TO_LAYER['b']
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        gray_layer = board.MARBLE_TO_LAYER["g"]
+        black_layer = board.MARBLE_TO_LAYER["b"]
 
         # Main region (3 rings)
         board.state[board.RING_LAYER][d4_idx] = 1
@@ -173,7 +174,7 @@ class TestWinConditions:
         placement_action = (0, e4_flat, d3_flat)
 
         # Take the placement action
-        game.take_action('PUT', placement_action)
+        game.take_action("PUT", placement_action)
 
         # After isolation, Player 1 should have captured the 3 isolated marbles
         # P1 should now have 3/3/3 → WIN!
@@ -214,12 +215,12 @@ class TestWinConditions:
         # C3 (white) → D4 (gray) → E5 (empty)
         # After capturing gray: 4+1=5 grays → WIN!
 
-        c3_idx = board.str_to_index('C3')
-        d4_idx = board.str_to_index('D4')
-        e5_idx = board.str_to_index('E5')
+        c3_idx = board.str_to_index("C3")
+        d4_idx = board.str_to_index("D4")
+        e5_idx = board.str_to_index("E5")
 
-        white_layer = board.MARBLE_TO_LAYER['w']
-        gray_layer = board.MARBLE_TO_LAYER['g']
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        gray_layer = board.MARBLE_TO_LAYER["g"]
 
         board.state[white_layer][c3_idx] = 1
         board.state[gray_layer][d4_idx] = 1
@@ -238,7 +239,7 @@ class TestWinConditions:
                 break
 
         # Take the capture action
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # After capture, Player 2 should have 5 grays → WIN!
         assert board.global_state[board.P2_CAP_G] == 5, "Player 2 should have 5 grays"
@@ -274,13 +275,13 @@ class TestWinConditions:
         # To-isolate: C1 (single ring with black marble) connected via D3
         # Removing D3 will isolate C1
 
-        d4_idx = board.str_to_index('D4')
-        d5_idx = board.str_to_index('D5')
-        e4_idx = board.str_to_index('E4')
-        d3_idx = board.str_to_index('D3')  # Connection ring (will be removed)
-        c1_idx = board.str_to_index('C1')
+        d4_idx = board.str_to_index("D4")
+        d5_idx = board.str_to_index("D5")
+        e4_idx = board.str_to_index("E4")
+        d3_idx = board.str_to_index("D3")  # Connection ring (will be removed)
+        c1_idx = board.str_to_index("C1")
 
-        black_layer = board.MARBLE_TO_LAYER['b']
+        black_layer = board.MARBLE_TO_LAYER["b"]
 
         # Main region (3 rings)
         board.state[board.RING_LAYER][d4_idx] = 1
@@ -308,7 +309,7 @@ class TestWinConditions:
         placement_action = (0, e4_flat, d3_flat)
 
         # Take the placement action
-        game.take_action('PUT', placement_action)
+        game.take_action("PUT", placement_action)
 
         # After isolation, Player 2 should have captured the isolated black marble
         # P2 should now have 3/3/3 → WIN!
@@ -348,7 +349,7 @@ class TestWinConditions:
 
         # Fill all rings with marbles so no placement is possible
         # Even if players have captured marbles, they can't place them
-        white_layer = board.MARBLE_TO_LAYER['w']
+        white_layer = board.MARBLE_TO_LAYER["w"]
         ring_positions = np.argwhere(board.state[board.RING_LAYER] == 1)
         for y, x in ring_positions:
             board.state[white_layer][y, x] = 1
@@ -356,18 +357,22 @@ class TestWinConditions:
         # Player 1's turn - should pass (no valid moves)
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
         placement, capture = game.get_valid_actions()
-        assert not np.any(placement) and not np.any(capture), "Player 1 should have no valid moves"
+        assert not np.any(placement) and not np.any(capture), (
+            "Player 1 should have no valid moves"
+        )
 
         # Player 1 passes
-        game.take_action('PASS', None)
+        game.take_action("PASS", None)
 
         # Now Player 2's turn - should also pass (no valid moves)
         assert board.global_state[board.CUR_PLAYER] == board.PLAYER_2
         placement, capture = game.get_valid_actions()
-        assert not np.any(placement) and not np.any(capture), "Player 2 should have no valid moves"
+        assert not np.any(placement) and not np.any(capture), (
+            "Player 2 should have no valid moves"
+        )
 
         # Player 2 passes
-        game.take_action('PASS', None)
+        game.take_action("PASS", None)
 
         # After both players pass, game should be tie (equal captures)
         outcome = game.get_game_ended()
@@ -386,10 +391,10 @@ class TestWinConditions:
         # For k=2, we need 8 moves total (2 pairs repeated twice)
         # Pattern: (action_type, action) tuples
         move_pattern = [
-            ('PUT', (0, 10, 5)),  # P1 move
-            ('PUT', (1, 15, 8)),  # P2 move
-            ('PUT', (0, 12, 7)),  # P1 move
-            ('PUT', (1, 18, 11)), # P2 move
+            ("PUT", (0, 10, 5)),  # P1 move
+            ("PUT", (1, 15, 8)),  # P2 move
+            ("PUT", (0, 12, 7)),  # P1 move
+            ("PUT", (1, 18, 11)),  # P2 move
         ]
 
         # Add the pattern twice to create a loop
@@ -426,12 +431,12 @@ class TestWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
         # Set up a capture scenario: B2 (gray) → C3 (white) → D4 (empty)
-        b2_idx = board.str_to_index('B2')
-        c3_idx = board.str_to_index('C3')
-        d4_idx = board.str_to_index('D4')
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
+        d4_idx = board.str_to_index("D4")
 
-        gray_layer = board.MARBLE_TO_LAYER['g']
-        white_layer = board.MARBLE_TO_LAYER['w']
+        gray_layer = board.MARBLE_TO_LAYER["g"]
+        white_layer = board.MARBLE_TO_LAYER["w"]
 
         board.state[gray_layer][b2_idx] = 1
         board.state[white_layer][c3_idx] = 1
@@ -450,7 +455,7 @@ class TestWinConditions:
                 break
 
         # Take the capture action
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # After capture, Player 1 should have 4 whites → WIN!
         assert board.global_state[board.P1_CAP_W] == 4, "Player 1 should have 4 whites"
@@ -483,12 +488,12 @@ class TestWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_2
 
         # Set up a capture scenario: B2 (black) → C3 (white) → D4 (empty)
-        b2_idx = board.str_to_index('B2')
-        c3_idx = board.str_to_index('C3')
-        d4_idx = board.str_to_index('D4')
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
+        d4_idx = board.str_to_index("D4")
 
-        black_layer = board.MARBLE_TO_LAYER['b']
-        white_layer = board.MARBLE_TO_LAYER['w']
+        black_layer = board.MARBLE_TO_LAYER["b"]
+        white_layer = board.MARBLE_TO_LAYER["w"]
 
         board.state[black_layer][b2_idx] = 1
         board.state[white_layer][c3_idx] = 1
@@ -507,7 +512,7 @@ class TestWinConditions:
                 break
 
         # Take the capture action
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # After capture, Player 2 should have 4 whites → WIN!
         assert board.global_state[board.P2_CAP_W] == 4, "Player 2 should have 4 whites"
@@ -539,17 +544,17 @@ class TestWinConditions:
         # Clear the board and set up a minimal topology with only 3 rings
         board.state[board.RING_LAYER] = 0
 
-        d3_idx = board.str_to_index('D3')
-        d4_idx = board.str_to_index('D4')
-        d5_idx = board.str_to_index('D5')
+        d3_idx = board.str_to_index("D3")
+        d4_idx = board.str_to_index("D4")
+        d5_idx = board.str_to_index("D5")
 
         board.state[board.RING_LAYER][d3_idx] = 1
         board.state[board.RING_LAYER][d4_idx] = 1
         board.state[board.RING_LAYER][d5_idx] = 1
 
         # Fill two rings with marbles, leave one empty
-        white_layer = board.MARBLE_TO_LAYER['w']
-        gray_layer = board.MARBLE_TO_LAYER['g']
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        gray_layer = board.MARBLE_TO_LAYER["g"]
         board.state[white_layer][d3_idx] = 1
         board.state[gray_layer][d4_idx] = 1
         # D5 is empty
@@ -558,18 +563,22 @@ class TestWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
         # Verify game is not over yet
-        assert game.get_game_ended() is None, "Game should not be over before board is full"
+        assert game.get_game_ended() is None, (
+            "Game should not be over before board is full"
+        )
 
         # Player 1 places a marble on the last empty ring (D5)
         d5_y, d5_x = d5_idx
         d5_flat = board._2d_to_flat(d5_y, d5_x)
 
         # Use black marble for placement (index 2), no removal (board is too small)
-        placement_action = (2, d5_flat, board.width ** 2)
-        game.take_action('PUT', placement_action)
+        placement_action = (2, d5_flat, board.width**2)
+        game.take_action("PUT", placement_action)
 
         # Board should now be full
-        assert np.all(np.sum(board.state[board.BOARD_LAYERS], axis=0) != 1), "Board should be full"
+        assert np.all(np.sum(board.state[board.BOARD_LAYERS], axis=0) != 1), (
+            "Board should be full"
+        )
 
         # Game should be over with Player 1 as winner (last to move)
         outcome = game.get_game_ended()
@@ -598,17 +607,17 @@ class TestWinConditions:
         # Clear the board and set up a minimal topology with only 3 rings
         board.state[board.RING_LAYER] = 0
 
-        d3_idx = board.str_to_index('D3')
-        d4_idx = board.str_to_index('D4')
-        d5_idx = board.str_to_index('D5')
+        d3_idx = board.str_to_index("D3")
+        d4_idx = board.str_to_index("D4")
+        d5_idx = board.str_to_index("D5")
 
         board.state[board.RING_LAYER][d3_idx] = 1
         board.state[board.RING_LAYER][d4_idx] = 1
         board.state[board.RING_LAYER][d5_idx] = 1
 
         # Fill two rings with marbles, leave one empty
-        white_layer = board.MARBLE_TO_LAYER['w']
-        black_layer = board.MARBLE_TO_LAYER['b']
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        black_layer = board.MARBLE_TO_LAYER["b"]
         board.state[white_layer][d3_idx] = 1
         board.state[black_layer][d4_idx] = 1
         # D5 is empty
@@ -617,18 +626,22 @@ class TestWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_2
 
         # Verify game is not over yet
-        assert game.get_game_ended() is None, "Game should not be over before board is full"
+        assert game.get_game_ended() is None, (
+            "Game should not be over before board is full"
+        )
 
         # Player 2 places a marble on the last empty ring (D5)
         d5_y, d5_x = d5_idx
         d5_flat = board._2d_to_flat(d5_y, d5_x)
 
         # Use gray marble for placement (index 1), no removal
-        placement_action = (1, d5_flat, board.width ** 2)
-        game.take_action('PUT', placement_action)
+        placement_action = (1, d5_flat, board.width**2)
+        game.take_action("PUT", placement_action)
 
         # Board should now be full
-        assert np.all(np.sum(board.state[board.BOARD_LAYERS], axis=0) != 1), "Board should be full"
+        assert np.all(np.sum(board.state[board.BOARD_LAYERS], axis=0) != 1), (
+            "Board should be full"
+        )
 
         # Game should be over with Player 2 as winner (last to move)
         outcome = game.get_game_ended()
@@ -660,21 +673,23 @@ class TestWinConditions:
         board.global_state[board.P2_CAP_B] = 2
 
         # Fill all rings with marbles so no placement is possible
-        white_layer = board.MARBLE_TO_LAYER['w']
+        white_layer = board.MARBLE_TO_LAYER["w"]
         ring_positions = np.argwhere(board.state[board.RING_LAYER] == 1)
         for y, x in ring_positions:
             board.state[white_layer][y, x] = 1
 
         # Player 1's turn - should pass (no valid moves)
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
-        game.take_action('PASS', None)
+        game.take_action("PASS", None)
 
         # Player 2's turn - should also pass (no valid moves)
-        game.take_action('PASS', None)
+        game.take_action("PASS", None)
 
         # After both players pass, Player 1 should win (has 3-of-each)
         outcome = game.get_game_ended()
-        assert outcome == PLAYER_1_WIN, "Player 1 should win with 3-of-each when both immobilized"
+        assert outcome == PLAYER_1_WIN, (
+            "Player 1 should win with 3-of-each when both immobilized"
+        )
 
     def test_both_immobilized_player2_has_win_condition(self):
         """Test that Player 2 wins when both are immobilized and P2 has win condition.
@@ -702,26 +717,29 @@ class TestWinConditions:
         board.global_state[board.P2_CAP_B] = 1
 
         # Fill all rings with marbles so no placement is possible
-        gray_layer = board.MARBLE_TO_LAYER['g']
+        gray_layer = board.MARBLE_TO_LAYER["g"]
         ring_positions = np.argwhere(board.state[board.RING_LAYER] == 1)
         for y, x in ring_positions:
             board.state[gray_layer][y, x] = 1
 
         # Player 1's turn - should pass (no valid moves)
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
-        game.take_action('PASS', None)
+        game.take_action("PASS", None)
 
         # Player 2's turn - should also pass (no valid moves)
-        game.take_action('PASS', None)
+        game.take_action("PASS", None)
 
         # After both players pass, Player 2 should win (has 4 whites)
         outcome = game.get_game_ended()
-        assert outcome == PLAYER_2_WIN, "Player 2 should win with 4 whites when both immobilized"
+        assert outcome == PLAYER_2_WIN, (
+            "Player 2 should win with 4 whites when both immobilized"
+        )
 
 
 # ============================================================================
 # Blitz Mode Win Condition Tests
 # ============================================================================
+
 
 class TestBlitzWinConditions:
     """Test win condition detection in Blitz variant.
@@ -737,9 +755,11 @@ class TestBlitzWinConditions:
         """Test that Player 1 wins with 2 of each color in Blitz mode."""
         from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
-        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37,
-                        marbles=BLITZ_MARBLES,
-                        win_con=BLITZ_WIN_CONDITIONS)
+        game = ZertzGame(
+            rings=ZertzBoard.SMALL_BOARD_37,
+            marbles=BLITZ_MARBLES,
+            win_con=BLITZ_WIN_CONDITIONS,
+        )
         board = game.board
 
         # Clear the board
@@ -755,12 +775,12 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
         # Set up capture scenario
-        b2_idx = board.str_to_index('B2')
-        c3_idx = board.str_to_index('C3')
-        d4_idx = board.str_to_index('D4')
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
+        d4_idx = board.str_to_index("D4")
 
-        white_layer = board.MARBLE_TO_LAYER['w']
-        black_layer = board.MARBLE_TO_LAYER['b']
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        black_layer = board.MARBLE_TO_LAYER["b"]
 
         board.state[white_layer][b2_idx] = 1
         board.state[black_layer][c3_idx] = 1
@@ -774,20 +794,24 @@ class TestBlitzWinConditions:
                 capture_action = (dir_idx, b2_y, b2_x)
                 break
 
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # Player 1 should have 2/2/2 → WIN in Blitz!
         assert board.global_state[board.P1_CAP_B] == 2
         outcome = game.get_game_ended()
-        assert outcome == PLAYER_1_WIN, "Player 1 should win with 2-of-each in Blitz mode"
+        assert outcome == PLAYER_1_WIN, (
+            "Player 1 should win with 2-of-each in Blitz mode"
+        )
 
     def test_blitz_player2_win_3_white(self):
         """Test that Player 2 wins with 3 white marbles in Blitz mode."""
         from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
-        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37,
-                        marbles=BLITZ_MARBLES,
-                        win_con=BLITZ_WIN_CONDITIONS)
+        game = ZertzGame(
+            rings=ZertzBoard.SMALL_BOARD_37,
+            marbles=BLITZ_MARBLES,
+            win_con=BLITZ_WIN_CONDITIONS,
+        )
         board = game.board
 
         # Clear the board
@@ -803,11 +827,11 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_2
 
         # Set up capture scenario
-        b2_idx = board.str_to_index('B2')
-        c3_idx = board.str_to_index('C3')
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
 
-        gray_layer = board.MARBLE_TO_LAYER['g']
-        white_layer = board.MARBLE_TO_LAYER['w']
+        gray_layer = board.MARBLE_TO_LAYER["g"]
+        white_layer = board.MARBLE_TO_LAYER["w"]
 
         board.state[gray_layer][b2_idx] = 1
         board.state[white_layer][c3_idx] = 1
@@ -821,20 +845,24 @@ class TestBlitzWinConditions:
                 capture_action = (dir_idx, b2_y, b2_x)
                 break
 
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # Player 2 should have 3 whites → WIN in Blitz!
         assert board.global_state[board.P2_CAP_W] == 3
         outcome = game.get_game_ended()
-        assert outcome == PLAYER_2_WIN, "Player 2 should win with 3 whites in Blitz mode"
+        assert outcome == PLAYER_2_WIN, (
+            "Player 2 should win with 3 whites in Blitz mode"
+        )
 
     def test_blitz_player1_win_4_grey(self):
         """Test that Player 1 wins with 4 grey marbles in Blitz mode."""
         from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
-        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37,
-                        marbles=BLITZ_MARBLES,
-                        win_con=BLITZ_WIN_CONDITIONS)
+        game = ZertzGame(
+            rings=ZertzBoard.SMALL_BOARD_37,
+            marbles=BLITZ_MARBLES,
+            win_con=BLITZ_WIN_CONDITIONS,
+        )
         board = game.board
 
         # Clear the board
@@ -850,11 +878,11 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
         # Set up capture scenario
-        b2_idx = board.str_to_index('B2')
-        c3_idx = board.str_to_index('C3')
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
 
-        white_layer = board.MARBLE_TO_LAYER['w']
-        gray_layer = board.MARBLE_TO_LAYER['g']
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        gray_layer = board.MARBLE_TO_LAYER["g"]
 
         board.state[white_layer][b2_idx] = 1
         board.state[gray_layer][c3_idx] = 1
@@ -868,7 +896,7 @@ class TestBlitzWinConditions:
                 capture_action = (dir_idx, b2_y, b2_x)
                 break
 
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # Player 1 should have 4 greys → WIN in Blitz!
         assert board.global_state[board.P1_CAP_G] == 4
@@ -879,9 +907,11 @@ class TestBlitzWinConditions:
         """Test that Player 2 wins with 5 black marbles in Blitz mode."""
         from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
-        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37,
-                        marbles=BLITZ_MARBLES,
-                        win_con=BLITZ_WIN_CONDITIONS)
+        game = ZertzGame(
+            rings=ZertzBoard.SMALL_BOARD_37,
+            marbles=BLITZ_MARBLES,
+            win_con=BLITZ_WIN_CONDITIONS,
+        )
         board = game.board
 
         # Clear the board
@@ -897,11 +927,11 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_2
 
         # Set up capture scenario
-        b2_idx = board.str_to_index('B2')
-        c3_idx = board.str_to_index('C3')
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
 
-        gray_layer = board.MARBLE_TO_LAYER['g']
-        black_layer = board.MARBLE_TO_LAYER['b']
+        gray_layer = board.MARBLE_TO_LAYER["g"]
+        black_layer = board.MARBLE_TO_LAYER["b"]
 
         board.state[gray_layer][b2_idx] = 1
         board.state[black_layer][c3_idx] = 1
@@ -915,9 +945,11 @@ class TestBlitzWinConditions:
                 capture_action = (dir_idx, b2_y, b2_x)
                 break
 
-        game.take_action('CAP', capture_action)
+        game.take_action("CAP", capture_action)
 
         # Player 2 should have 5 blacks → WIN in Blitz!
         assert board.global_state[board.P2_CAP_B] == 5
         outcome = game.get_game_ended()
-        assert outcome == PLAYER_2_WIN, "Player 2 should win with 5 blacks in Blitz mode"
+        assert outcome == PLAYER_2_WIN, (
+            "Player 2 should win with 5 blacks in Blitz mode"
+        )

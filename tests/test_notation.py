@@ -1,385 +1,407 @@
 """
-Unit tests for Simplified Notation Generation.
+Unit tests for Notation Generation.
 
-Tests that notation is generated in one pass after action execution,
-with isolation information included automatically.
+Tests the core notation generation functionality from action dictionaries
+and ActionResult objects. Uses real game objects with minimal mocking.
 """
 
 import pytest
 import sys
-from io import StringIO
 from pathlib import Path
-from unittest.mock import Mock, patch
+import numpy as np
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from controller.zertz_game_controller import ZertzGameController
 from game.zertz_game import ZertzGame
-from controller.game_logger import GameLogger
+from game.zertz_board import ZertzBoard
 from game.action_result import ActionResult
-from renderer.text_renderer import TextRenderer
 
 
-# ============================================================================
-# Fixtures
-# ============================================================================
+class TestNotationGeneration:
+    """Test notation generation for various action types."""
 
-@pytest.fixture
-def mock_game_session():
-    """Create a mock game session."""
-    session = Mock()
-    session.game = Mock(spec=ZertzGame)
-    session.rings = 37
-    session.blitz = False
+    def test_placement_notation_without_removal(self):
+        """Test notation for placement without ring removal."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
-    # Mock game methods
-    session.game.action_to_str = Mock(return_value=('PUT', {
-        'action': 'PUT',
-        'marble': 'w',
-        'dst': 'D4',
-        'remove': 'B2'
-    }))
+        action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""}
+        action_result = ActionResult(
+            captured_marbles=None, newly_frozen_positions=set()
+        )
 
-    # action_to_notation now receives ActionResult and generates complete notation in one pass
-    def mock_action_to_notation(action_dict, action_result):
-        if action_result is None or not action_result.is_isolation():
-            return "Wd4,b2"
-        # Include isolation in notation
-        return "Wd4,b2 x Wa1Wb2"
+        notation = game.action_to_notation(action_dict, action_result)
 
-    session.game.action_to_notation = Mock(side_effect=mock_action_to_notation)
+        assert notation == "Wd4", f"Expected 'Wd4', got '{notation}'"
 
-    # Mock render data
-    from shared.render_data import RenderData
-    session.game.get_render_data = Mock(return_value=RenderData(action_dict={
-        'action': 'PUT',
-        'marble': 'w',
-        'dst': 'D4',
-        'remove': 'B2'
-    }))
+    def test_placement_notation_with_removal(self):
+        """Test notation for placement with ring removal."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
-    # Return ActionResult by default (no isolation)
-    session.game.take_action = Mock(return_value=ActionResult(
-        captured_marbles=None,
-        newly_frozen_positions=set()
-    ))
+        action_dict = {"action": "PUT", "marble": "g", "dst": "D4", "remove": "B2"}
+        action_result = ActionResult(
+            captured_marbles=None, newly_frozen_positions=set()
+        )
 
-    # Mock session methods
-    session.get_current_player = Mock()
-    session.is_replay_mode = Mock(return_value=False)
-    session.get_seed = Mock(return_value=12345)
-    session.game.get_game_ended = Mock(return_value=None)
+        notation = game.action_to_notation(action_dict, action_result)
 
-    return session
+        assert notation == "Gd4,b2", f"Expected 'Gd4,b2', got '{notation}'"
 
+    def test_placement_notation_with_isolation(self):
+        """Test notation for placement that causes isolation."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
-@pytest.fixture
-def mock_logger():
-    """Create a mock logger."""
-    logger = Mock(spec=GameLogger)
-    logger.log_file = None
-    logger.notation_file = None
-    logger.log_action = Mock()
-    logger.log_notation = Mock()  # Direct logging, no buffering
-    return logger
+        action_dict = {"action": "PUT", "marble": "b", "dst": "D4", "remove": "C3"}
 
-
-@pytest.fixture
-def mock_player():
-    """Create a mock player."""
-    player = Mock()
-    player.n = 1
-    player.get_action = Mock(return_value=('PUT', (0, 0, 0)))
-    player.add_capture = Mock()
-    return player
-
-
-@pytest.fixture
-def text_renderer():
-    """Provide a text renderer that writes to an in-memory buffer."""
-    return TextRenderer(stream=StringIO())
-
-
-# ============================================================================
-# One-Pass Notation Generation Tests
-# ============================================================================
-
-def test_notation_generated_after_action_execution(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that notation is generated AFTER action execution with ActionResult."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
-
-        mock_game_session.get_current_player.return_value = mock_player
-
-        task = Mock()
-        task.delay_time = 0
-
-        # Run update
-        controller.update_game(task)
-
-        # Verify action was executed first
-        mock_game_session.game.take_action.assert_called_once()
-
-        # Verify notation was generated with ActionResult (not None)
-        mock_game_session.game.action_to_notation.assert_called_once()
-        call_args = mock_game_session.game.action_to_notation.call_args
-        action_result = call_args[0][1]
-        # ActionResult should be provided (not None)
-        assert action_result is not None
-        assert isinstance(action_result, ActionResult)
-
-
-def test_notation_logged_directly_no_buffering(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that notation is logged directly without buffering."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
-
-        mock_game_session.get_current_player.return_value = mock_player
-
-        task = Mock()
-        task.delay_time = 0
-
-        # Run update
-        controller.update_game(task)
-
-        # Verify notation was logged directly
-        mock_logger.log_notation.assert_called_once()
-        # Should be called with complete notation
-        notation = mock_logger.log_notation.call_args[0][0]
-        assert isinstance(notation, str)
-        assert len(notation) > 0
-
-
-def test_notation_includes_isolation_in_one_pass(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that notation includes isolation information immediately."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
-
-        mock_game_session.get_current_player.return_value = mock_player
-
-        # Set up isolation result
-        isolation_result = ActionResult(
+        # Simulate isolation result
+        action_result = ActionResult(
             captured_marbles=[
-                {'marble': 'w', 'pos': 'A1'},
-                {'marble': 'w', 'pos': 'B2'}
+                {"marble": "w", "pos": "A1"},
+                {"marble": "g", "pos": "B2"},
             ],
-            newly_frozen_positions=set()
+            newly_frozen_positions=set(),
         )
-        mock_game_session.game.take_action = Mock(return_value=isolation_result)
 
-        task = Mock()
-        task.delay_time = 0
+        notation = game.action_to_notation(action_dict, action_result)
 
-        # Run update
-        controller.update_game(task)
-
-        # Verify notation was logged with isolation marker
-        mock_logger.log_notation.assert_called_once()
-        notation = mock_logger.log_notation.call_args[0][0]
-        # Should include isolation marker ' x '
-        assert ' x ' in notation
-
-
-def test_no_buffering_attributes_in_controller(mock_game_session, mock_logger, text_renderer):
-    """Test that controller no longer has buffering attributes."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-
-        # Controller should NOT have these attributes (removed with temporal coupling)
-        assert not hasattr(controller, 'pending_action_dict')
-        assert not hasattr(controller, 'pending_notation')
-
-        # Controller SHOULD expose new renderer coordination attributes
-        assert hasattr(controller, 'waiting_for_renderer')
-        assert hasattr(controller, '_completion_queue')
-
-
-# ============================================================================
-# Action Result Processing Tests
-# ============================================================================
-
-def test_action_result_stored_for_processing(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that action_result is stored for later processing."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
-
-        mock_game_session.get_current_player.return_value = mock_player
-
-        task = Mock()
-        task.delay_time = 0
-
-        # Initially no pending completions
-        assert controller._completion_queue == []
-
-        # Run update
-        controller.update_game(task)
-
-        # Should have stored action_result for processing
-        # (In headless mode, it's processed immediately and cleared)
-        # So we verify take_action was called
-        mock_game_session.game.take_action.assert_called_once()
-        assert controller.waiting_for_renderer is False
-        assert controller._completion_queue == []
-
-
-def test_isolation_captures_added_to_player(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that isolation captures are added to player's collection."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
-
-        # Set up isolation result
-        isolation_result = ActionResult(
-            captured_marbles=[
-                {'marble': 'w', 'pos': 'A1'},
-                {'marble': 'b', 'pos': 'B2'}
-            ],
-            newly_frozen_positions=set()
+        # Should include isolation marker
+        assert " x " in notation, f"Expected isolation marker in '{notation}'"
+        assert notation.startswith("Bd4,c3 x "), (
+            f"Expected 'Bd4,c3 x ...' prefix, got '{notation}'"
         )
-        mock_game_session.game.take_action = Mock(return_value=isolation_result)
-        mock_game_session.get_current_player.return_value = mock_player
+        assert "Wa1" in notation, f"Expected 'Wa1' in isolation captures"
+        assert "Gb2" in notation, f"Expected 'Gb2' in isolation captures"
 
-        task = Mock()
-        task.delay_time = 0
+    def test_capture_notation(self):
+        """Test notation for capture actions."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
-        # Run update - action execution
-        controller.update_game(task)
+        action_dict = {
+            "action": "CAP",
+            "marble": "w",
+            "src": "C3",
+            "dst": "E5",
+            "capture": "g",
+            "cap": "D4",
+        }
+        action_result = ActionResult(captured_marbles="g", newly_frozen_positions=set())
 
-        # In headless mode, result is processed immediately
-        # So we need to trigger the processing by calling update_game again
-        controller.update_game(task)
+        notation = game.action_to_notation(action_dict, action_result)
 
-        # Verify captures were added
-        assert mock_player.add_capture.called
+        assert notation == "x c3Ge5", f"Expected 'x c3Ge5', got '{notation}'"
 
+    def test_pass_notation(self):
+        """Test notation for pass actions."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
-def test_single_capture_added_directly(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that single capture (CAP action) is added to player."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
-
-        # Single capture (not isolation)
-        capture_result = ActionResult(
-            captured_marbles='w',  # Single marble
-            newly_frozen_positions=set()
+        action_dict = {"action": "PASS"}
+        action_result = ActionResult(
+            captured_marbles=None, newly_frozen_positions=set()
         )
-        mock_game_session.game.take_action = Mock(return_value=capture_result)
-        mock_game_session.get_current_player.return_value = mock_player
 
-        task = Mock()
-        task.delay_time = 0
+        notation = game.action_to_notation(action_dict, action_result)
 
-        # Run update
-        controller.update_game(task)
-        controller.update_game(task)  # Process result
-
-        # Verify single capture was added
-        mock_player.add_capture.assert_called()
+        assert notation == "-", f"Expected '-', got '{notation}'"
 
 
-# ============================================================================
-# Integration Tests
-# ============================================================================
+class TestNotationImmediacy:
+    """Test that notation is generated immediately, not deferred."""
 
-def test_complete_notation_workflow(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test complete notation workflow from action to logging."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
+    def test_notation_generated_with_action_result(self):
+        """Test that action_to_notation receives ActionResult and generates correct isolation notation."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
+        action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "C3"}
+        action_result = ActionResult(
+            captured_marbles=[{"marble": "w", "pos": "A1"}],
+            newly_frozen_positions=set(),
+        )
 
-        mock_game_session.get_current_player.return_value = mock_player
+        # Should be able to generate notation immediately with result
+        notation = game.action_to_notation(action_dict, action_result)
 
-        task = Mock()
-        task.delay_time = 0
+        # Notation should be exactly correct for this isolation
+        expected = "Wd4,c3 x Wa1"
+        assert notation == expected, f"Expected '{expected}', got '{notation}'"
 
-        # Run update
-        controller.update_game(task)
+    def test_no_buffering_required(self):
+        """Test that notation doesn't require buffering or deferred generation."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
-        # Verify correct call order:
-        # 1. Get action from player
-        mock_player.get_action.assert_called()
+        # Test multiple actions in sequence with exact expected output
+        actions_and_expected = [
+            (
+                {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""},
+                ActionResult(None, set()),
+                "Wd4",
+            ),
+            (
+                {"action": "PUT", "marble": "g", "dst": "E5", "remove": "C3"},
+                ActionResult(None, set()),
+                "Ge5,c3",
+            ),
+            (
+                {
+                    "action": "CAP",
+                    "marble": "w",
+                    "src": "B2",
+                    "dst": "D4",
+                    "capture": "g",
+                    "cap": "C3",
+                },
+                ActionResult("g", set()),
+                "x b2Gd4",
+            ),
+        ]
 
-        # 2. Execute action
-        mock_game_session.game.take_action.assert_called()
-
-        # 3. Generate notation with result
-        mock_game_session.game.action_to_notation.assert_called()
-
-        # 4. Log notation directly
-        mock_logger.log_notation.assert_called()
-
-
-def test_no_regeneration_or_update_calls(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that notation is generated only once, not regenerated."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
-
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
-
-        mock_game_session.get_current_player.return_value = mock_player
-
-        task = Mock()
-        task.delay_time = 0
-
-        # Run update
-        controller.update_game(task)
-
-        # action_to_notation should be called EXACTLY once
-        assert mock_game_session.game.action_to_notation.call_count == 1
-
-        # log_notation should be called EXACTLY once
-        assert mock_logger.log_notation.call_count == 1
+        # Each action should generate correct notation immediately
+        for action_dict, action_result, expected in actions_and_expected:
+            notation = game.action_to_notation(action_dict, action_result)
+            assert notation == expected, f"Expected '{expected}', got '{notation}'"
 
 
-def test_headless_mode_processes_immediately(mock_game_session, mock_logger, mock_player, text_renderer):
-    """Test that headless mode processes actions immediately without deferral."""
-    with patch('controller.zertz_game_controller.GameSession', return_value=mock_game_session), \
-         patch('controller.zertz_game_controller.GameLogger', return_value=mock_logger):
+class TestNotationWorkflow:
+    """Test notation generation in realistic game scenarios."""
 
-        controller = ZertzGameController(rings=37, renderer_or_factory=text_renderer)
-        controller.session = mock_game_session
-        controller.logger = mock_logger
+    def test_full_placement_action_workflow(self):
+        """Test complete workflow: action execution → notation generation."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
+        board = game.board
 
-        mock_game_session.get_current_player.return_value = mock_player
+        # Use specific placement: place white marble at D4, remove C1
+        d4_idx = board.str_to_index("D4")
+        c1_idx = board.str_to_index("C1")
+        d4_y, d4_x = d4_idx
+        c1_y, c1_x = c1_idx
+        d4_flat = board._2d_to_flat(d4_y, d4_x)
+        c1_flat = board._2d_to_flat(c1_y, c1_x)
 
-        task = Mock()
-        task.delay_time = 0
+        marble_idx = 0  # White marble
+        action = (marble_idx, d4_flat, c1_flat)
 
-        # Single update_game call should complete everything
-        controller.update_game(task)
+        # Generate action string before execution
+        action_str, action_dict = game.action_to_str("PUT", action)
 
-        # All operations should be complete
-        assert mock_game_session.game.take_action.called
-        assert mock_game_session.game.action_to_notation.called
-        assert mock_logger.log_notation.called
+        # Verify action dict has expected values
+        assert action_dict["action"] == "PUT"
+        assert action_dict["marble"] == "w"
+        assert action_dict["dst"] == "D4"
+        assert action_dict["remove"] == "C1"
+
+        # Execute action
+        action_result = game.take_action("PUT", action)
+
+        # Generate notation with result
+        notation = game.action_to_notation(action_dict, action_result)
+
+        # Verify notation is exactly correct
+        assert notation == "Wd4,c1", f"Expected 'Wd4,c1', got '{notation}'"
+
+    def test_isolation_workflow_end_to_end(self):
+        """Test isolation detection and notation generation."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
+        board = game.board
+
+        # Clear board and set up isolation scenario
+        board.state[board.RING_LAYER] = 0
+        board.state[board.MARBLE_LAYERS] = 0
+
+        # Create minimal topology:
+        # Main region: D4, E4 (2 rings)
+        # Isolated region: C1 (1 ring with white marble)
+        # Connection: D3 (will be removed to isolate C1)
+
+        d4_idx = board.str_to_index("D4")
+        e4_idx = board.str_to_index("E4")
+        d3_idx = board.str_to_index("D3")
+        c1_idx = board.str_to_index("C1")
+
+        board.state[board.RING_LAYER][d4_idx] = 1
+        board.state[board.RING_LAYER][e4_idx] = 1
+        board.state[board.RING_LAYER][d3_idx] = 1
+        board.state[board.RING_LAYER][c1_idx] = 1
+
+        # Place white marble on C1
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        board.state[white_layer][c1_idx] = 1
+
+        # Prepare action: place marble at E4, remove D3 (isolates C1)
+        e4_y, e4_x = e4_idx
+        d3_y, d3_x = d3_idx
+        e4_flat = board._2d_to_flat(e4_y, e4_x)
+        d3_flat = board._2d_to_flat(d3_y, d3_x)
+
+        action = (0, e4_flat, d3_flat)  # Use white marble
+        action_str, action_dict = game.action_to_str("PUT", action)
+
+        # Execute action
+        action_result = game.take_action("PUT", action)
+
+        # Verify isolation occurred
+        assert action_result.is_isolation(), "Should have detected isolation"
+        assert len(action_result.captured_marbles) > 0, (
+            "Should have captured isolated marbles"
+        )
+
+        # Generate notation
+        notation = game.action_to_notation(action_dict, action_result)
+
+        # Verify notation includes isolation marker
+        assert " x " in notation, (
+            f"Notation should include isolation marker, got '{notation}'"
+        )
+
+    def test_capture_action_workflow(self):
+        """Test capture action execution and notation."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
+        board = game.board
+
+        # Set up simple capture scenario
+        board.state[board.MARBLE_LAYERS] = 0
+
+        # B2 (white) → C3 (gray) → D4 (empty)
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
+        d4_idx = board.str_to_index("D4")
+
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        gray_layer = board.MARBLE_TO_LAYER["g"]
+
+        board.state[white_layer][b2_idx] = 1
+        board.state[gray_layer][c3_idx] = 1
+
+        # Find capture direction
+        b2_y, b2_x = b2_idx
+        c3_y, c3_x = c3_idx
+
+        for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
+            if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
+                action = (dir_idx, b2_y, b2_x)
+                break
+
+        # Execute capture
+        action_str, action_dict = game.action_to_str("CAP", action)
+        action_result = game.take_action("CAP", action)
+
+        # Verify capture occurred
+        assert action_result.captured_marbles == "g", "Should have captured gray marble"
+
+        # Generate notation
+        notation = game.action_to_notation(action_dict, action_result)
+
+        # Verify notation format
+        assert notation.startswith("x "), (
+            f"Capture notation should start with 'x ', got '{notation}'"
+        )
+        assert "G" in notation, f"Should include captured gray marble, got '{notation}'"
+
+    def test_multiple_captures_in_sequence(self):
+        """Test notation generation for chain capture (multiple captures in one turn)."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
+        board = game.board
+
+        # Set up chain capture scenario
+        board.state[board.MARBLE_LAYERS] = 0
+
+        # Create chain along same row: B2 (w) → C3 (g) → D4 (empty) → E4 (b) → F4 (empty)
+        # Row A1 B2 C3 D4 E4 F4 G4 - all aligned horizontally
+        b2_idx = board.str_to_index("B2")
+        c3_idx = board.str_to_index("C3")
+        d4_idx = board.str_to_index("D4")
+        e4_idx = board.str_to_index("E4")
+
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        gray_layer = board.MARBLE_TO_LAYER["g"]
+        black_layer = board.MARBLE_TO_LAYER["b"]
+
+        board.state[white_layer][b2_idx] = 1
+        board.state[gray_layer][c3_idx] = 1
+        board.state[black_layer][e4_idx] = 1
+
+        # First capture: B2 → C3 → D4
+        b2_y, b2_x = b2_idx
+        c3_y, c3_x = c3_idx
+
+        direction1 = None
+        for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
+            if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
+                direction1 = dir_idx
+                action1 = (dir_idx, b2_y, b2_x)
+                break
+
+        assert direction1 is not None, "Should find direction from B2 to C3"
+
+        action_str1, action_dict1 = game.action_to_str("CAP", action1)
+        action_result1 = game.take_action("CAP", action1)
+        notation1 = game.action_to_notation(action_dict1, action_result1)
+
+        # Verify first notation is exactly correct
+        assert notation1 == "x b2Gd4", f"Expected 'x b2Gd4', got '{notation1}'"
+        assert action_result1.captured_marbles == "g", "Should capture gray marble"
+
+        # Verify chain capture can continue: D4 → E4 → F4
+        # Game should automatically require the chain capture
+        placement_mask, capture_mask = game.get_valid_actions()
+        d4_y, d4_x = d4_idx
+        e4_y, e4_x = e4_idx
+
+        # Capture should be forced from D4 (no placement moves allowed)
+        assert not np.any(placement_mask), (
+            "No placement moves during forced chain capture"
+        )
+
+        direction2 = None
+        for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
+            if (d4_y + dy, d4_x + dx) == (e4_y, e4_x):
+                # Check that this capture is available
+                if capture_mask[dir_idx, d4_y, d4_x]:
+                    direction2 = dir_idx
+                    action2 = (dir_idx, d4_y, d4_x)
+                    break
+
+        assert direction2 is not None, (
+            "Should find direction from D4 to E4 for chain capture"
+        )
+        assert direction2 == direction1, (
+            "Chain capture should continue in same direction"
+        )
+
+        action_str2, action_dict2 = game.action_to_str("CAP", action2)
+        action_result2 = game.take_action("CAP", action2)
+        notation2 = game.action_to_notation(action_dict2, action_result2)
+
+        # Verify second notation is exactly correct
+        assert notation2 == "x d4Bf4", f"Expected 'x d4Bf4', got '{notation2}'"
+        assert action_result2.captured_marbles == "b", "Should capture black marble"
+
+    def test_pass_action_workflow(self):
+        """Test pass action when player has no valid moves."""
+        game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
+        board = game.board
+
+        # Empty the marble pool and player's captured marbles
+        board.global_state[board.SUPPLY_W] = 0
+        board.global_state[board.SUPPLY_G] = 0
+        board.global_state[board.SUPPLY_B] = 0
+        board.global_state[board.P1_CAP_W] = 0
+        board.global_state[board.P1_CAP_G] = 0
+        board.global_state[board.P1_CAP_B] = 0
+
+        # Fill all rings to prevent placement
+        white_layer = board.MARBLE_TO_LAYER["w"]
+        ring_positions = np.argwhere(board.state[board.RING_LAYER] == 1)
+        for y, x in ring_positions:
+            board.state[white_layer][y, x] = 1
+
+        # Player should have no valid moves
+        placement_mask, capture_mask = game.get_valid_actions()
+        assert not np.any(placement_mask), "Should have no valid placements"
+        assert not np.any(capture_mask), "Should have no valid captures"
+
+        # Execute pass
+        action_result = game.take_action("PASS", None)
+        action_dict = {"action": "PASS"}
+        notation = game.action_to_notation(action_dict, action_result)
+
+        # Verify pass notation
+        assert notation == "-", f"Pass notation should be '-', got '{notation}'"

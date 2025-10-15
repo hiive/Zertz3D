@@ -256,3 +256,12 @@ policy = PolicyHead(combined)
 - Continue slimming `ZertzGameController` (e.g., extract post-action/logging helpers)
 - Document status reporter/TextRenderer defaults and provide a way to silence text output for service deployments
 - Allow `ZertzFactory` to opt out of the text renderer when running non-interactive builds
+
+## Andrew's notes (DO NOT DELETE)
+- Add unit tests for tagging system.
+- Allow board to be rotated around its geometric center round an axis perpendicular to the board.
+- Add "how the player won" (or how they drew) to the end of the standard text output.
+- Extract out entities from renderer (marbles and rings with a base).
+- Extract out SelectionHandler class from renderer.
+- Extract out "Materials" using for various forms of highlighting (base color, emission color)
+- 

@@ -12,8 +12,16 @@ class HybridZertzAI(nn.Module):
     Outputs policy (move probabilities for PUT-REM and CAP actions) and value (position evaluation).
     """
 
-    def __init__(self, in_channels=4, cnn_hidden=32, gnn_hidden=64, num_moves=48, height=8, width=8,
-                 num_captured_features=6):
+    def __init__(
+        self,
+        in_channels=4,
+        cnn_hidden=32,
+        gnn_hidden=64,
+        num_moves=48,
+        height=8,
+        width=8,
+        num_captured_features=6,
+    ):
         """
         Args:
             in_channels (int): Number of input channels (4: ring, w, g, b).
@@ -32,22 +40,28 @@ class HybridZertzAI(nn.Module):
         self.num_captured_features = num_captured_features
 
         # CNN Component
-        self.cnn = CNNFeatureExtractor(in_channels=in_channels, hidden_channels=cnn_hidden)
+        self.cnn = CNNFeatureExtractor(
+            in_channels=in_channels, hidden_channels=cnn_hidden
+        )
 
         # GNN Component
-        self.gnn = GNNFeatureExtractor(in_channels=cnn_hidden, hidden_channels=gnn_hidden, num_layers=2)
+        self.gnn = GNNFeatureExtractor(
+            in_channels=cnn_hidden, hidden_channels=gnn_hidden, num_layers=2
+        )
 
         # Captured Counts Embedding
         self.captured_embed = nn.Linear(num_captured_features, gnn_hidden)
 
         # Policy Heads
-        self.fc_policy_put = nn.Linear(gnn_hidden, num_moves)  # For Placement and Removal
+        self.fc_policy_put = nn.Linear(
+            gnn_hidden, num_moves
+        )  # For Placement and Removal
         self.fc_policy_cap = nn.Linear(gnn_hidden, num_moves)  # For Capture actions
 
         # Value Head
         self.fc_value = nn.Linear(gnn_hidden, 1)
 
-    def forward(self, x, edge_index, captured_counts, action_type='put'):
+    def forward(self, x, edge_index, captured_counts, action_type="put"):
         """
         Forward pass for the hybrid network.
         Args:
@@ -62,7 +76,9 @@ class HybridZertzAI(nn.Module):
         batch_size = x.size(0)
 
         # CNN Feature Extraction
-        cnn_features = self.cnn(x)  # GeometricTensor with shape [batch_size, cnn_hidden, H', W']
+        cnn_features = self.cnn(
+            x
+        )  # GeometricTensor with shape [batch_size, cnn_hidden, H', W']
 
         # Prepare node features for GNN
         # Flatten the spatial dimensions to create node embeddings
@@ -73,7 +89,9 @@ class HybridZertzAI(nn.Module):
 
         # Reshape CNN features to [batch_size, num_nodes, cnn_hidden]
         # cnn_features.tensor shape: [batch_size, cnn_hidden, H', W']
-        cnn_features = cnn_features.tensor.view(batch_size, -1, cnn_features.tensor.size(1))
+        cnn_features = cnn_features.tensor.view(
+            batch_size, -1, cnn_features.tensor.size(1)
+        )
 
         # Pass through GNN and incorporate captured counts
         policies = []
@@ -84,7 +102,9 @@ class HybridZertzAI(nn.Module):
             node_features = cnn_features[i]  # Shape: [num_nodes, cnn_hidden]
 
             # Pass through GNN
-            gnn_features = self.gnn(node_features, edge_index)  # Shape: [num_nodes, gnn_hidden]
+            gnn_features = self.gnn(
+                node_features, edge_index
+            )  # Shape: [num_nodes, gnn_hidden]
 
             # Global pooling (mean pooling)
             pooled_features = gnn_features.mean(dim=0)  # Shape: [gnn_hidden]
@@ -94,12 +114,14 @@ class HybridZertzAI(nn.Module):
             captured_embedding = self.captured_embed(captured)  # Shape: [gnn_hidden]
 
             # Combine pooled features with captured counts
-            combined_features = pooled_features + captured_embedding  # Shape: [gnn_hidden]
+            combined_features = (
+                pooled_features + captured_embedding
+            )  # Shape: [gnn_hidden]
 
             # Policy head based on action type
-            if action_type == 'put':
+            if action_type == "put":
                 policy = self.fc_policy_put(combined_features)  # Shape: [num_moves]
-            elif action_type == 'cap':
+            elif action_type == "cap":
                 policy = self.fc_policy_cap(combined_features)  # Shape: [num_moves]
             else:
                 raise ValueError("Invalid action_type. Choose 'put' or 'cap'.")

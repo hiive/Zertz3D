@@ -23,7 +23,9 @@ class ActionProcessor:
         """Update the renderer reference if the controller swaps renderers."""
         self._renderer = renderer
 
-    def process(self, player: Any, result: ActionResult | None, delay_time: float) -> None:
+    def process(
+        self, player: Any, result: ActionResult | None, delay_time: float
+    ) -> None:
         """Apply the effects of ``result`` for ``player``.
 
         Args:
@@ -43,19 +45,21 @@ class ActionProcessor:
 
     # Internal helpers -------------------------------------------------
 
-    def _handle_isolation(self, player: Any, result: ActionResult, delay_time: float) -> None:
+    def _handle_isolation(
+        self, player: Any, result: ActionResult, delay_time: float
+    ) -> None:
         """Handle isolation captures and renderer notifications."""
         if not isinstance(result.captured_marbles, list):
             return
 
         for removal in result.captured_marbles:
-            marble = removal.get('marble')
+            marble = removal.get("marble")
             if marble:
                 player.add_capture(marble)
             if self._renderer is not None:
                 self._renderer.show_isolated_removal(
                     player,
-                    removal.get('pos', ''),
+                    removal.get("pos", ""),
                     marble,
                     delay_time,
                 )

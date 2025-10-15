@@ -7,14 +7,23 @@ and variant detection.
 import ast
 from typing import Callable
 from game.zertz_board import ZertzBoard
-from game.zertz_game import (BLITZ_MARBLES, BLITZ_WIN_CONDITIONS,
-                             STANDARD_MARBLES, STANDARD_WIN_CONDITIONS)
+from game.zertz_game import (
+    BLITZ_MARBLES,
+    BLITZ_WIN_CONDITIONS,
+    STANDARD_MARBLES,
+    STANDARD_WIN_CONDITIONS,
+)
 
 
 class ReplayLoader:
     """Loads and parses replay files for Zertz games."""
 
-    def __init__(self, replay_file, blitz=False, status_reporter: Callable[[str], None] | None = None):
+    def __init__(
+        self,
+        replay_file,
+        blitz=False,
+        status_reporter: Callable[[str], None] | None = None,
+    ):
         """Initialize the replay loader.
 
         Args:
@@ -44,22 +53,22 @@ class ReplayLoader:
         player2_actions = []
         all_actions = []
 
-        with open(self.replay_file, 'r') as f:
+        with open(self.replay_file, "r") as f:
             for line in f:
                 line = line.strip()
 
                 # Check for variant in comment headers
-                if line.startswith('# Variant:'):
-                    variant = line.split(':', 1)[1].strip().lower()
-                    if variant == 'blitz':
+                if line.startswith("# Variant:"):
+                    variant = line.split(":", 1)[1].strip().lower()
+                    if variant == "blitz":
                         self.detected_blitz = True
 
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
 
                 # Parse line format: "Player N: {'action': 'PUT', ...}"
-                if line.startswith('Player '):
-                    parts = line.split(': ', 1)
+                if line.startswith("Player "):
+                    parts = line.split(": ", 1)
                     player_num = int(parts[0].split()[1])
                     action_dict = ast.literal_eval(parts[1])
 
@@ -82,7 +91,9 @@ class ReplayLoader:
                 self._report("  (automatically enabling blitz mode)")
             self.blitz = True
         elif self.blitz:
-            self._report("Warning: --blitz flag specified but replay file is standard mode")
+            self._report(
+                "Warning: --blitz flag specified but replay file is standard mode"
+            )
             self._report("         Using blitz rules anyway")
 
         # Always set marbles and win_condition based on final variant
@@ -106,11 +117,11 @@ class ReplayLoader:
         Returns:
             Number of rings (37, 48, or 61)
         """
-        max_letter = 'A'
+        max_letter = "A"
 
         for action in all_actions:
             # Check all position fields that might contain ring coordinates
-            for key in ['dst', 'src', 'remove', 'cap']:
+            for key in ["dst", "src", "remove", "cap"]:
                 if key in action and action[key]:
                     pos = str(action[key])
                     if len(pos) >= 2:
@@ -123,9 +134,9 @@ class ReplayLoader:
         #   A-G (7 letters) = 37 rings
         #   A-H (8 letters) = 48 rings
         #   A-J (9 letters, skipping I) = 61 rings
-        if max_letter <= 'G':
+        if max_letter <= "G":
             return ZertzBoard.SMALL_BOARD_37
-        elif max_letter <= 'H':
+        elif max_letter <= "H":
             return ZertzBoard.MEDIUM_BOARD_48
         else:
             # J or beyond = 61 ring board

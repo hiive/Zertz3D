@@ -32,24 +32,34 @@ class TextRenderer(IRenderer):
     ) -> None:
         """Text renderer does not animate; immediately notify completion."""
         action = render_data.action_dict
-        self.report_status(f"Executing action for Player {getattr(player, 'n', '?')}: {action}")
+        self.report_status(
+            f"Executing action for Player {getattr(player, 'n', '?')}: {action}"
+        )
         if on_complete:
             on_complete(player, action_result)
 
-    def show_isolated_removal(self, player: Any, pos: str, marble: str | None, delay_time: float) -> None:
+    def show_isolated_removal(
+        self, player: Any, pos: str, marble: str | None, delay_time: float
+    ) -> None:
         marble_label = marble if marble is not None else "none"
-        self.report_status(f"Isolation removal for Player {getattr(player, 'n', '?')}: {pos} ({marble_label})")
+        self.report_status(
+            f"Isolation removal for Player {getattr(player, 'n', '?')}: {pos} ({marble_label})"
+        )
 
     def report_status(self, message: str) -> None:
         if message is None:
             return
         print(message, file=self._stream)
 
-    def attach_update_loop(self, update_fn: Callable[[], bool], interval: float) -> bool:
+    def attach_update_loop(
+        self, update_fn: Callable[[], bool], interval: float
+    ) -> bool:
         return False
 
     # Context highlighting is a no-op for the text renderer
-    def set_context_highlights(self, context, positions, color=None, emission=None) -> None:
+    def set_context_highlights(
+        self, context, positions, color=None, emission=None
+    ) -> None:
         pass
 
     def clear_context_highlights(self, context=None) -> None:
@@ -59,6 +69,20 @@ class TextRenderer(IRenderer):
         pass
 
     def clear_highlight_context(self, context=None) -> None:
+        pass
+
+    def set_selection_callback(self, callback) -> None:
+        pass
+
+    def show_hover_feedback(
+        self, primary=None, secondary=None, supply_colors=None, captured_targets=None
+    ) -> None:
+        pass
+
+    def clear_hover_highlights(self) -> None:
+        pass
+
+    def set_hover_callback(self, callback) -> None:
         pass
 
     def apply_context_masks(self, board, placement_mask, capture_mask) -> None:

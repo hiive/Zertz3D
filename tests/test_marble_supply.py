@@ -21,6 +21,7 @@ from game.zertz_board import ZertzBoard
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def board():
     """Create a fresh 37-ring board for each test."""
@@ -30,6 +31,7 @@ def board():
 # ============================================================================
 # Marble Supply Tests
 # ============================================================================
+
 
 class TestMarbleSupplyLogic:
     """Test marble supply rules for placement moves."""
@@ -64,18 +66,17 @@ class TestMarbleSupplyLogic:
         # Check that white moves (index 0) are NOT available
         # (even though player has captured white marbles)
         white_moves = moves[0, :, :]
-        assert not np.any(white_moves), \
+        assert not np.any(white_moves), (
             "White moves should NOT be available when supply has other marbles"
+        )
 
         # Check that gray moves (index 1) ARE available (from supply)
         gray_moves = moves[1, :, :]
-        assert np.any(gray_moves), \
-            "Gray moves should be available from supply"
+        assert np.any(gray_moves), "Gray moves should be available from supply"
 
         # Check that black moves (index 2) ARE available (from supply)
         black_moves = moves[2, :, :]
-        assert np.any(black_moves), \
-            "Black moves should be available from supply"
+        assert np.any(black_moves), "Black moves should be available from supply"
 
     def test_all_marbles_empty_can_use_captured(self, board):
         """Test that players CAN use captured marbles when ALL supply marbles are depleted.
@@ -103,18 +104,21 @@ class TestMarbleSupplyLogic:
 
         # Check that white moves (index 0) ARE available (from captured)
         white_moves = moves[0, :, :]
-        assert np.any(white_moves), \
+        assert np.any(white_moves), (
             "White moves should be available from captured marbles"
+        )
 
         # Check that gray moves (index 1) ARE available (from captured)
         gray_moves = moves[1, :, :]
-        assert np.any(gray_moves), \
+        assert np.any(gray_moves), (
             "Gray moves should be available from captured marbles"
+        )
 
         # Check that black moves (index 2) are NOT available (none captured)
         black_moves = moves[2, :, :]
-        assert not np.any(black_moves), \
+        assert not np.any(black_moves), (
             "Black moves should NOT be available (player has no captured black marbles)"
+        )
 
     def test_supply_to_captured_transition(self, board):
         """Test transition from using supply to using captured marbles.
@@ -152,12 +156,13 @@ class TestMarbleSupplyLogic:
         gray_moves_before = moves_before[1, :, :]
         black_moves_before = moves_before[2, :, :]
 
-        assert np.any(white_moves_before), \
-            "White moves should be available from supply"
-        assert not np.any(gray_moves_before), \
+        assert np.any(white_moves_before), "White moves should be available from supply"
+        assert not np.any(gray_moves_before), (
             "Gray moves should NOT be available (supply empty, captured not allowed yet)"
-        assert not np.any(black_moves_before), \
+        )
+        assert not np.any(black_moves_before), (
             "Black moves should NOT be available (supply empty, captured not allowed yet)"
+        )
 
         # Simulate placing the last white marble from supply
         board.global_state[board.SUPPLY_W] = 0  # Supply now completely empty
@@ -173,12 +178,15 @@ class TestMarbleSupplyLogic:
         gray_moves_after = moves_after[1, :, :]
         black_moves_after = moves_after[2, :, :]
 
-        assert np.any(white_moves_after), \
+        assert np.any(white_moves_after), (
             "White moves should be available from Player 2's captured marbles"
-        assert np.any(gray_moves_after), \
+        )
+        assert np.any(gray_moves_after), (
             "Gray moves should be available from Player 2's captured marbles"
-        assert np.any(black_moves_after), \
+        )
+        assert np.any(black_moves_after), (
             "Black moves should be available from Player 2's captured marbles"
+        )
 
     def test_player_2_uses_correct_captured_pool(self, board):
         """Test that Player 2 uses their own captured pool, not Player 1's.
@@ -212,18 +220,21 @@ class TestMarbleSupplyLogic:
 
         # Check that white moves are NOT available (Player 2 has no captured white)
         white_moves = moves[0, :, :]
-        assert not np.any(white_moves), \
+        assert not np.any(white_moves), (
             "White moves should NOT be available (Player 2 has no captured white marbles)"
+        )
 
         # Check that gray moves ARE available (from Player 2's captured)
         gray_moves = moves[1, :, :]
-        assert np.any(gray_moves), \
+        assert np.any(gray_moves), (
             "Gray moves should be available from Player 2's captured marbles"
+        )
 
         # Check that black moves ARE available (from Player 2's captured)
         black_moves = moves[2, :, :]
-        assert np.any(black_moves), \
+        assert np.any(black_moves), (
             "Black moves should be available from Player 2's captured marbles"
+        )
 
     def test_supply_partial_depletion_no_captured_use(self, board):
         """Test that captured marbles cannot be used while any supply marbles remain.
@@ -254,9 +265,10 @@ class TestMarbleSupplyLogic:
         gray_moves = moves[1, :, :]
         black_moves = moves[2, :, :]
 
-        assert not np.any(white_moves), \
+        assert not np.any(white_moves), (
             "White moves should NOT be available (supply not fully depleted)"
-        assert not np.any(gray_moves), \
+        )
+        assert not np.any(gray_moves), (
             "Gray moves should NOT be available (supply not fully depleted)"
-        assert np.any(black_moves), \
-            "Black moves should be available from supply"
+        )
+        assert np.any(black_moves), "Black moves should be available from supply"

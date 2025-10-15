@@ -41,15 +41,17 @@ class ZertzFactory:
             renderers: list[IRenderer] = []
 
             if not headless:
-                board_layout = ZertzBoard.generate_standard_board_layout(controller.session.rings)
+                board_layout = ZertzBoard.generate_standard_board_layout(
+                    controller.session.rings
+                )
                 renderer = ZertzRenderer(
-                        rings=controller.session.rings,
-                        board_layout=board_layout,
-                        show_coords=controller.show_coords,
-                        highlight_choices=controller.highlight_choices,
-                        update_callback=controller.update_game,
-                        move_duration=controller.move_duration,
-                    )
+                    rings=controller.session.rings,
+                    board_layout=board_layout,
+                    show_coords=controller.show_coords,
+                    highlight_choices=controller.highlight_choices,
+                    update_callback=controller.update_game,
+                    move_duration=controller.move_duration,
+                )
                 renderers.append(renderer)
 
             text_renderer = TextRenderer(stream=self._text_stream)

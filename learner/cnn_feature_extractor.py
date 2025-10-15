@@ -13,13 +13,19 @@ class CNNFeatureExtractor(nn.Module):
         super(CNNFeatureExtractor, self).__init__()
 
         # First C6-equivariant convolutional layer
-        self.c6_conv1 = C6ConvLayer(in_channels, hidden_channels, kernel_size=3, padding=1)
+        self.c6_conv1 = C6ConvLayer(
+            in_channels, hidden_channels, kernel_size=3, padding=1
+        )
 
         # Second C6-equivariant convolutional layer
-        self.c6_conv2 = C6ConvLayer(hidden_channels, hidden_channels, kernel_size=3, padding=1)
+        self.c6_conv2 = C6ConvLayer(
+            hidden_channels, hidden_channels, kernel_size=3, padding=1
+        )
 
         # Pooling layer (equivariant)
-        self.pool = e2nn.PointwiseMaxPool(self.c6_conv2.conv.out_type, kernel_size=2, stride=2)
+        self.pool = e2nn.PointwiseMaxPool(
+            self.c6_conv2.conv.out_type, kernel_size=2, stride=2
+        )
 
     def forward(self, x):
         """

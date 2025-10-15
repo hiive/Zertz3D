@@ -5,8 +5,6 @@ from e2cnn import gspaces
 from e2cnn import nn as e2nn
 
 
-
-
 class C6ConvLayer(nn.Module):
     """
     C6-equivariant Convolutional Layer using e2cnn's R2Conv.
@@ -21,15 +19,13 @@ class C6ConvLayer(nn.Module):
         # Define input and output field types
         # Each channel is associated with a regular representation of C6
         in_type = e2nn.FieldType(self.r2_act, [self.r2_act.regular_repr] * in_channels)
-        out_type = e2nn.FieldType(self.r2_act, [self.r2_act.regular_repr] * out_channels)
+        out_type = e2nn.FieldType(
+            self.r2_act, [self.r2_act.regular_repr] * out_channels
+        )
 
         # Define the equivariant convolution
         self.conv = e2nn.R2Conv(
-            in_type,
-            out_type,
-            kernel_size=kernel_size,
-            padding=padding,
-            bias=True
+            in_type, out_type, kernel_size=kernel_size, padding=padding, bias=True
         )
 
         # Define equivariant batch normalization
@@ -50,5 +46,3 @@ class C6ConvLayer(nn.Module):
         x = self.bn(x)
         x = self.relu(x)
         return x
-
-

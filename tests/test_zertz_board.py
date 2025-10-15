@@ -19,11 +19,14 @@ from game.zertz_board import ZertzBoard
 # Fixtures
 # ============================================================================
 
-@pytest.fixture(params=[
-    ZertzBoard.SMALL_BOARD_37,
-    ZertzBoard.MEDIUM_BOARD_48,
-    ZertzBoard.LARGE_BOARD_61
-])
+
+@pytest.fixture(
+    params=[
+        ZertzBoard.SMALL_BOARD_37,
+        ZertzBoard.MEDIUM_BOARD_48,
+        ZertzBoard.LARGE_BOARD_61,
+    ]
+)
 def board_size(request):
     """Parameterized fixture for all supported board sizes."""
     return request.param
@@ -57,6 +60,7 @@ def large_board():
 # Coordinate Conversion Tests
 # ============================================================================
 
+
 class TestCoordinateConversion:
     """Test coordinate conversion helper methods."""
 
@@ -89,7 +93,7 @@ class TestCoordinateConversion:
         """Test string to index conversion and back."""
         # Get all valid positions from the board layout
         if board.letter_layout is not None:
-            valid_positions = board.letter_layout[board.letter_layout != '']
+            valid_positions = board.letter_layout[board.letter_layout != ""]
             for pos_str in valid_positions:
                 # Convert to index and back
                 idx = board.str_to_index(pos_str)
@@ -103,27 +107,31 @@ class TestCoordinateConversion:
 # Mirror Coordinate Tests
 # ============================================================================
 
+
 class TestMirrorCoordinates:
     """Test mirroring of coordinates."""
 
-    @pytest.mark.parametrize("pos_str,expected_mirror", [
-        #        A4  b5  c6  D7
-        #      a3  B3  C5  d6  e6
-        #    a2  b3  c4  d5  E5  f5
-        #  A1  b2  c3  D4  e4  f4  G4
-        #    b1  C2  d3  e3  f3  g3
-        #      c1  d2  e2  f2  g2
-        #        D1  e1  f1  G1
-        # 37-ring board: mirror swaps x and y axes
-        ("A1", "D7"),  # Corner positions 1
-        ("D1", "G4"),  # Corner positions 2
-        ("D4", "D4"),  # Center stays at center
-        ("A4", "A4"),  # On diagonal
-        ("D7", "A1"),  # Reverse of A1
-        ("B3", "C5"),  # General position
-        ("C2", "E5"),  # Another position
-        ("G1", "G1"),  # On diagonal
-    ])
+    @pytest.mark.parametrize(
+        "pos_str,expected_mirror",
+        [
+            #        A4  b5  c6  D7
+            #      a3  B3  C5  d6  e6
+            #    a2  b3  c4  d5  E5  f5
+            #  A1  b2  c3  D4  e4  f4  G4
+            #    b1  C2  d3  e3  f3  g3
+            #      c1  d2  e2  f2  g2
+            #        D1  e1  f1  G1
+            # 37-ring board: mirror swaps x and y axes
+            ("A1", "D7"),  # Corner positions 1
+            ("D1", "G4"),  # Corner positions 2
+            ("D4", "D4"),  # Center stays at center
+            ("A4", "A4"),  # On diagonal
+            ("D7", "A1"),  # Reverse of A1
+            ("B3", "C5"),  # General position
+            ("C2", "E5"),  # Another position
+            ("G1", "G1"),  # On diagonal
+        ],
+    )
     def test_mirror_coords_small_board(self, small_board, pos_str, expected_mirror):
         """Test coordinate mirroring on 37-ring board."""
         # Convert position string to indices
@@ -135,16 +143,21 @@ class TestMirrorCoordinates:
         # Convert back to string
         result_str = small_board.index_to_str((new_y, new_x))
 
-        assert result_str == expected_mirror, f"Mirror of {pos_str} should be {expected_mirror}, got {result_str}"
+        assert result_str == expected_mirror, (
+            f"Mirror of {pos_str} should be {expected_mirror}, got {result_str}"
+        )
 
-    @pytest.mark.parametrize("pos_str,expected_mirror", [
-        # 48-ring board: mirror swaps x and y axes
-        ("D5", "D5"),  # Center area (stays put)
-        ("E4", "E4"),  # Center area (stays put)
-        ("A5", "A5"),  # On diagonal
-        ("D8", "A2"),  # Off diagonal
-        ("H1", "H1"),  # On diagonal
-    ])
+    @pytest.mark.parametrize(
+        "pos_str,expected_mirror",
+        [
+            # 48-ring board: mirror swaps x and y axes
+            ("D5", "D5"),  # Center area (stays put)
+            ("E4", "E4"),  # Center area (stays put)
+            ("A5", "A5"),  # On diagonal
+            ("D8", "A2"),  # Off diagonal
+            ("H1", "H1"),  # On diagonal
+        ],
+    )
     def test_mirror_coords_medium_board(self, medium_board, pos_str, expected_mirror):
         """Test coordinate mirroring on 48-ring board."""
         y, x = medium_board.str_to_index(pos_str)
@@ -152,14 +165,17 @@ class TestMirrorCoordinates:
         result_str = medium_board.index_to_str((new_y, new_x))
         assert result_str == expected_mirror
 
-    @pytest.mark.parametrize("pos_str,expected_mirror", [
-        # 61-ring board: mirror swaps x and y axes (ABCDEFGHJ, skipping I)
-        ("A1", "E9"),  # Corner positions
-        ("E5", "E5"),  # Center (stays put)
-        ("A5", "A5"),  # On diagonal
-        ("E8", "B2"),  # Off diagonal
-        ("J1", "J1"),  # On diagonal
-    ])
+    @pytest.mark.parametrize(
+        "pos_str,expected_mirror",
+        [
+            # 61-ring board: mirror swaps x and y axes (ABCDEFGHJ, skipping I)
+            ("A1", "E9"),  # Corner positions
+            ("E5", "E5"),  # Center (stays put)
+            ("A5", "A5"),  # On diagonal
+            ("E8", "B2"),  # Off diagonal
+            ("J1", "J1"),  # On diagonal
+        ],
+    )
     def test_mirror_coords_large_board(self, large_board, pos_str, expected_mirror):
         """Test coordinate mirroring on 61-ring board."""
         y, x = large_board.str_to_index(pos_str)
@@ -172,34 +188,43 @@ class TestMirrorCoordinates:
 # Rotate Coordinate Tests
 # ============================================================================
 
+
 class TestRotateCoordinates:
     """Test 180-degree rotation of coordinates."""
 
-    @pytest.mark.parametrize("pos_str,expected_rotated", [
-        # 37-ring board: Cartesian 180° rotation (point reflection through center)
-        ("A1", "G4"),  # Bottom-left to top-right
-        ("D4", "D4"),  # Center stays at center
-        ("A4", "G1"),  # Top-left to bottom-right
-        ("D7", "D1"),  # Top to bottom
-        ("B3", "F3"),  # Symmetric reflection
-        ("C2", "E5"),  # General position
-        ("G1", "A4"),  # Bottom-right to top-left
-    ])
+    @pytest.mark.parametrize(
+        "pos_str,expected_rotated",
+        [
+            # 37-ring board: Cartesian 180° rotation (point reflection through center)
+            ("A1", "G4"),  # Bottom-left to top-right
+            ("D4", "D4"),  # Center stays at center
+            ("A4", "G1"),  # Top-left to bottom-right
+            ("D7", "D1"),  # Top to bottom
+            ("B3", "F3"),  # Symmetric reflection
+            ("C2", "E5"),  # General position
+            ("G1", "A4"),  # Bottom-right to top-left
+        ],
+    )
     def test_rotate_coords_small_board(self, small_board, pos_str, expected_rotated):
         """Test 180° rotation on 37-ring board."""
         y, x = small_board.str_to_index(pos_str)
         new_y, new_x = small_board._rotate_coords(y, x)
         result_str = small_board.index_to_str((new_y, new_x))
-        assert result_str == expected_rotated, f"Rotation of {pos_str} should be {expected_rotated}, got {result_str}"
+        assert result_str == expected_rotated, (
+            f"Rotation of {pos_str} should be {expected_rotated}, got {result_str}"
+        )
 
-    @pytest.mark.parametrize("pos_str,expected_rotated", [
-        # 48-ring board: Cartesian 180° rotation
-        ("D5", "E4"),  # Near center
-        ("E4", "D5"),  # Reverse
-        ("A5", "H1"),  # Top-left area to bottom-right
-        ("D8", "E1"),  # Top to bottom
-        ("H1", "A5"),  # Bottom-right to top-left area
-    ])
+    @pytest.mark.parametrize(
+        "pos_str,expected_rotated",
+        [
+            # 48-ring board: Cartesian 180° rotation
+            ("D5", "E4"),  # Near center
+            ("E4", "D5"),  # Reverse
+            ("A5", "H1"),  # Top-left area to bottom-right
+            ("D8", "E1"),  # Top to bottom
+            ("H1", "A5"),  # Bottom-right to top-left area
+        ],
+    )
     def test_rotate_coords_medium_board(self, medium_board, pos_str, expected_rotated):
         """Test 180° rotation on 48-ring board."""
         y, x = medium_board.str_to_index(pos_str)
@@ -207,14 +232,17 @@ class TestRotateCoordinates:
         result_str = medium_board.index_to_str((new_y, new_x))
         assert result_str == expected_rotated
 
-    @pytest.mark.parametrize("pos_str,expected_rotated", [
-        # 61-ring board: Cartesian 180° rotation
-        ("A1", "J5"),  # Bottom-left to top-right
-        ("E5", "E5"),  # Center stays at center
-        ("A5", "J1"),  # Left to right
-        ("E8", "E2"),  # Top to bottom
-        ("J1", "A5"),  # Bottom-right to top-left
-    ])
+    @pytest.mark.parametrize(
+        "pos_str,expected_rotated",
+        [
+            # 61-ring board: Cartesian 180° rotation
+            ("A1", "J5"),  # Bottom-left to top-right
+            ("E5", "E5"),  # Center stays at center
+            ("A5", "J1"),  # Left to right
+            ("E8", "E2"),  # Top to bottom
+            ("J1", "A5"),  # Bottom-right to top-left
+        ],
+    )
     def test_rotate_coords_large_board(self, large_board, pos_str, expected_rotated):
         """Test 180° rotation on 61-ring board."""
         y, x = large_board.str_to_index(pos_str)
@@ -227,16 +255,17 @@ class TestRotateCoordinates:
 # Action Translation Tests
 # ============================================================================
 
+
 class TestMirrorAction:
     """Test mirror_action for PUT and CAP action types."""
 
     def test_mirror_put_action_preserves_shape(self, board):
         """Test that mirror_action preserves PUT action array shape."""
         # Create a dummy PUT action array
-        put_actions = np.zeros((3, board.width ** 2, board.width ** 2 + 1), dtype=bool)
+        put_actions = np.zeros((3, board.width**2, board.width**2 + 1), dtype=bool)
         put_actions[0, 5, 10] = True  # Set one action
 
-        mirrored = board.mirror_action('PUT', put_actions)
+        mirrored = board.mirror_action("PUT", put_actions)
 
         assert mirrored.shape == put_actions.shape
         assert mirrored.dtype == put_actions.dtype
@@ -246,7 +275,7 @@ class TestMirrorAction:
         cap_actions = np.zeros((6, board.width, board.width), dtype=bool)
         cap_actions[0, 2, 3] = True
 
-        mirrored = board.mirror_action('CAP', cap_actions)
+        mirrored = board.mirror_action("CAP", cap_actions)
 
         assert mirrored.shape == cap_actions.shape
         assert mirrored.dtype == cap_actions.dtype
@@ -261,11 +290,13 @@ class TestMirrorAction:
         rem_flat = small_board._2d_to_flat(*rem_idx)
 
         # Create action array with this action set
-        put_actions = np.zeros((3, small_board.width ** 2, small_board.width ** 2 + 1), dtype=bool)
+        put_actions = np.zeros(
+            (3, small_board.width**2, small_board.width**2 + 1), dtype=bool
+        )
         put_actions[1, put_flat, rem_flat] = True  # Gray marble
 
         # Mirror the actions
-        mirrored = small_board.mirror_action('PUT', put_actions)
+        mirrored = small_board.mirror_action("PUT", put_actions)
 
         # Expected mirrored positions: B3 -> C5, C5 -> B3 (mirror swaps x and y)
         expected_put_idx = small_board.str_to_index("C5")
@@ -283,10 +314,10 @@ class TestRotateAction:
 
     def test_rotate_put_action_preserves_shape(self, board):
         """Test that rotate_action preserves PUT action array shape."""
-        put_actions = np.zeros((3, board.width ** 2, board.width ** 2 + 1), dtype=bool)
+        put_actions = np.zeros((3, board.width**2, board.width**2 + 1), dtype=bool)
         put_actions[0, 5, 10] = True
 
-        rotated = board.rotate_action('PUT', put_actions)
+        rotated = board.rotate_action("PUT", put_actions)
 
         assert rotated.shape == put_actions.shape
         assert rotated.dtype == put_actions.dtype
@@ -296,7 +327,7 @@ class TestRotateAction:
         cap_actions = np.zeros((6, board.width, board.width), dtype=bool)
         cap_actions[0, 2, 3] = True
 
-        rotated = board.rotate_action('CAP', cap_actions)
+        rotated = board.rotate_action("CAP", cap_actions)
 
         assert rotated.shape == cap_actions.shape
         assert rotated.dtype == cap_actions.dtype
@@ -311,11 +342,13 @@ class TestRotateAction:
         rem_flat = small_board._2d_to_flat(*rem_idx)
 
         # Create action array
-        put_actions = np.zeros((3, small_board.width ** 2, small_board.width ** 2 + 1), dtype=bool)
+        put_actions = np.zeros(
+            (3, small_board.width**2, small_board.width**2 + 1), dtype=bool
+        )
         put_actions[2, put_flat, rem_flat] = True  # Black marble
 
         # Rotate 180°
-        rotated = small_board.rotate_action('PUT', put_actions)
+        rotated = small_board.rotate_action("PUT", put_actions)
 
         # Expected rotated positions: B3 -> F3, C5 -> E2 (180° point reflection)
         expected_put_idx = small_board.str_to_index("F3")
@@ -331,6 +364,7 @@ class TestRotateAction:
 # ============================================================================
 # Game Logic Stub Tests
 # ============================================================================
+
 
 class TestBoardInitialization:
     """Test board initialization."""
@@ -368,13 +402,17 @@ class TestBoardMethods:
 
         # All neighbors should be in bounds
         for ny, nx in neighbors:
-            assert board._is_inbounds((ny, nx)), f"Neighbor {(ny, nx)} should be in bounds"
+            assert board._is_inbounds((ny, nx)), (
+                f"Neighbor {(ny, nx)} should be in bounds"
+            )
 
         # Test corner position - may have fewer neighbors
         corner_pos = (0, 0)
         corner_neighbors = board.get_neighbors(corner_pos)
         assert len(corner_neighbors) <= 6, "Corner position should have <= 6 neighbors"
-        assert len(corner_neighbors) >= 2, "Corner position should have at least 2 neighbors"
+        assert len(corner_neighbors) >= 2, (
+            "Corner position should have at least 2 neighbors"
+        )
 
         # Test that neighbors are exactly one step away in each direction
         for neighbor in neighbors[:3]:  # Check first 3 for efficiency
@@ -407,7 +445,7 @@ class TestBoardMethods:
     def test_get_placement_moves_shape(self, board):
         """Test that placement moves array has correct shape."""
         moves = board.get_placement_moves()
-        assert moves.shape == (3, board.width ** 2, board.width ** 2 + 1)
+        assert moves.shape == (3, board.width**2, board.width**2 + 1)
 
     def test_get_capture_moves_shape(self, board):
         """Test that capture moves array has correct shape."""
@@ -423,8 +461,8 @@ class TestSymmetryOperations:
         board = small_board
 
         # Place a marble at a known position
-        test_pos = board.str_to_index('B3')
-        white_layer = board.MARBLE_TO_LAYER['w']
+        test_pos = board.str_to_index("B3")
+        white_layer = board.MARBLE_TO_LAYER["w"]
         board.state[white_layer][test_pos] = 1
 
         # Get rotated state
@@ -435,17 +473,21 @@ class TestSymmetryOperations:
 
         # Check that the marble has moved to the rotated position
         # B3 rotates 180° to F3
-        rotated_pos = board.str_to_index('F3')
-        assert rotated[white_layer][rotated_pos] == 1, "Marble should be at rotated position"
-        assert rotated[white_layer][test_pos] == 0, "Original position should be empty after rotation"
+        rotated_pos = board.str_to_index("F3")
+        assert rotated[white_layer][rotated_pos] == 1, (
+            "Marble should be at rotated position"
+        )
+        assert rotated[white_layer][test_pos] == 0, (
+            "Original position should be empty after rotation"
+        )
 
     def test_get_mirror_symmetries(self, small_board):
         """Test board state mirroring preserves shape and transforms marbles correctly."""
         board = small_board
 
         # Place a marble at a known position
-        test_pos = board.str_to_index('B3')
-        gray_layer = board.MARBLE_TO_LAYER['g']
+        test_pos = board.str_to_index("B3")
+        gray_layer = board.MARBLE_TO_LAYER["g"]
         board.state[gray_layer][test_pos] = 1
 
         # Get mirrored state
@@ -456,9 +498,13 @@ class TestSymmetryOperations:
 
         # Check that the marble has moved to the mirrored position
         # B3 mirrors to C5
-        mirrored_pos = board.str_to_index('C5')
-        assert mirrored[gray_layer][mirrored_pos] == 1, "Marble should be at mirrored position"
-        assert mirrored[gray_layer][test_pos] == 0, "Original position should be empty after mirroring"
+        mirrored_pos = board.str_to_index("C5")
+        assert mirrored[gray_layer][mirrored_pos] == 1, (
+            "Marble should be at mirrored position"
+        )
+        assert mirrored[gray_layer][test_pos] == 0, (
+            "Original position should be empty after mirroring"
+        )
 
     def test_get_state_symmetries(self, board):
         """Test that get_state_symmetries returns mirror, rotate, and mirror+rotate transformations."""
@@ -471,7 +517,9 @@ class TestSymmetryOperations:
         # All symmetries should have same shape as original state
         for transform_id, sym_state in symmetries:
             assert isinstance(transform_id, int), "Transform ID should be an integer"
-            assert sym_state.shape == board.state.shape, "Symmetry should preserve state shape"
+            assert sym_state.shape == board.state.shape, (
+                "Symmetry should preserve state shape"
+            )
 
 
 def test_capture_sequence_continues_with_same_marble():
@@ -494,17 +542,17 @@ def test_capture_sequence_continues_with_same_marble():
 
     # Set up scenario: place marbles for a capture sequence
     # Marble A (white) at C2
-    c2_idx = board.str_to_index('C2')
-    white_layer = board.MARBLE_TO_LAYER['w']
+    c2_idx = board.str_to_index("C2")
+    white_layer = board.MARBLE_TO_LAYER["w"]
     board.state[white_layer][c2_idx] = 1
 
     # Marble X (white) at D3 (will be captured)
-    d3_idx = board.str_to_index('D3')
+    d3_idx = board.str_to_index("D3")
     board.state[white_layer][d3_idx] = 1
 
     # Marble B (gray) at F2
-    f2_idx = board.str_to_index('F2')
-    gray_layer = board.MARBLE_TO_LAYER['g']
+    f2_idx = board.str_to_index("F2")
+    gray_layer = board.MARBLE_TO_LAYER["g"]
     board.state[gray_layer][f2_idx] = 1
 
     # Get initial capture moves - should show A can capture X
@@ -513,11 +561,13 @@ def test_capture_sequence_continues_with_same_marble():
     # Verify A can capture X (C2 → D3 → E3)
     # Direction 4 from C2 should be valid (southeast direction)
     c2_y, c2_x = c2_idx
-    assert captures_before[4, c2_y, c2_x], "Marble A at C2 should be able to capture X at D3"
+    assert captures_before[4, c2_y, c2_x], (
+        "Marble A at C2 should be able to capture X at D3"
+    )
 
     # Simulate the capture: A moves from C2 to E3, X is removed
     board.state[white_layer][c2_idx] = 0
-    e3_idx = board.str_to_index('E3')
+    e3_idx = board.str_to_index("E3")
     board.state[white_layer][e3_idx] = 1
     board.state[white_layer][d3_idx] = 0  # X is captured
 
@@ -531,12 +581,18 @@ def test_capture_sequence_continues_with_same_marble():
     # CRITICAL TEST: Only marble A should be able to capture (continue its sequence)
     # A can capture B: E3 → F2 → G1 (direction 5)
     e3_y, e3_x = e3_idx
-    assert captures_after[5, e3_y, e3_x], "Marble A at E3 should be able to capture B at F2"
+    assert captures_after[5, e3_y, e3_x], (
+        "Marble A at E3 should be able to capture B at F2"
+    )
 
     # B should NOT be able to capture A (it's not B's turn in the sequence)
     f2_y, f2_x = f2_idx
-    assert not captures_after[2, f2_y, f2_x], "Marble B at F2 should NOT be able to capture A (wrong sequence)"
+    assert not captures_after[2, f2_y, f2_x], (
+        "Marble B at F2 should NOT be able to capture A (wrong sequence)"
+    )
 
     # Verify we found exactly 1 capture option (only A can continue)
     total_captures = np.sum(captures_after)
-    assert total_captures == 1, f"Expected 1 capture option (only A continues), found {total_captures}"
+    assert total_captures == 1, (
+        f"Expected 1 capture option (only A continues), found {total_captures}"
+    )

@@ -103,7 +103,7 @@ class ZertzPositionCollection:
         if board.board_layout is not None:
             mask = board.board_layout.astype(bool)
         elif board.letter_layout is not None:
-            mask = board.letter_layout != ''
+            mask = board.letter_layout != ""
         else:
             mask = board.state[board.RING_LAYER] != 0
 
@@ -205,7 +205,7 @@ class ZertzPositionCollection:
     def label_for_yx(self, index: Tuple[int, int]) -> str:
         self.ensure()
         pos = self._by_yx.get(index)
-        return pos.label if pos else ''
+        return pos.label if pos else ""
 
     @property
     def yx_to_ax(self) -> Dict[Tuple[int, int], Tuple[int, int]]:

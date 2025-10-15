@@ -32,8 +32,13 @@ class RenderData:
             Format: {'A1': True, 'B2': False, ...} where True = will blink, False = won't blink
     """
 
-    def __init__(self, action_dict, placement_positions=None,
-                 capture_moves=None, removal_positions=None):
+    def __init__(
+        self,
+        action_dict,
+        placement_positions=None,
+        capture_moves=None,
+        removal_positions=None,
+    ):
         """Initialize render data.
 
         Args:
@@ -43,18 +48,24 @@ class RenderData:
             removal_positions: Dict of removal positions with blink status (default: empty dict)
         """
         self.action_dict = action_dict
-        self.placement_positions = placement_positions if placement_positions is not None else []
+        self.placement_positions = (
+            placement_positions if placement_positions is not None else []
+        )
         self.capture_moves = capture_moves if capture_moves is not None else []
-        self.removal_positions = removal_positions if removal_positions is not None else {}
+        self.removal_positions = (
+            removal_positions if removal_positions is not None else {}
+        )
 
     def __repr__(self):
         """String representation for debugging."""
-        action_type = self.action_dict.get('action', 'UNKNOWN')
+        action_type = self.action_dict.get("action", "UNKNOWN")
         highlights = ""
         if self.has_highlights():
-            highlights = (f", placements={len(self.placement_positions)}, "
-                          f"captures={len(self.capture_moves)}, "
-                          f"removals={len(self.removal_positions)}")
+            highlights = (
+                f", placements={len(self.placement_positions)}, "
+                f"captures={len(self.capture_moves)}, "
+                f"removals={len(self.removal_positions)}"
+            )
         return f"RenderData(action={action_type}{highlights})"
 
     def has_highlights(self):
@@ -63,9 +74,11 @@ class RenderData:
         Returns:
             bool: True if any highlight data is present
         """
-        return (self.has_placement_highlights() or
-                self.has_capture_highlights() or
-                self.has_removal_highlights())
+        return (
+            self.has_placement_highlights()
+            or self.has_capture_highlights()
+            or self.has_removal_highlights()
+        )
 
     def has_placement_highlights(self):
         """Check if placement highlights are available.

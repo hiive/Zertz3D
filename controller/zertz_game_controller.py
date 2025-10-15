@@ -2,7 +2,10 @@
 
 Manages game loop, player actions, renderer updates, and game state.
 """
+
 from __future__ import annotations
+
+from typing import Optional
 
 import numpy as np
 
@@ -14,16 +17,29 @@ from controller.action_processor import ActionProcessor
 from controller.game_session import GameSession
 from controller.game_loop import GameLoop
 from shared.interfaces import IRenderer, IRendererFactory
+from shared.constants import MARBLE_TYPES
+
 
 class ZertzGameController:
     # Fraction of move_duration used for animations (leaves buffer before next turn)
-    ANIMATION_DURATION_RATIO = 60.0/100.0 # 1% of 60fps
+    ANIMATION_DURATION_RATIO = 60.0 / 100.0  # 1% of 60fps
 
-    def __init__(self, rings=37, replay_file=None, seed=None, log_to_file=False, partial_replay=False,
-                 max_games=None, highlight_choices=False, show_coords=False, log_notation=False,
-                 blitz=False, move_duration=0.666,
-                 renderer_or_factory: IRenderer | IRendererFactory | None = None,
-                 human_players: tuple[int, ...] | None = None):
+    def __init__(
+        self,
+        rings=37,
+        replay_file=None,
+        seed=None,
+        log_to_file=False,
+        partial_replay=False,
+        max_games=None,
+        highlight_choices=False,
+        show_coords=False,
+        log_notation=False,
+        blitz=False,
+        move_duration=0.666,
+        renderer_or_factory: IRenderer | IRendererFactory | None = None,
+        human_players: tuple[int, ...] | None = None,
+    ):
         self.show_coords = show_coords
         self.max_games = max_games  # None means play indefinitely
         self.highlight_choices = highlight_choices
@@ -34,17 +50,25 @@ class ZertzGameController:
         self.renderer = None
         self.waiting_for_renderer = False
         self._completion_queue = []
-        self._game_ending_processed = False  # Track if current game ending has been processed
+        self._game_ending_processed = (
+            False  # Track if current game ending has been processed
+        )
 
         # Initialize logger and move formatter
-        self.logger = GameLogger(log_to_file=log_to_file, log_notation=log_notation, status_reporter=self._report)
+        self.logger = GameLogger(
+            log_to_file=log_to_file,
+            log_notation=log_notation,
+            status_reporter=self._report,
+        )
         self.move_formatter = ActionTextFormatter()
 
         # Load replay first to detect board size and variant if needed
         replay_actions = None
         loader = None
         if replay_file is not None:
-            loader = ReplayLoader(replay_file, blitz=blitz, status_reporter=self._report)
+            loader = ReplayLoader(
+                replay_file, blitz=blitz, status_reporter=self._report
+            )
             replay_actions = loader.load()
             # Use loader's authoritative configuration
             rings = loader.detected_rings
@@ -62,7 +86,6 @@ class ZertzGameController:
             human_players=human_players,
         )
 
-
         if isinstance(renderer_or_factory, IRenderer):
             self.renderer = renderer_or_factory
         elif isinstance(renderer_or_factory, IRendererFactory):
@@ -70,7 +93,14 @@ class ZertzGameController:
         elif renderer_or_factory is None:
             pass
         else:
-            raise TypeError("renderer_or_factory must be an IRenderer, IRendererFactory, or None")
+            raise TypeError(
+                "renderer_or_factory must be an IRenderer, IRendererFactory, or None"
+            )
+
+        if self.renderer and hasattr(self.renderer, "set_selection_callback"):
+            self.renderer.set_selection_callback(self._handle_renderer_selection)
+        if self.renderer and hasattr(self.renderer, "set_hover_callback"):
+            self.renderer.set_hover_callback(self._handle_renderer_hover)
 
         self.action_processor = ActionProcessor(self.renderer)
         self._game_loop = GameLoop(self, self.renderer, self.move_duration)
@@ -83,7 +113,9 @@ class ZertzGameController:
 
         # Open log file for first game (if not in replay mode)
         if not self.session.is_replay_mode():
-            self.logger.open_log_files(self.session.get_seed(), self.session.rings, self.session.blitz)
+            self.logger.open_log_files(
+                self.session.get_seed(), self.session.rings, self.session.blitz
+            )
 
     def _close_log_file(self):
         """Close the current log file and append final game state."""
@@ -119,7 +151,9 @@ class ZertzGameController:
 
         # Open log file for new game (if not in replay mode)
         if not self.session.is_replay_mode():
-            self.logger.open_log_files(self.session.get_seed(), self.session.rings, self.session.blitz)
+            self.logger.open_log_files(
+                self.session.get_seed(), self.session.rings, self.session.blitz
+            )
 
     def _display_valid_moves(self, player):
         """Display valid move information for the current player.
@@ -127,27 +161,218 @@ class ZertzGameController:
         Args:
             player: The current player
         """
-        formatted_moves = self.move_formatter.format_valid_actions(self.session.game, player)
+        formatted_moves = self.move_formatter.format_valid_actions(
+            self.session.game, player
+        )
         self._report(formatted_moves)
+
+    def _clear_hover_feedback(self):
+        if self.renderer and hasattr(self.renderer, "clear_hover_highlights"):
+            self.renderer.clear_hover_highlights()
+
+    def _update_hover_feedback(self, player) -> None:
+        if not self.renderer or not hasattr(self.renderer, "show_hover_feedback"):
+            return
+        if not hasattr(player, "get_current_options") or not hasattr(
+            player, "get_selection_state"
+        ):
+            self._clear_hover_feedback()
+            return
+
+        options = player.get_current_options()
+        if not options:
+            self._clear_hover_feedback()
+            return
+
+        board = self.session.game.board
+        state = player.get_selection_state()
+        primary: set[str] = set()
+        secondary: set[str] = set()
+        supply_colors: set[str] = set()
+        captured_targets: set[tuple[int, str]] = set()
+        player_id = getattr(player, "n", None)
+
+        def idx_to_label(idx: tuple[int, int] | None) -> str | None:
+            if idx is None:
+                return None
+            y, x = idx
+            try:
+                label = board.index_to_str((y, x))
+            except (IndexError, ValueError):
+                return None
+            return label or None
+
+        placement_mask, capture_mask = (
+            player.get_context_masks()
+            if hasattr(player, "get_context_masks")
+            else (None, None)
+        )
+        context = options.get("context")
+
+        if context == "placement":
+            color = state.get("placement_color")
+            color_idx = state.get("placement_color_idx")
+            if color_idx is None:
+                # Highlight all available supply colors
+                counts = options.get("supply_counts", ())
+                for idx, marble in enumerate(MARBLE_TYPES):
+                    if idx < len(counts) and counts[idx] > 0:
+                        supply_colors.add(marble)
+            else:
+                if color:
+                    supply_colors.add(color)
+                if (
+                    player_id is not None
+                    and state.get("placement_source") == "captured"
+                    and color
+                ):
+                    captured_targets.add((player_id, color))
+            if player_id is not None and options.get("supply_total", 0) == 0:
+                for marble in options.get("supply_colors", set()):
+                    captured_targets.add((player_id, marble))
+            placement_dst = state.get("placement_dst")
+            if placement_dst is not None:
+                label = idx_to_label(placement_dst)
+                if label:
+                    primary.add(label)
+            pending_removals = state.get("placement_pending_removals") or set()
+            for idx in pending_removals:
+                label = idx_to_label(idx)
+                if label:
+                    secondary.add(label)
+
+            if (
+                color_idx is not None
+                and placement_mask is not None
+                and placement_mask.size > 0
+            ):
+                width = board.width
+                if placement_dst is None:
+                    dest_indices = np.where(np.any(placement_mask[color_idx], axis=1))[
+                        0
+                    ]
+                    for flat in dest_indices:
+                        y, x = divmod(int(flat), width)
+                        label = idx_to_label((y, x))
+                        if label:
+                            primary.add(label)
+                elif not pending_removals:
+                    allow_none = state.get("placement_allow_none_removal", False)
+                    if allow_none:
+                        label = idx_to_label(placement_dst)
+                        if label:
+                            secondary.add(label)
+
+        elif context == "capture":
+            capture_src = state.get("capture_src")
+            if capture_src is not None:
+                label = idx_to_label(capture_src)
+                if label:
+                    primary.add(label)
+                capture_paths = options.get("capture_paths", {}).get(capture_src, set())
+                for idx in capture_paths:
+                    label_dst = idx_to_label(idx)
+                    if label_dst:
+                        secondary.add(label_dst)
+            else:
+                for idx in options.get("capture_sources", set()):
+                    label = idx_to_label(idx)
+                    if label:
+                        primary.add(label)
+
+        hover_state = state.get("hover")
+        if hover_state:
+            h_type = hover_state.get("type")
+            if h_type in ("ring", "board_marble"):
+                label = idx_to_label(hover_state.get("index"))
+                if label:
+                    if context == "capture" and state.get("capture_src") is not None:
+                        secondary.add(label)
+                    elif (
+                        context == "placement"
+                        and state.get("placement_dst") is not None
+                    ):
+                        secondary.add(label)
+                    else:
+                        primary.add(label)
+            elif h_type in ("supply_marble", "captured_marble"):
+                color = hover_state.get("color")
+                if color:
+                    if state.get("placement_color_idx") is None:
+                        supply_colors = {color}
+                    else:
+                        supply_colors.add(color)
+                    if h_type == "captured_marble":
+                        owner = hover_state.get("owner", player_id)
+                        if owner is not None:
+                            captured_targets.add((int(owner), color))
+
+        if not primary and not secondary and not supply_colors and not captured_targets:
+            self._clear_hover_feedback()
+            return
+
+        self.renderer.show_hover_feedback(
+            primary, secondary, supply_colors, captured_targets
+        )
+
+    def _handle_renderer_selection(self, selection: dict) -> None:
+        player = self.session.get_current_player()
+        payload = dict(selection)
+        label = selection.get("label")
+        if label:
+            try:
+                payload["index"] = self.session.game.board.str_to_index(label)
+            except ValueError:
+                payload["index"] = None
+
+        index = payload.get("index")
+        if index is not None:
+            payload["index"] = (int(index[0]), int(index[1]))
+
+        player.handle_selection(payload)
+        self._update_hover_feedback(player)
+
+    def _handle_renderer_hover(self, hover: Optional[dict]) -> None:
+        player = self.session.get_current_player()
+        if not hasattr(player, "handle_hover"):
+            return
+
+        payload = None
+        if hover:
+            payload = dict(hover)
+            label = hover.get("label")
+            if label:
+                try:
+                    payload["index"] = self.session.game.board.str_to_index(label)
+                except ValueError:
+                    payload["index"] = None
+            index = payload.get("index")
+            if index is not None:
+                payload["index"] = (int(index[0]), int(index[1]))
+
+        player.handle_hover(payload)
+        self._update_hover_feedback(player)
 
     def _resolve_player_context(self, player, placement_mask, capture_mask):
         # Determine the logical phase name based on available masks
         if np.any(capture_mask):
-            context = 'capture'
+            context = "capture"
         elif np.any(placement_mask):
-            context = 'placement'
+            context = "placement"
         else:
-            context = 'idle'
+            context = "idle"
         player.on_turn_start(context, placement_mask, capture_mask)
+        self._update_hover_feedback(player)
 
     def _update_context_highlights(self, player, placement_mask, capture_mask):
         if not self.highlight_choices or not self.renderer:
             return
 
         self.renderer.clear_highlight_context()
-        self._resolve_player_context(player, placement_mask, capture_mask)
-
-        self.renderer.apply_context_masks(self.session.game.board, placement_mask, capture_mask)
+        self.renderer.apply_context_masks(
+            self.session.game.board, placement_mask, capture_mask
+        )
+        self._update_hover_feedback(player)
 
     def update_game(self, task):
         # Wait for renderer callback before continuing
@@ -165,11 +390,18 @@ class ZertzGameController:
         # Get next action from current player
         player = self.session.get_current_player()
 
+        placement_mask, capture_mask = self.session.game.get_valid_actions()
+        self._resolve_player_context(player, placement_mask, capture_mask)
+
         if self.highlight_choices and self.renderer:
-            placement_mask, capture_mask = self.session.game.get_valid_actions()
             self._update_context_highlights(player, placement_mask, capture_mask)
 
         try:
+            if (
+                hasattr(player, "pending_actions_empty")
+                and player.pending_actions_empty()
+            ):
+                return task.again
             ax, ay = player.get_action()
         except ValueError as e:
             self._report(f"Error getting action: {e}")
@@ -187,7 +419,8 @@ class ZertzGameController:
         # Clear context highlights once an action is chosen
         if self.highlight_choices and self.renderer:
             self.renderer.clear_highlight_context()
-            player.clear_context()
+        player.clear_context()
+        self._clear_hover_feedback()
 
         # Display valid moves if enabled (text-only)
         if self.highlight_choices:
@@ -213,7 +446,7 @@ class ZertzGameController:
 
         # Generate complete notation WITH action_result (includes isolation in one pass)
         notation = self.session.game.action_to_notation(action_dict, action_result)
-        self._report(f'Player {player.n}: {action_dict} ({notation})')
+        self._report(f"Player {player.n}: {action_dict} ({notation})")
 
         # Log notation directly (no buffering needed)
         self._log_notation(notation)
@@ -221,7 +454,13 @@ class ZertzGameController:
         # Dispatch to renderer (if present) and wait for callback
         if self.renderer:
             self.waiting_for_renderer = True
-            self.renderer.execute_action(player, render_data, action_result, self.animation_duration, self._handle_action_completion)
+            self.renderer.execute_action(
+                player,
+                render_data,
+                action_result,
+                self.animation_duration,
+                self._handle_action_completion,
+            )
             if self.waiting_for_renderer:
                 return task.again
             # If callback was synchronous, process completions and check status immediately
@@ -291,9 +530,9 @@ class ZertzGameController:
         if winner:
             # Convert winner constant to player number for display
             player_num = 1 if winner == PLAYER_1_WIN else 2
-            self._report(f'Winner: Player {player_num}')
+            self._report(f"Winner: Player {player_num}")
         else:
-            self._report('Game ended in a tie')
+            self._report("Game ended in a tie")
         self.session.game.print_state(self._report)
 
         self._report(f"Player 1 captures: {self.session.player1.captured}")
@@ -305,7 +544,10 @@ class ZertzGameController:
         if self.session.is_replay_mode():
             self._report("Replay complete")
             return task.done
-        if self.max_games is not None and self.session.get_games_played() >= self.max_games:
+        if (
+            self.max_games is not None
+            and self.session.get_games_played() >= self.max_games
+        ):
             # Reached max games limit
             self._report(f"Completed {self.session.get_games_played()} game(s)")
             self._close_log_file()  # Close log file before exiting

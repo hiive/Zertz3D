@@ -46,9 +46,10 @@ class TestGeometricRingRemoval:
                     original = small_board._is_removable((y, x))
                     geometric = small_board._is_removable_geometric((y, x))
 
-                    assert original == geometric, \
-                        f"Mismatch at {small_board.index_to_str((y, x))}: " \
+                    assert original == geometric, (
+                        f"Mismatch at {small_board.index_to_str((y, x))}: "
                         f"original={original}, geometric={geometric}"
+                    )
 
     def test_corner_rings_removable_when_two_neighbors_missing(self, small_board):
         """Test that corner rings are removable when two neighbors are removed."""
@@ -68,8 +69,9 @@ class TestGeometricRingRemoval:
         original = small_board._is_removable(a4_pos)
         geometric = small_board._is_removable_geometric(a4_pos)
 
-        assert original == geometric is True, \
+        assert original == geometric is True, (
             f"A4 should be removable: original={original}, geometric={geometric}"
+        )
 
     def test_center_ring_not_removable_on_full_board(self, small_board):
         """Center ring (D4) should not be removable on a full board."""
@@ -78,8 +80,9 @@ class TestGeometricRingRemoval:
         original = small_board._is_removable(d4_pos)
         geometric = small_board._is_removable_geometric(d4_pos)
 
-        assert original == geometric is False, \
+        assert original == geometric is False, (
             f"D4 should not be removable: original={original}, geometric={geometric}"
+        )
 
     def test_ring_with_marble_not_removable(self, small_board):
         """Rings with marbles should not be removable."""
@@ -97,10 +100,13 @@ class TestGeometricRingRemoval:
         original = small_board._is_removable(a4_pos)
         geometric = small_board._is_removable_geometric(a4_pos)
 
-        assert original == geometric is False, \
+        assert original == geometric is False, (
             f"A4 with marble should not be removable: original={original}, geometric={geometric}"
+        )
 
-    @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
     def test_exhaustive_comparison_on_full_board(self, request, board_fixture):
         """Exhaustively compare both methods on every ring of a full board."""
         board = request.getfixturevalue(board_fixture)
@@ -118,10 +124,13 @@ class TestGeometricRingRemoval:
                             f"{pos_str}: original={original}, geometric={geometric}"
                         )
 
-        assert len(mismatches) == 0, \
+        assert len(mismatches) == 0, (
             f"Found {len(mismatches)} mismatches:\n" + "\n".join(mismatches)
+        )
 
-    @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
     def test_systematic_ring_removal_patterns(self, request, board_fixture):
         """Test various systematic ring removal patterns."""
         board = request.getfixturevalue(board_fixture)
@@ -134,7 +143,9 @@ class TestGeometricRingRemoval:
                     ring_positions.append((y, x))
 
         # Test removing each ring one at a time and checking all others
-        for remove_y, remove_x in ring_positions[:10]:  # Test first 10 to keep it manageable
+        for remove_y, remove_x in ring_positions[
+            :10
+        ]:  # Test first 10 to keep it manageable
             # Create a copy of the board
             test_board = ZertzBoard(clone=board)
 
@@ -158,9 +169,10 @@ class TestGeometricRingRemoval:
                         )
 
             removed_str = board.index_to_str((remove_y, remove_x))
-            assert len(mismatches) == 0, \
-                f"After removing {removed_str}, found {len(mismatches)} mismatches:\n" + \
-                "\n".join(mismatches)
+            assert len(mismatches) == 0, (
+                f"After removing {removed_str}, found {len(mismatches)} mismatches:\n"
+                + "\n".join(mismatches)
+            )
 
     def test_edge_ring_patterns(self, small_board):
         """Test specific edge ring patterns that should be removable."""
@@ -180,8 +192,9 @@ class TestGeometricRingRemoval:
         original = small_board._is_removable(f2_pos)
         geometric = small_board._is_removable_geometric(f2_pos)
 
-        assert original == geometric, \
+        assert original == geometric, (
             f"F2 removability mismatch: original={original}, geometric={geometric}"
+        )
 
     def test_48_ring_board_specific_patterns(self, medium_board):
         """Test specific patterns on the 48-ring board."""
@@ -200,8 +213,9 @@ class TestGeometricRingRemoval:
         original = medium_board._is_removable(a5_pos)
         geometric = medium_board._is_removable_geometric(a5_pos)
 
-        assert original == geometric, \
+        assert original == geometric, (
             f"A5 removability mismatch: original={original}, geometric={geometric}"
+        )
 
     def test_61_ring_board_specific_patterns(self, large_board):
         """Test specific patterns on the 61-ring board."""
@@ -220,13 +234,17 @@ class TestGeometricRingRemoval:
         original = large_board._is_removable(a5_pos)
         geometric = large_board._is_removable_geometric(a5_pos)
 
-        assert original == geometric, \
+        assert original == geometric, (
             f"A5 removability mismatch: original={original}, geometric={geometric}"
+        )
 
-    @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
     def test_random_ring_removal_patterns(self, request, board_fixture):
         """Test random ring removal patterns."""
         import random
+
         random.seed(42)  # Reproducible tests
 
         board = request.getfixturevalue(board_fixture)
@@ -262,9 +280,10 @@ class TestGeometricRingRemoval:
                             f"{pos_str}: original={original}, geometric={geometric}"
                         )
 
-            assert len(mismatches) == 0, \
-                f"Trial {trial}: found {len(mismatches)} mismatches:\n" + \
-                "\n".join(mismatches)
+            assert len(mismatches) == 0, (
+                f"Trial {trial}: found {len(mismatches)} mismatches:\n"
+                + "\n".join(mismatches)
+            )
 
 
 class TestGeometricHelpers:
@@ -279,8 +298,9 @@ class TestGeometricHelpers:
         # D4 is at array position (3, 3) for a 7x7 board
         # In axial: q = 3 - 3 = 0, r = 3 - 3 = 0
         # In Cartesian: xc = sqrt(3) * (0 + 0/2) = 0, yc = 1.5 * 0 = 0
-        assert abs(xc) < 1e-10 and abs(yc) < 1e-10, \
+        assert abs(xc) < 1e-10 and abs(yc) < 1e-10, (
             f"D4 should be at origin, got ({xc}, {yc})"
+        )
 
     def test_neighbor_distances_are_consistent(self, small_board):
         """Test that all neighbor pairs have consistent distances."""
@@ -296,15 +316,22 @@ class TestGeometricHelpers:
             neighbors = small_board.get_neighbors(pos)
 
             for neighbor in neighbors:
-                if (small_board._is_inbounds(neighbor) and
-                    small_board.state[small_board.RING_LAYER, neighbor[0], neighbor[1]] == 1):
-
+                if (
+                    small_board._is_inbounds(neighbor)
+                    and small_board.state[
+                        small_board.RING_LAYER, neighbor[0], neighbor[1]
+                    ]
+                    == 1
+                ):
                     neighbor_x, neighbor_y = small_board._yx_to_cartesian(*neighbor)
 
                     # Distance between neighbors in a hexagonal grid should be sqrt(3)
                     # (for our unit size of 1.0)
-                    dist = np.sqrt((neighbor_x - pos_x)**2 + (neighbor_y - pos_y)**2)
+                    dist = np.sqrt(
+                        (neighbor_x - pos_x) ** 2 + (neighbor_y - pos_y) ** 2
+                    )
 
                     # Allow small floating point error
-                    assert abs(dist - sqrt3) < 1e-10, \
+                    assert abs(dist - sqrt3) < 1e-10, (
                         f"Distance from {pos_str} to neighbor should be √3, got {dist}"
+                    )

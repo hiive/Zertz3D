@@ -35,11 +35,17 @@ class ActionResult:
             newly_frozen_positions: Set of position strings that became frozen (set or None)
         """
         self.captured_marbles = captured_marbles
-        self.newly_frozen_positions = newly_frozen_positions if newly_frozen_positions is not None else set()
+        self.newly_frozen_positions = (
+            newly_frozen_positions if newly_frozen_positions is not None else set()
+        )
 
     def __repr__(self):
         """String representation for debugging."""
-        frozen_str = f", frozen={len(self.newly_frozen_positions)} positions" if self.newly_frozen_positions else ""
+        frozen_str = (
+            f", frozen={len(self.newly_frozen_positions)} positions"
+            if self.newly_frozen_positions
+            else ""
+        )
         return f"ActionResult(captured={self.captured_marbles}{frozen_str})"
 
     def has_captures(self):

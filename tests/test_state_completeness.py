@@ -19,16 +19,16 @@ class TestStateCompleteness:
         state = game.get_current_state()
 
         assert isinstance(state, dict), "State should be a dictionary"
-        assert 'spatial' in state, "State should have 'spatial' key"
-        assert 'global' in state, "State should have 'global' key"
-        assert 'player' in state, "State should have 'player' key"
+        assert "spatial" in state, "State should have 'spatial' key"
+        assert "global" in state, "State should have 'global' key"
+        assert "player" in state, "State should have 'player' key"
 
     def test_spatial_state_shape(self):
         """Spatial state should have correct shape (L, H, W)."""
         game = ZertzGame(rings=37, t=1)
         state = game.get_current_state()
 
-        spatial = state['spatial']
+        spatial = state["spatial"]
         assert isinstance(spatial, np.ndarray), "Spatial should be numpy array"
         assert len(spatial.shape) == 3, "Spatial should be 3D array"
 
@@ -40,7 +40,7 @@ class TestStateCompleteness:
         game = ZertzGame(rings=37)
         state = game.get_current_state()
 
-        global_state = state['global']
+        global_state = state["global"]
         assert isinstance(global_state, np.ndarray), "Global should be numpy array"
         assert global_state.shape == (10,), f"Expected (10,), got {global_state.shape}"
 
@@ -49,7 +49,7 @@ class TestStateCompleteness:
         game = ZertzGame(rings=37)
         state = game.get_current_state()
 
-        global_state = state['global']
+        global_state = state["global"]
         # Default supply: [6, 8, 10] for w, g, b
         assert global_state[ZertzBoard.SUPPLY_W] == 6, "White supply should be 6"
         assert global_state[ZertzBoard.SUPPLY_G] == 8, "Gray supply should be 8"
@@ -60,7 +60,7 @@ class TestStateCompleteness:
         game = ZertzGame(rings=37)
         state = game.get_current_state()
 
-        global_state = state['global']
+        global_state = state["global"]
         # Initial captured counts should be 0
         assert global_state[ZertzBoard.P1_CAP_W] == 0, "P1 white captured should be 0"
         assert global_state[ZertzBoard.P1_CAP_G] == 0, "P1 gray captured should be 0"
@@ -74,7 +74,7 @@ class TestStateCompleteness:
         game = ZertzGame(rings=37)
         state = game.get_current_state()
 
-        global_state = state['global']
+        global_state = state["global"]
         # Game starts with player 1 (index 0)
         assert global_state[ZertzBoard.CUR_PLAYER] == 0, "Current player should be 0"
 
@@ -84,17 +84,17 @@ class TestStateCompleteness:
         state = game.get_current_state()
 
         # Should start with player 1
-        assert state['player'] == 1, "Player 1 should have value 1"
+        assert state["player"] == 1, "Player 1 should have value 1"
 
         # Take an action to switch to player 2
         placement, capture = game.get_valid_actions()
         valid_actions = np.argwhere(placement)
         if len(valid_actions) > 0:
             action = tuple(valid_actions[0])
-            game.take_action('PUT', action)
+            game.take_action("PUT", action)
 
             state2 = game.get_current_state()
-            assert state2['player'] == -1, "Player 2 should have value -1"
+            assert state2["player"] == -1, "Player 2 should have value -1"
 
     def test_state_is_copied(self):
         """State arrays should be copies, not references."""
@@ -102,15 +102,15 @@ class TestStateCompleteness:
         state1 = game.get_current_state()
 
         # Modify returned arrays
-        state1['spatial'][0, 0, 0] = 99
-        state1['global'][0] = 99
+        state1["spatial"][0, 0, 0] = 99
+        state1["global"][0] = 99
 
         # Get state again
         state2 = game.get_current_state()
 
         # Should not be affected
-        assert state2['spatial'][0, 0, 0] != 99, "Spatial should be a copy"
-        assert state2['global'][0] != 99, "Global should be a copy"
+        assert state2["spatial"][0, 0, 0] != 99, "Spatial should be a copy"
+        assert state2["global"][0] != 99, "Global should be a copy"
 
     def test_get_next_state_returns_dict(self):
         """get_next_state should also return dictionary format."""
@@ -122,12 +122,12 @@ class TestStateCompleteness:
         assert len(valid_actions) > 0, "Should have valid placement actions"
 
         action = tuple(valid_actions[0])
-        next_state = game.get_next_state(action, 'PUT')
+        next_state = game.get_next_state(action, "PUT")
 
         assert isinstance(next_state, dict), "Next state should be a dictionary"
-        assert 'spatial' in next_state
-        assert 'global' in next_state
-        assert 'player' in next_state
+        assert "spatial" in next_state
+        assert "global" in next_state
+        assert "player" in next_state
 
     def test_state_changes_after_action(self):
         """State should reflect changes after action."""
@@ -135,7 +135,7 @@ class TestStateCompleteness:
         initial_state = game.get_current_state()
 
         # Initial supply
-        initial_supply = initial_state['global'][ZertzBoard.SUPPLY_SLICE].copy()
+        initial_supply = initial_state["global"][ZertzBoard.SUPPLY_SLICE].copy()
 
         # Find and take a placement action
         placement, capture = game.get_valid_actions()
@@ -145,16 +145,18 @@ class TestStateCompleteness:
         # Determine which marble type was placed
         marble_type_idx = action[0]
 
-        next_state = game.get_next_state(action, 'PUT')
+        next_state = game.get_next_state(action, "PUT")
 
         # Supply should have decreased
-        new_supply = next_state['global'][ZertzBoard.SUPPLY_SLICE]
-        assert new_supply[marble_type_idx] == initial_supply[marble_type_idx] - 1, \
+        new_supply = next_state["global"][ZertzBoard.SUPPLY_SLICE]
+        assert new_supply[marble_type_idx] == initial_supply[marble_type_idx] - 1, (
             "Supply should decrease by 1 for placed marble"
+        )
 
         # Player should have switched
-        assert next_state['player'] == -initial_state['player'], \
+        assert next_state["player"] == -initial_state["player"], (
             "Player should switch after action"
+        )
 
     def test_different_board_sizes(self):
         """State should work correctly for all board sizes."""
@@ -163,9 +165,12 @@ class TestStateCompleteness:
             state = game.get_current_state()
 
             # Check shapes
-            assert state['spatial'].shape == (5, width, width), \
+            assert state["spatial"].shape == (5, width, width), (
                 f"Spatial shape wrong for {rings}-ring board"
-            assert state['global'].shape == (10,), \
+            )
+            assert state["global"].shape == (10,), (
                 f"Global shape wrong for {rings}-ring board"
-            assert state['player'] in [1, -1], \
+            )
+            assert state["player"] in [1, -1], (
                 f"Player value wrong for {rings}-ring board"
+            )

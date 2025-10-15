@@ -15,28 +15,28 @@ def test_process_handles_isolation_and_renderer_notifications():
     player = Mock()
     result = ActionResult(
         captured_marbles=[
-            {'marble': 'w', 'pos': 'A1'},
-            {'marble': None, 'pos': 'B2'},
+            {"marble": "w", "pos": "A1"},
+            {"marble": None, "pos": "B2"},
         ]
     )
 
     processor = ActionProcessor(renderer)
     processor.process(player, result, delay_time=0.5)
 
-    player.add_capture.assert_called_once_with('w')
-    renderer.show_isolated_removal.assert_any_call(player, 'A1', 'w', 0.5)
-    renderer.show_isolated_removal.assert_any_call(player, 'B2', None, 0.5)
+    player.add_capture.assert_called_once_with("w")
+    renderer.show_isolated_removal.assert_any_call(player, "A1", "w", 0.5)
+    renderer.show_isolated_removal.assert_any_call(player, "B2", None, 0.5)
     assert renderer.show_isolated_removal.call_count == 2
 
 
 def test_process_handles_standard_capture_without_renderer():
     player = Mock()
     processor = ActionProcessor(None)
-    result = ActionResult(captured_marbles='g')
+    result = ActionResult(captured_marbles="g")
 
     processor.process(player, result, delay_time=0.25)
 
-    player.add_capture.assert_called_once_with('g')
+    player.add_capture.assert_called_once_with("g")
 
 
 def test_process_ignores_empty_results():

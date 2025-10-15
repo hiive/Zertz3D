@@ -64,18 +64,24 @@ class ActionTextFormatter:
 
         if len(capture_positions) > 0:
             lines.append("Capture moves available:")
-            for i, (direction, y, x) in enumerate(capture_positions[:10]):  # Show up to 10
+            for i, (direction, y, x) in enumerate(
+                capture_positions[:10]
+            ):  # Show up to 10
                 try:
                     _, action_dict = game.action_to_str("CAP", (direction, y, x))
-                    marble = action_dict['marble']
-                    src = action_dict['src']
-                    dst = action_dict['dst']
-                    captured = action_dict['capture']
-                    cap_pos = action_dict['cap']
-                    lines.append(f"  - CAP {marble} {src} -> {dst} capturing {captured} at {cap_pos}")
+                    marble = action_dict["marble"]
+                    src = action_dict["src"]
+                    dst = action_dict["dst"]
+                    captured = action_dict["capture"]
+                    cap_pos = action_dict["cap"]
+                    lines.append(
+                        f"  - CAP {marble} {src} -> {dst} capturing {captured} at {cap_pos}"
+                    )
                 except (IndexError, KeyError):
                     src_pos = game.board.position_from_yx((y, x))
-                    lines.append(f"  - Jump from {src_pos.label} (direction {direction})")
+                    lines.append(
+                        f"  - Jump from {src_pos.label} (direction {direction})"
+                    )
 
             if len(capture_positions) > 10:
                 lines.append(f"  ... and {len(capture_positions) - 10} more")
@@ -110,7 +116,7 @@ class ActionTextFormatter:
                 if key not in placements:
                     placements[key] = []
 
-                if rem != game.board.width ** 2:
+                if rem != game.board.width**2:
                     rem_y = rem // game.board.width
                     rem_x = rem % game.board.width
                     rem_str = game.board.position_from_yx((rem_y, rem_x)).label

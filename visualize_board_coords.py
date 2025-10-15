@@ -14,7 +14,8 @@ Supports all board sizes:
 """
 
 import sys
-sys.path.insert(0, 'game')
+
+sys.path.insert(0, "game")
 
 import argparse
 import numpy as np
@@ -26,6 +27,7 @@ from game.zertz_board import ZertzBoard
 # --------------------------------------------------------------------------- #
 # Coordinate conversion helpers
 # --------------------------------------------------------------------------- #
+
 
 def yx_to_axial(y, x, width):
     """Zertz axial convention: q = x - center, r = y - x."""
@@ -46,6 +48,7 @@ def axial_to_cart(q, r, size=1.0):
 # Visualization
 # --------------------------------------------------------------------------- #
 
+
 def visualize_board(rings=37):
     """
     Visualize a Zèrtz board with the specified number of rings.
@@ -65,7 +68,7 @@ def visualize_board(rings=37):
         symmetry = "D6 symmetry"
 
     fig, ax = plt.subplots(figsize=(10, 9))
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
     ax.grid(False)
 
     # Collect all ring coordinates
@@ -86,8 +89,7 @@ def visualize_board(rings=37):
     # Apply 30° CCW rotation about the geometric center
     # --------------------------------------------------------------- #
     theta = np.deg2rad(30)
-    R = np.array([[np.cos(theta), -np.sin(theta)],
-                  [np.sin(theta),  np.cos(theta)]])
+    R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
     rotated_coords = (all_coords - geometric_center) @ R.T + geometric_center
 
     # --------------------------------------------------------------- #
@@ -97,8 +99,9 @@ def visualize_board(rings=37):
     geometric_center[1] *= -1
 
     # Replace positions' Cartesian coords with rotated versions
-    positions = [(label, yx, qr, rc)
-                 for (label, yx, qr, _), rc in zip(positions, rotated_coords)]
+    positions = [
+        (label, yx, qr, rc) for (label, yx, qr, _), rc in zip(positions, rotated_coords)
+    ]
     all_coords = rotated_coords
     # --------------------------------------------------------------- #
 
@@ -115,37 +118,48 @@ def visualize_board(rings=37):
     # Draw all rings
     for label, (_, _), (_, _), (xc, yc) in positions:
         if label in closest_labels:
-            color = 'red'
+            color = "red"
             lw = 2.8
         else:
-            color = 'blue'
+            color = "blue"
             lw = 1.3
-        ax.add_patch(Circle((xc, yc), ring_radius,
-                            fill=False, edgecolor=color, linewidth=lw))
-        ax.text(xc, yc, label, ha='center', va='center',
-                fontsize=8, fontweight='bold')
+        ax.add_patch(
+            Circle((xc, yc), ring_radius, fill=False, edgecolor=color, linewidth=lw)
+        )
+        ax.text(xc, yc, label, ha="center", va="center", fontsize=8, fontweight="bold")
 
     # Draw geometric center as red star
-    ax.plot(geometric_center[0], geometric_center[1], 'r*',
-            markersize=16, label='Geometric Center')
+    ax.plot(
+        geometric_center[0],
+        geometric_center[1],
+        "r*",
+        markersize=16,
+        label="Geometric Center",
+    )
 
     # Formatting
     pad = 2.2 * size
     ax.set_xlim(all_coords[:, 0].min() - pad, all_coords[:, 0].max() + pad)
     ax.set_ylim(all_coords[:, 1].min() - pad, all_coords[:, 1].max() + pad)
-    ax.set_xlabel('X (axial→Cartesian, pointy-top)')
-    ax.set_ylabel('Y (axial→Cartesian, pointy-top)')
-    ax.set_title(f'{rings}-Ring Zèrtz Board ({symmetry}) — Rings Closest to Geometric Center',
-                 fontsize=13, fontweight='bold')
+    ax.set_xlabel("X (axial→Cartesian, pointy-top)")
+    ax.set_ylabel("Y (axial→Cartesian, pointy-top)")
+    ax.set_title(
+        f"{rings}-Ring Zèrtz Board ({symmetry}) — Rings Closest to Geometric Center",
+        fontsize=13,
+        fontweight="bold",
+    )
 
     # Add legend with names of center-nearest rings
     ring_text = ", ".join(closest_labels)
-    ax.legend([plt.Line2D([], [], color='red', linewidth=2)],
-              [f'Closest ring(s): {ring_text}'], loc='upper right')
+    ax.legend(
+        [plt.Line2D([], [], color="red", linewidth=2)],
+        [f"Closest ring(s): {ring_text}"],
+        loc="upper right",
+    )
 
     plt.tight_layout()
-    output_path = f'board_visualization_{rings}.png'
-    plt.savefig(output_path, dpi=160, bbox_inches='tight')
+    output_path = f"board_visualization_{rings}.png"
+    plt.savefig(output_path, dpi=160, bbox_inches="tight")
     print(f"\nSaved: {output_path}")
     print(f"Board: {rings} rings ({symmetry})")
     print(f"Geometric Center: ({geometric_center[0]:.4f}, {geometric_center[1]:.4f})")
@@ -154,16 +168,16 @@ def visualize_board(rings=37):
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Visualize Zèrtz board with geometric center highlighted'
+        description="Visualize Zèrtz board with geometric center highlighted"
     )
     parser.add_argument(
-        '--rings',
+        "--rings",
         type=int,
         default=37,
         choices=[37, 48, 61],
-        help='Number of rings on the board (default: 37)'
+        help="Number of rings on the board (default: 37)",
     )
     args = parser.parse_args()
 

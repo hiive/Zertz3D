@@ -1,6 +1,7 @@
 from torch import nn as nn
 from torch_geometric.nn import GCNConv
 
+
 # PyTorch Geometric for GNNs
 class GNNFeatureExtractor(nn.Module):
     """

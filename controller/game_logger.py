@@ -9,7 +9,12 @@ from typing import Callable
 class GameLogger:
     """Handles logging to files (actions + notation)."""
 
-    def __init__(self, log_to_file=False, log_notation=False, status_reporter: Callable[[str], None] | None = None):
+    def __init__(
+        self,
+        log_to_file=False,
+        log_notation=False,
+        status_reporter: Callable[[str], None] | None = None,
+    ):
         """Initialize the game logger.
 
         Args:
@@ -36,7 +41,7 @@ class GameLogger:
 
         if self.log_to_file_enabled:
             self.log_filename = f"zertzlog{variant}_{seed}.txt"
-            self.log_file = open(self.log_filename, 'w')
+            self.log_file = open(self.log_filename, "w")
             self.log_file.write(f"# Seed: {seed}\n")
             self.log_file.write(f"# Rings: {rings}\n")
             if blitz:
@@ -46,7 +51,7 @@ class GameLogger:
 
         if self.log_notation_enabled:
             self.notation_filename = f"zertzlog{variant}_{seed}_notation.txt"
-            self.notation_file = open(self.notation_filename, 'w')
+            self.notation_file = open(self.notation_filename, "w")
             # First line: rings and variant
             variant_text = " Blitz" if blitz else ""
             self.notation_file.write(f"{rings}{variant_text}\n")
@@ -64,7 +69,12 @@ class GameLogger:
             self.log_file.write("# Final game state:\n")
             self.log_file.write("# ---------------\n")
             self.log_file.write("# Board state:\n")
-            board_state = game.board.state[0] + game.board.state[1] + game.board.state[2] * 2 + game.board.state[3] * 3
+            board_state = (
+                game.board.state[0]
+                + game.board.state[1]
+                + game.board.state[2] * 2
+                + game.board.state[3] * 3
+            )
             for row in board_state:
                 self.log_file.write(f"# {row}\n")
             self.log_file.write("# ---------------\n")

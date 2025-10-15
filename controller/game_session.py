@@ -9,17 +9,30 @@ import hashlib
 from typing import Callable
 import numpy as np
 
-from game.zertz_game import (ZertzGame, STANDARD_MARBLES, BLITZ_MARBLES,
-                             STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS)
+from game.zertz_game import (
+    ZertzGame,
+    STANDARD_MARBLES,
+    BLITZ_MARBLES,
+    STANDARD_WIN_CONDITIONS,
+    BLITZ_WIN_CONDITIONS,
+)
 from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer, HumanZertzPlayer
 
 
 class GameSession:
     """Manages a single game's lifecycle (board state, players, current game)."""
 
-    def __init__(self, rings=37, blitz=False, seed=None, replay_actions=None,
-                 partial_replay=False, t=5, status_reporter: Callable[[str], None] | None = None,
-                 human_players: tuple[int, ...] | None = None):
+    def __init__(
+        self,
+        rings=37,
+        blitz=False,
+        seed=None,
+        replay_actions=None,
+        partial_replay=False,
+        t=5,
+        status_reporter: Callable[[str], None] | None = None,
+        human_players: tuple[int, ...] | None = None,
+    ):
         """Initialize a game session.
 
         Args:
@@ -89,7 +102,7 @@ class GameSession:
         # Hash the current seed to get a new one
         hash_obj = hashlib.sha256(str(self.current_seed).encode())
         # Take first 8 bytes and convert to integer
-        new_seed = int.from_bytes(hash_obj.digest()[:8], byteorder='big')
+        new_seed = int.from_bytes(hash_obj.digest()[:8], byteorder="big")
         # Keep it in a reasonable range (32-bit unsigned int)
         new_seed = new_seed % (2**32)
         return new_seed
@@ -103,7 +116,11 @@ class GameSession:
         self._report(f"** New game{variant_text} **")
 
         # Generate new seed for non-replay games (only after the first game)
-        if not self.replay_mode and self.current_seed is not None and self.game is not None:
+        if (
+            not self.replay_mode
+            and self.current_seed is not None
+            and self.game is not None
+        ):
             self.current_seed = self._generate_next_seed()
             self._apply_seed(self.current_seed)
 
@@ -145,7 +162,9 @@ class GameSession:
             ZertzPlayer: The new current player
         """
         if not self.partial_replay:
-            raise ValueError("Cannot switch to random play when partial_replay is False")
+            raise ValueError(
+                "Cannot switch to random play when partial_replay is False"
+            )
 
         self._report("Replay finished - continuing with random play")
         if 1 in self.human_players:

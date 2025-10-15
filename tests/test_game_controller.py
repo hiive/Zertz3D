@@ -23,6 +23,7 @@ from game.action_result import ActionResult
 # Test Game Ending in Headless Mode
 # ============================================================================
 
+
 class TestGameControllerHeadless:
     """Test game controller behavior in headless mode (no renderer)."""
 
@@ -39,11 +40,12 @@ class TestGameControllerHeadless:
 
         # Capture console output to verify correct winner display
         output_lines = []
+
         def capture_print(*args, **kwargs):
             """Capture print statements."""
-            output_lines.append(' '.join(str(arg) for arg in args))
+            output_lines.append(" ".join(str(arg) for arg in args))
 
-        with patch('builtins.print', side_effect=capture_print):
+        with patch("builtins.print", side_effect=capture_print):
             # Create controller in headless mode with max_games=1
             controller = ZertzGameController(
                 rings=37,
@@ -52,7 +54,7 @@ class TestGameControllerHeadless:
                 highlight_choices=False,
                 show_coords=False,
                 log_to_file=False,
-                renderer_or_factory=None  # Headless mode
+                renderer_or_factory=None,  # Headless mode
             )
 
             # Run the game loop
@@ -66,7 +68,7 @@ class TestGameControllerHeadless:
         )
 
         # Verify winner was reported correctly (not as -1 or 1)
-        winner_lines = [line for line in output_lines if line.startswith('Winner:')]
+        winner_lines = [line for line in output_lines if line.startswith("Winner:")]
         assert len(winner_lines) == 1, (
             f"Expected exactly 1 winner announcement, but got {len(winner_lines)}. "
             f"Lines: {winner_lines}"
@@ -74,20 +76,22 @@ class TestGameControllerHeadless:
 
         # Winner should be displayed as "Player 1" or "Player 2", not "Player -1" or "Player 1" (constant)
         winner_line = winner_lines[0]
-        assert 'Player 1' in winner_line or 'Player 2' in winner_line, (
+        assert "Player 1" in winner_line or "Player 2" in winner_line, (
             f"Winner should be displayed as 'Player 1' or 'Player 2', got: {winner_line}"
         )
-        assert 'Player -1' not in winner_line, (
+        assert "Player -1" not in winner_line, (
             f"Winner should not be displayed as 'Player -1', got: {winner_line}"
         )
 
         # Verify "Completed X game(s)" appears exactly once
-        completed_lines = [line for line in output_lines if line.startswith('Completed')]
+        completed_lines = [
+            line for line in output_lines if line.startswith("Completed")
+        ]
         assert len(completed_lines) == 1, (
             f"Expected exactly 1 'Completed' announcement, but got {len(completed_lines)}. "
             f"Lines: {completed_lines}"
         )
-        assert 'Completed 1 game(s)' in completed_lines[0], (
+        assert "Completed 1 game(s)" in completed_lines[0], (
             f"Expected 'Completed 1 game(s)', got: {completed_lines[0]}"
         )
 
@@ -102,21 +106,21 @@ class TestGameControllerHeadless:
         output_lines = []
 
         def capture_print(*args, **kwargs):
-            output_lines.append(' '.join(str(arg) for arg in args))
+            output_lines.append(" ".join(str(arg) for arg in args))
 
-        with patch('builtins.print', side_effect=capture_print):
+        with patch("builtins.print", side_effect=capture_print):
             controller = ZertzGameController(
                 rings=37,
                 seed=seed,
                 max_games=2,  # Allow 2 games, but should stop after 2
                 highlight_choices=False,
-                renderer_or_factory=None
+                renderer_or_factory=None,
             )
 
             controller.run()
 
         # Count winner announcements
-        winner_lines = [line for line in output_lines if line.startswith('Winner:')]
+        winner_lines = [line for line in output_lines if line.startswith("Winner:")]
 
         # Should have exactly 2 winner announcements (one per game)
         assert len(winner_lines) == 2, (
@@ -135,27 +139,27 @@ class TestGameControllerHeadless:
         output_lines = []
 
         def capture_print(*args, **kwargs):
-            output_lines.append(' '.join(str(arg) for arg in args))
+            output_lines.append(" ".join(str(arg) for arg in args))
 
-        with patch('builtins.print', side_effect=capture_print):
+        with patch("builtins.print", side_effect=capture_print):
             controller = ZertzGameController(
                 rings=37,
                 seed=seed,
                 max_games=1,
                 highlight_choices=False,
-                renderer_or_factory=None
+                renderer_or_factory=None,
             )
 
             controller.run()
 
-        winner_lines = [line for line in output_lines if line.startswith('Winner:')]
+        winner_lines = [line for line in output_lines if line.startswith("Winner:")]
 
         # Should have exactly one winner announcement
         assert len(winner_lines) == 1
 
         # Winner line should contain either "Player 1" or "Player 2"
         winner_line = winner_lines[0]
-        assert 'Player 1' in winner_line or 'Player 2' in winner_line, (
+        assert "Player 1" in winner_line or "Player 2" in winner_line, (
             f"Winner should be 'Player 1' or 'Player 2', got: {winner_line}"
         )
 
@@ -169,7 +173,7 @@ class TestGameControllerHeadless:
             max_games=3,
             highlight_choices=False,
             renderer_or_factory=None,
-            log_to_file=False
+            log_to_file=False,
         )
 
         # Initially should be 0
@@ -185,12 +189,14 @@ class TestGameControllerHeadless:
 
     def test_completion_queue_uses_action_processor(self):
         """Ensure completion queue delegates to action processor helper."""
-        controller = ZertzGameController(rings=37, highlight_choices=False, renderer_or_factory=None)
+        controller = ZertzGameController(
+            rings=37, highlight_choices=False, renderer_or_factory=None
+        )
         processor = Mock()
         controller.action_processor = processor
 
         player = Mock()
-        result = ActionResult(captured_marbles='w')
+        result = ActionResult(captured_marbles="w")
 
         controller._handle_action_completion(player, result)
         controller._process_completion_queue(delay_time=0.5)

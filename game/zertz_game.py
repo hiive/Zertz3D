@@ -17,14 +17,24 @@ TIE = 0
 # None = game not over
 
 # Game variant configurations
-STANDARD_MARBLES = {'w': 6, 'g': 8, 'b': 10}
-BLITZ_MARBLES = {'w': 5, 'g': 7, 'b': 9}
+STANDARD_MARBLES = {"w": 6, "g": 8, "b": 10}
+BLITZ_MARBLES = {"w": 5, "g": 7, "b": 9}
 
-STANDARD_WIN_CONDITIONS = [{'w': 3, 'g': 3, 'b': 3}, {'w': 4}, {'g': 5}, {'b': 6}]
-BLITZ_WIN_CONDITIONS = [{'w': 2, 'g': 2, 'b': 2}, {'w': 3}, {'g': 4}, {'b': 5}]
+STANDARD_WIN_CONDITIONS = [{"w": 3, "g": 3, "b": 3}, {"w": 4}, {"g": 5}, {"b": 6}]
+BLITZ_WIN_CONDITIONS = [{"w": 2, "g": 2, "b": 2}, {"w": 3}, {"g": 4}, {"b": 5}]
+
 
 class ZertzGame:
-    def __init__(self, rings=37, marbles=None, win_con=None, t=1, board_layout=None, clone=None, clone_state=None):
+    def __init__(
+        self,
+        rings=37,
+        marbles=None,
+        win_con=None,
+        t=1,
+        board_layout=None,
+        clone=None,
+        clone_state=None,
+    ):
         if clone is not None:
             # Creates an instance of ZertzGame with settings copied from clone and updated to
             # have the same board state as clone_state
@@ -46,7 +56,9 @@ class ZertzGame:
             self.marbles = marbles
             self.board_layout = board_layout
 
-            self.board = ZertzBoard(self.initial_rings, self.marbles, self.t, board_layout=self.board_layout)
+            self.board = ZertzBoard(
+                self.initial_rings, self.marbles, self.t, board_layout=self.board_layout
+            )
 
             # The win conditions (amount of each marble needed)
             #   default:
@@ -56,8 +68,7 @@ class ZertzGame:
             #     -6 black marbles
             if win_con is None:
                 # Use the default win conditions
-                self.win_con = [{'w': 3, 'g': 3, 'b': 3},
-                                {'w': 4}, {'g': 5}, {'b': 6}]
+                self.win_con = [{"w": 3, "g": 3, "b": 3}, {"w": 4}, {"g": 5}, {"b": 6}]
             else:
                 self.win_con = win_con
 
@@ -107,9 +118,9 @@ class ZertzGame:
             return False
 
         # Get last k pairs (4k moves)
-        last_k_pairs = self.move_history[-needed_moves // 2:]
+        last_k_pairs = self.move_history[-needed_moves // 2 :]
         # Get preceding k pairs
-        preceding_k_pairs = self.move_history[-needed_moves:-needed_moves // 2]
+        preceding_k_pairs = self.move_history[-needed_moves : -needed_moves // 2]
 
         return last_k_pairs == preceding_k_pairs
 
@@ -122,8 +133,10 @@ class ZertzGame:
         if len(self.move_history) < 2:
             return False
 
-        return (self.move_history[-1] == ('PASS', None) and
-                self.move_history[-2] == ('PASS', None))
+        return self.move_history[-1] == ("PASS", None) and self.move_history[-2] == (
+            "PASS",
+            None,
+        )
 
     def get_current_state(self):
         """Returns complete observable game state for ML.
@@ -135,9 +148,9 @@ class ZertzGame:
                 - 'player': int - 1 for Player 1, -1 for Player 2 (perspective value)
         """
         return {
-            'spatial': np.copy(self.board.state),
-            'global': np.copy(self.board.global_state),
-            'player': self.get_cur_player_value()
+            "spatial": np.copy(self.board.state),
+            "global": np.copy(self.board.global_state),
+            "player": self.get_cur_player_value(),
         }
 
     def get_next_state(self, action, action_type, cur_state=None):
@@ -180,7 +193,7 @@ class ZertzGame:
 
     def get_capture_action_size(self):
         # Return the number of possible capture actions
-        return 6 * self.board.width ** 2
+        return 6 * self.board.width**2
 
     def get_capture_action_shape(self):
         # Return the shape of the capture actions as a tuple
@@ -188,7 +201,7 @@ class ZertzGame:
 
     def get_placement_action_size(self):
         # Return the number of possible placement actions
-        return 3 * self.board.width ** 2 * (self.board.width ** 2 + 1)
+        return 3 * self.board.width**2 * (self.board.width**2 + 1)
 
     def get_placement_action_shape(self):
         # Return the shape of the placement actions as a tuple
@@ -291,11 +304,15 @@ class ZertzGame:
             # Standard win conditions
             # The winner is the player that made the previous action
             if np.sum(self.board.state[self.board.CAPTURE_LAYER]) == 0:
-                return PLAYER_2_WIN if self.get_cur_player_value() == 1 else PLAYER_1_WIN
+                return (
+                    PLAYER_2_WIN if self.get_cur_player_value() == 1 else PLAYER_1_WIN
+                )
             else:
                 # The game is over in the middle of the players turn during a chain capture
                 # if they have enough marbles to meet a win condition.
-                return PLAYER_1_WIN if self.get_cur_player_value() == 1 else PLAYER_2_WIN
+                return (
+                    PLAYER_1_WIN if self.get_cur_player_value() == 1 else PLAYER_2_WIN
+                )
         else:
             # Return if game is ended for an arbitrary game state
             temp_game = ZertzGame(clone=self, clone_state=cur_state)
@@ -306,7 +323,7 @@ class ZertzGame:
         # First, there are rotational symmetry in that every board position can be rotated in
         # six different ways
         # Second, there are mirror symmetry with every rotation being able to be flipped
-        # Third, there are translational symmetries once the board has gotten small enough that 
+        # Third, there are translational symmetries once the board has gotten small enough that
         # it can be shifted in one of the six directions and still be able to fit within the
         # original space.
         # Total board symmetries = 6 * 2 * (# of shift symmetries)
@@ -321,9 +338,9 @@ class ZertzGame:
     def translate_action_symmetry(self, action_type, symmetry, actions):
         translated = np.copy(actions)
         if len(translated.shape) != 3:
-            if action_type == 'PUT':
+            if action_type == "PUT":
                 translated = translated.reshape(self.get_placement_action_shape())
-            elif action_type == 'CAP':
+            elif action_type == "CAP":
                 translated = translated.reshape(self.get_capture_action_shape())
         if symmetry == 0:  # mirror
             translated = self.board.mirror_action(action_type, translated)
@@ -346,14 +363,14 @@ class ZertzGame:
         # Translate an action string [i.e. 'PUT w A1 B2' or 'CAP b C4 g C2'] to a tuple/type
         args = action_str.split()
         action_type = args[0]
-        if action_type == 'PUT':
+        if action_type == "PUT":
             if len(args) == 4:
                 marble_type, put_str, rem_str = args[1:]
             elif len(args) == 3:
                 marble_type, put_str = args[1:]
                 rem_str = None
             else:
-                return '', None
+                return "", None
             layer = self.board.MARBLE_TO_LAYER[marble_type] - 1
             y, x = self.board.str_to_index(put_str)
             put = y * self.board.width + x
@@ -361,13 +378,13 @@ class ZertzGame:
                 y, x = self.board.str_to_index(rem_str)
                 rem = y * self.board.width + x
             else:
-                rem = self.board.width ** 2
+                rem = self.board.width**2
             action = (layer, put, rem)
-        elif action_type == 'CAP':
+        elif action_type == "CAP":
             if len(args) == 5:
                 _a, src_str, _b, dst_str = args[1:]
             else:
-                return '', None
+                return "", None
             src = self.board.str_to_index(src_str)
             dst = self.board.str_to_index(dst_str)
             cap = self.board.get_middle_ring(src, dst)
@@ -380,16 +397,16 @@ class ZertzGame:
 
     def action_to_str(self, action_type, action):
         # Translate an action tuple and type to a human readable string representation
-        action_str = action_type + ' '
+        action_str = action_type + " "
         action_dict = {}
 
-        if action_type == 'PASS':
+        if action_type == "PASS":
             # Player has no valid moves and must pass
-            action_str = 'PASS'
-            action_dict = {'action': 'PASS'}
+            action_str = "PASS"
+            action_dict = {"action": "PASS"}
             return action_str, action_dict
 
-        if action_type == 'PUT':
+        if action_type == "PUT":
             marble_type, put, rem = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
 
@@ -397,22 +414,23 @@ class ZertzGame:
             put_pos = self.board.position_from_yx(put_index)
             put_str = put_pos.label
 
-            if rem == self.board.width ** 2:
-                rem_str = ''
+            if rem == self.board.width**2:
+                rem_str = ""
             else:
                 rem_index = rem // self.board.width, rem % self.board.width
                 rem_pos = self.board.position_from_yx(rem_index)
                 rem_str = rem_pos.label
             action_str = "{} {} {} {}".format(
-                action_type, marble_type, put_str, rem_str).rstrip()
+                action_type, marble_type, put_str, rem_str
+            ).rstrip()
             action_dict = {
-                'action': action_type,
-                'marble': marble_type,
-                'dst': str(put_str),
-                'remove': str(rem_str)
+                "action": action_type,
+                "marble": marble_type,
+                "dst": str(put_str),
+                "remove": str(rem_str),
             }
 
-        elif action_type == 'CAP':
+        elif action_type == "CAP":
             direction, y, x = action
             src = (y, x)
             src_marble = self.board.get_marble_type_at(src)
@@ -426,14 +444,15 @@ class ZertzGame:
             dst_str = self.board.position_from_yx(dst).label
 
             action_str = "{} {} {} {} {}".format(
-                action_type, src_marble, src_str, cap_marble, dst_str)
+                action_type, src_marble, src_str, cap_marble, dst_str
+            )
             action_dict = {
-                'action': action_type,
-                'marble': src_marble,
-                'src': str(src_str),
-                'dst': str(dst_str),
-                'capture': cap_marble,
-                'cap': str(cap_str)
+                "action": action_type,
+                "marble": src_marble,
+                "src": str(src_str),
+                "dst": str(dst_str),
+                "capture": cap_marble,
+                "cap": str(cap_str),
             }
         return action_str, action_dict
 
@@ -456,18 +475,18 @@ class ZertzGame:
         Returns:
             str: Notation string
         """
-        if action_dict['action'] == 'PASS':
-            return '-'
+        if action_dict["action"] == "PASS":
+            return "-"
 
-        if action_dict['action'] == 'PUT':
+        if action_dict["action"] == "PUT":
             # Convert marble color to uppercase
-            marble = action_dict['marble'].upper()
+            marble = action_dict["marble"].upper()
             # Convert destination to lowercase
-            dst = action_dict['dst'].lower()
+            dst = action_dict["dst"].lower()
 
             # Check if a ring was removed
-            if action_dict['remove']:
-                remove = action_dict['remove'].lower()
+            if action_dict["remove"]:
+                remove = action_dict["remove"].lower()
                 notation = f"{marble}{dst},{remove}"
             else:
                 notation = f"{marble}{dst}"
@@ -476,23 +495,23 @@ class ZertzGame:
             if action_result and action_result.is_isolation():
                 isolated_parts = []
                 for removal in action_result.captured_marbles:
-                    if removal['marble']:
-                        color = removal['marble'].upper()
-                        pos = removal['pos'].lower()
+                    if removal["marble"]:
+                        color = removal["marble"].upper()
+                        pos = removal["pos"].lower()
                         isolated_parts.append(f"{color}{pos}")
                 if isolated_parts:
                     notation += " x " + "".join(isolated_parts)
 
             return notation
 
-        elif action_dict['action'] == 'CAP':
+        elif action_dict["action"] == "CAP":
             # Convert to lowercase and get captured marble as uppercase
-            src = action_dict['src'].lower()
-            dst = action_dict['dst'].lower()
-            captured = action_dict['capture'].upper()
+            src = action_dict["src"].lower()
+            dst = action_dict["dst"].lower()
+            captured = action_dict["capture"].upper()
             return f"x {src}{captured}{dst}"
 
-        return ''
+        return ""
 
     def get_placement_positions(self, placement_array):
         """Convert placement array to list of position strings.
@@ -563,7 +582,7 @@ class ZertzGame:
         removable_positions = []
         for rem_idx in removable_indices:
             # Skip the "no removal" option (width²) and the destination itself
-            if rem_idx != width ** 2 and rem_idx != dst:
+            if rem_idx != width**2 and rem_idx != dst:
                 rem_y = rem_idx // width
                 rem_x = rem_idx % width
                 if self.board.state[self.board.RING_LAYER, rem_y, rem_x]:
@@ -602,13 +621,15 @@ class ZertzGame:
         # Convert arrays to renderer-friendly formats
         placement_positions = self.get_placement_positions(placement_array)
         capture_moves = self.get_capture_dicts(capture_array)
-        removal_positions = self.get_removal_positions(placement_array, action_type, action)
+        removal_positions = self.get_removal_positions(
+            placement_array, action_type, action
+        )
 
         return RenderData(
             action_dict=action_dict,
             placement_positions=placement_positions,
             capture_moves=capture_moves,
-            removal_positions=removal_positions
+            removal_positions=removal_positions,
         )
 
     def print_state(self, reporter=None):
@@ -618,10 +639,12 @@ class ZertzGame:
 
         reporter("---------------")
         reporter("Board state:")
-        reporter(self.board.state[self.board.RING_LAYER] +
-                 self.board.state[self.board.MARBLE_TO_LAYER['w']] +
-                 self.board.state[self.board.MARBLE_TO_LAYER['g']] * 2 +
-                 self.board.state[self.board.MARBLE_TO_LAYER['b']] * 3)
+        reporter(
+            self.board.state[self.board.RING_LAYER]
+            + self.board.state[self.board.MARBLE_TO_LAYER["w"]]
+            + self.board.state[self.board.MARBLE_TO_LAYER["g"]] * 2
+            + self.board.state[self.board.MARBLE_TO_LAYER["b"]] * 3
+        )
         reporter("---------------")
         reporter("Marble supply:")
         reporter(self.board.global_state[self.board.SUPPLY_SLICE])
@@ -640,7 +663,7 @@ class ZertzGame:
         # Record the move for loop detection
         self.move_history.append((action_type, action))
 
-        if action_type == 'PASS':
+        if action_type == "PASS":
             # Player passes (no valid moves), switch player
             self.board._next_player()
             return ActionResult(captured_marbles=None, newly_frozen_positions=set())
@@ -662,4 +685,6 @@ class ZertzGame:
                 if self.board.index_to_str(pos)
             }
 
-            return ActionResult(captured_marbles=captured, newly_frozen_positions=frozen_position_strs)
+            return ActionResult(
+                captured_marbles=captured, newly_frozen_positions=frozen_position_strs
+            )

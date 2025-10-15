@@ -5,6 +5,7 @@ from learner.hybrid_zertz_ai import HybridZertzAI
 
 # Assuming the previous classes (C6ConvLayer, CNNFeatureExtractor, GNNFeatureExtractor, HybridZertzAI) are already defined
 
+
 def label_to_grid_mapping(board_size=48):
     """
     Maps board labels to grid coordinates based on board size.
@@ -20,27 +21,27 @@ def label_to_grid_mapping(board_size=48):
     if board_size == 37:
         # Define the mapping based on the 37-ring board structure
         labels = [
-            ['A4', 'B5', 'C6', 'D7', 'E8'],
-            ['A3', 'B4', 'C5', 'D6', 'E7'],
-            ['A2', 'B3', 'C4', 'D5', 'E6', 'F7'],
-            ['A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7'],
-            ['B1', 'C2', 'D3', 'E4', 'F5', 'G6'],
-            ['C1', 'D2', 'E3', 'F4', 'G5'],
-            ['D1', 'E2', 'F3', 'G4']
+            ["A4", "B5", "C6", "D7", "E8"],
+            ["A3", "B4", "C5", "D6", "E7"],
+            ["A2", "B3", "C4", "D5", "E6", "F7"],
+            ["A1", "B2", "C3", "D4", "E5", "F6", "G7"],
+            ["B1", "C2", "D3", "E4", "F5", "G6"],
+            ["C1", "D2", "E3", "F4", "G5"],
+            ["D1", "E2", "F3", "G4"],
         ]
         height = 7
         width = 9  # Adjust based on actual grid
     elif board_size == 48:
         # Define the mapping based on the 48-ring board structure
         labels = [
-            ['A5', 'B6', 'C7', 'D8', 'E9'],
-            ['A4', 'B5', 'C6', 'D7', 'E8', 'F9'],
-            ['A3', 'B4', 'C5', 'D6', 'E7', 'F8', 'G9'],
-            ['A2', 'B3', 'C4', 'D5', 'E6', 'F7', 'G8', 'H9'],
-            ['A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8'],
-            ['B1', 'C2', 'D3', 'E4', 'F5', 'G6', 'H7'],
-            ['C1', 'D2', 'E3', 'F4', 'G5', 'H6'],
-            ['D1', 'E2', 'F3', 'G4', 'H5']
+            ["A5", "B6", "C7", "D8", "E9"],
+            ["A4", "B5", "C6", "D7", "E8", "F9"],
+            ["A3", "B4", "C5", "D6", "E7", "F8", "G9"],
+            ["A2", "B3", "C4", "D5", "E6", "F7", "G8", "H9"],
+            ["A1", "B2", "C3", "D4", "E5", "F6", "G7", "H8"],
+            ["B1", "C2", "D3", "E4", "F5", "G6", "H7"],
+            ["C1", "D2", "E3", "F4", "G5", "H6"],
+            ["D1", "E2", "F3", "G4", "H5"],
         ]
         height = 8
         width = 9  # Adjust based on actual grid
@@ -70,28 +71,103 @@ def grid_to_graph_no_mask(height, width, label_to_coord, board_size=48):
     edge_index = []
     active_nodes = set()
 
-    if board_size == '37-ring':
+    if board_size == "37-ring":
         # Define active labels for 37-ring board
         active_labels = [
-            'A4', 'B5', 'C6', 'D7', 'E8',
-            'A3', 'B4', 'C5', 'D6', 'E7',
-            'A2', 'B3', 'C4', 'D5', 'E6', 'F7',
-            'A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7',
-            'B1', 'C2', 'D3', 'E4', 'F5', 'G6',
-            'C1', 'D2', 'E3', 'F4', 'G5',
-            'D1', 'E2', 'F3', 'G4'
+            "A4",
+            "B5",
+            "C6",
+            "D7",
+            "E8",
+            "A3",
+            "B4",
+            "C5",
+            "D6",
+            "E7",
+            "A2",
+            "B3",
+            "C4",
+            "D5",
+            "E6",
+            "F7",
+            "A1",
+            "B2",
+            "C3",
+            "D4",
+            "E5",
+            "F6",
+            "G7",
+            "B1",
+            "C2",
+            "D3",
+            "E4",
+            "F5",
+            "G6",
+            "C1",
+            "D2",
+            "E3",
+            "F4",
+            "G5",
+            "D1",
+            "E2",
+            "F3",
+            "G4",
         ]
-    elif board_size == '48-ring':
+    elif board_size == "48-ring":
         # Define active labels for 48-ring board (all are active)
         active_labels = [
-            'A5', 'B6', 'C7', 'D8', 'E9',
-            'A4', 'B5', 'C6', 'D7', 'E8', 'F9',
-            'A3', 'B4', 'C5', 'D6', 'E7', 'F8', 'G9',
-            'A2', 'B3', 'C4', 'D5', 'E6', 'F7', 'G8', 'H9',
-            'A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8',
-            'B1', 'C2', 'D3', 'E4', 'F5', 'G6', 'H7',
-            'C1', 'D2', 'E3', 'F4', 'G5', 'H6',
-            'D1', 'E2', 'F3', 'G4', 'H5'
+            "A5",
+            "B6",
+            "C7",
+            "D8",
+            "E9",
+            "A4",
+            "B5",
+            "C6",
+            "D7",
+            "E8",
+            "F9",
+            "A3",
+            "B4",
+            "C5",
+            "D6",
+            "E7",
+            "F8",
+            "G9",
+            "A2",
+            "B3",
+            "C4",
+            "D5",
+            "E6",
+            "F7",
+            "G8",
+            "H9",
+            "A1",
+            "B2",
+            "C3",
+            "D4",
+            "E5",
+            "F6",
+            "G7",
+            "H8",
+            "B1",
+            "C2",
+            "D3",
+            "E4",
+            "F5",
+            "G6",
+            "H7",
+            "C1",
+            "D2",
+            "E3",
+            "F4",
+            "G5",
+            "H6",
+            "D1",
+            "E2",
+            "F3",
+            "G4",
+            "H5",
         ]
     else:
         raise ValueError("Unsupported board size. Choose '37-ring' or '48-ring'.")
@@ -177,11 +253,11 @@ def create_input_tensor(marbles, ring_presence, label_to_coord, height, width):
         row, col = label_to_coord[label]
         if x[0, 0, row, col] == 0:
             continue  # Cannot place marbles on removed rings
-        if marble_type == 'w':
+        if marble_type == "w":
             x[0, 1, row, col] = 1  # White plane
-        elif marble_type == 'g':
+        elif marble_type == "g":
             x[0, 2, row, col] = 1  # Gray plane
-        elif marble_type == 'b':
+        elif marble_type == "b":
             x[0, 3, row, col] = 1  # Black plane
 
     return x
@@ -196,14 +272,17 @@ def create_captured_counts(captured_p1, captured_p2):
     Returns:
         counts (torch.Tensor): Tensor of shape [1, 6] representing captured counts.
     """
-    counts = torch.tensor([
-        captured_p1.get('w', 0),
-        captured_p1.get('g', 0),
-        captured_p1.get('b', 0),
-        captured_p2.get('w', 0),
-        captured_p2.get('g', 0),
-        captured_p2.get('b', 0)
-    ], dtype=torch.float32).unsqueeze(0)  # Shape: [1, 6]
+    counts = torch.tensor(
+        [
+            captured_p1.get("w", 0),
+            captured_p1.get("g", 0),
+            captured_p1.get("b", 0),
+            captured_p2.get("w", 0),
+            captured_p2.get("g", 0),
+            captured_p2.get("b", 0),
+        ],
+        dtype=torch.float32,
+    ).unsqueeze(0)  # Shape: [1, 6]
 
     # Normalize counts (optional, depending on training strategy)
     # For example, assuming a maximum of 10 captures per type
@@ -212,7 +291,7 @@ def create_captured_counts(captured_p1, captured_p2):
     return counts
 
 
-def example_usage(board_size='37-ring'):
+def example_usage(board_size="37-ring"):
     """
     Example usage of the HybridZertzAI network with dummy data based on the provided board structure.
     Args:
@@ -222,7 +301,9 @@ def example_usage(board_size='37-ring'):
     label_to_coord, height, width = label_to_grid_mapping(board_size)
 
     # Convert grid to graph
-    edge_index, active_nodes = grid_to_graph_no_mask(height, width, label_to_coord, board_size)
+    edge_index, active_nodes = grid_to_graph_no_mask(
+        height, width, label_to_coord, board_size
+    )
 
     # Define number of moves (active rings)
     num_moves = len(active_nodes)
@@ -235,30 +316,69 @@ def example_usage(board_size='37-ring'):
         num_moves=num_moves,
         height=height,
         width=width,
-        num_captured_features=6  # p1_w, p1_g, p1_b, p2_w, p2_g, p2_b
+        num_captured_features=6,  # p1_w, p1_g, p1_b, p2_w, p2_g, p2_b
     )
 
     # Create dummy input data
     # Example marbles: list of (marble_type, position_label)
     marbles = [
-        ('w', 'A4'),
-        ('g', 'B5'),
-        ('b', 'C6'),
-        ('w', 'D7'),
-        ('g', 'E8'),
+        ("w", "A4"),
+        ("g", "B5"),
+        ("b", "C6"),
+        ("w", "D7"),
+        ("g", "E8"),
         # ... more marbles as needed
     ]
 
     # Example ring presence
-    ring_presence = ['A4', 'B5', 'C6', 'D7', 'E8', 'A3', 'B4', 'C5', 'D6', 'E7', 'A2', 'B3', 'C4', 'D5', 'E6', 'F7',
-                     'A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'B1', 'C2', 'D3', 'E4', 'F5', 'G6', 'C1', 'D2',
-                     'E3', 'F4', 'G5', 'D1', 'E2', 'F3', 'G4']  # Adjust based on actual game state
+    ring_presence = [
+        "A4",
+        "B5",
+        "C6",
+        "D7",
+        "E8",
+        "A3",
+        "B4",
+        "C5",
+        "D6",
+        "E7",
+        "A2",
+        "B3",
+        "C4",
+        "D5",
+        "E6",
+        "F7",
+        "A1",
+        "B2",
+        "C3",
+        "D4",
+        "E5",
+        "F6",
+        "G7",
+        "B1",
+        "C2",
+        "D3",
+        "E4",
+        "F5",
+        "G6",
+        "C1",
+        "D2",
+        "E3",
+        "F4",
+        "G5",
+        "D1",
+        "E2",
+        "F3",
+        "G4",
+    ]  # Adjust based on actual game state
 
-    x = create_input_tensor(marbles, ring_presence, label_to_coord, height, width)  # Shape: [1, 4, height, width]
+    x = create_input_tensor(
+        marbles, ring_presence, label_to_coord, height, width
+    )  # Shape: [1, 4, height, width]
 
     # Example captured counts
-    captured_p1 = {'w': 5, 'g': 3, 'b': 2}
-    captured_p2 = {'w': 4, 'g': 6, 'b': 1}
+    captured_p1 = {"w": 5, "g": 3, "b": 2}
+    captured_p2 = {"w": 4, "g": 6, "b": 1}
     captured_counts = create_captured_counts(captured_p1, captured_p2)  # Shape: [1, 6]
 
     # Determine if captures are possible (dummy logic for illustration)
@@ -267,7 +387,7 @@ def example_usage(board_size='37-ring'):
     captures_available = False  # Change to True to simulate captures
 
     # Set action_type based on captures availability
-    action_type = 'cap' if captures_available else 'put'
+    action_type = "cap" if captures_available else "put"
 
     # Forward pass
     policy, value = model(x, edge_index, captured_counts, action_type=action_type)

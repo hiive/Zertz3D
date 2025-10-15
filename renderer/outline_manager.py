@@ -11,7 +11,8 @@ from panda3d.core import (
     LVector4,
     Mat4,
     NodePath,
-    Shader, TransparencyAttrib,
+    Shader,
+    TransparencyAttrib,
 )
 
 

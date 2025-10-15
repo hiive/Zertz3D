@@ -21,6 +21,7 @@ from game.zertz_board import ZertzBoard
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def small_board():
     """37-ring board for hex transformation tests.
@@ -55,6 +56,7 @@ def large_board():
 # Axial Coordinate Mapping
 # ============================================================================
 
+
 class TestAxialCoordinateMaps:
     def test_center_position_is_origin(self, small_board):
         """Test that D4 (center) maps to origin in axial coordinates."""
@@ -75,14 +77,17 @@ class TestAxialCoordinateMaps:
 
 
 class TestHexRotation:
-    @pytest.mark.parametrize("start_pos,k,expected_pos", [
-        ("A4", 1, "D7"),  # 60° rotation
-        ("A4", 2, "G4"),  # 120° rotation
-        ("A4", 3, "G1"),  # 180° rotation
-        ("A4", 4, "D1"),  # 240° rotation
-        ("A4", 5, "A1"),  # 300° rotation
-        ("A4", 6, "A4"),  # 360° rotation (identity)
-    ])
+    @pytest.mark.parametrize(
+        "start_pos,k,expected_pos",
+        [
+            ("A4", 1, "D7"),  # 60° rotation
+            ("A4", 2, "G4"),  # 120° rotation
+            ("A4", 3, "G1"),  # 180° rotation
+            ("A4", 4, "D1"),  # 240° rotation
+            ("A4", 5, "A1"),  # 300° rotation
+            ("A4", 6, "A4"),  # 360° rotation (identity)
+        ],
+    )
     def test_rotate_positions(self, small_board, start_pos, k, expected_pos):
         """Test that rotation by k*60° produces expected position."""
         board = copy.deepcopy(small_board)
@@ -92,17 +97,18 @@ class TestHexRotation:
         y, x = board.str_to_index(start_pos)
         test_state = np.zeros_like(board.state)
         test_state[board.RING_LAYER] = board.state[board.RING_LAYER]  # Copy rings
-        test_state[board.MARBLE_TO_LAYER['w'], y, x] = 1  # Place white marble
+        test_state[board.MARBLE_TO_LAYER["w"], y, x] = 1  # Place white marble
 
         # Apply rotation
         rotated = board._transform_state_hex(test_state, rot60_k=k)
 
         # Find where the marble ended up
-        (end_y, end_x) = np.argwhere(rotated[board.MARBLE_TO_LAYER['w']] == 1)[0]
+        (end_y, end_x) = np.argwhere(rotated[board.MARBLE_TO_LAYER["w"]] == 1)[0]
         end_pos = board.index_to_str((end_y, end_x))
 
-        assert end_pos == expected_pos, \
+        assert end_pos == expected_pos, (
             f"Rotation by {k * 60}° of {start_pos} → expected {expected_pos}, got {end_pos}"
+        )
 
     def test_rotation_preserves_marbles(self, small_board):
         """Test that rotation preserves the number of marbles."""
@@ -111,28 +117,43 @@ class TestHexRotation:
         # Place marbles at multiple positions
         test_state = np.zeros_like(small_board.state)
         test_state[small_board.RING_LAYER] = small_board.state[small_board.RING_LAYER]
-        test_state[small_board.MARBLE_TO_LAYER['w'], *small_board.str_to_index("A4")] = 1
-        test_state[small_board.MARBLE_TO_LAYER['g'], *small_board.str_to_index("D4")] = 1
-        test_state[small_board.MARBLE_TO_LAYER['b'], *small_board.str_to_index("G1")] = 1
+        test_state[
+            small_board.MARBLE_TO_LAYER["w"], *small_board.str_to_index("A4")
+        ] = 1
+        test_state[
+            small_board.MARBLE_TO_LAYER["g"], *small_board.str_to_index("D4")
+        ] = 1
+        test_state[
+            small_board.MARBLE_TO_LAYER["b"], *small_board.str_to_index("G1")
+        ] = 1
 
         for k in range(6):
             rotated = small_board._transform_state_hex(test_state, rot60_k=k)
-            assert np.sum(rotated[small_board.MARBLE_TO_LAYER['w']]) == 1, f"White marbles not preserved for k={k}"
-            assert np.sum(rotated[small_board.MARBLE_TO_LAYER['g']]) == 1, f"Gray marbles not preserved for k={k}"
-            assert np.sum(rotated[small_board.MARBLE_TO_LAYER['b']]) == 1, f"Black marbles not preserved for k={k}"
+            assert np.sum(rotated[small_board.MARBLE_TO_LAYER["w"]]) == 1, (
+                f"White marbles not preserved for k={k}"
+            )
+            assert np.sum(rotated[small_board.MARBLE_TO_LAYER["g"]]) == 1, (
+                f"Gray marbles not preserved for k={k}"
+            )
+            assert np.sum(rotated[small_board.MARBLE_TO_LAYER["b"]]) == 1, (
+                f"Black marbles not preserved for k={k}"
+            )
 
 
 class TestHexMirror:
-    @pytest.mark.parametrize("start_pos,expected_pos", [
-        # FIXED: Using the actual q-axis mirror results (q, -q-r)
-        ("A4", "A1"),  # (-3,0) → (-3,3)
-        ("D7", "D1"),  # (0,-3) → (0,3)
-        ("G4", "G1"),  # (3,-3) → (3,0)
-        ("G1", "G4"),  # (3,0) → (3,-3)
-        ("D1", "D7"),  # (0,3) → (0,-3)
-        ("A1", "A4"),  # (-3,3) → (-3,0)
-        ("D4", "D4"),  # (0,0) → (0,0) - center stays fixed
-    ])
+    @pytest.mark.parametrize(
+        "start_pos,expected_pos",
+        [
+            # FIXED: Using the actual q-axis mirror results (q, -q-r)
+            ("A4", "A1"),  # (-3,0) → (-3,3)
+            ("D7", "D1"),  # (0,-3) → (0,3)
+            ("G4", "G1"),  # (3,-3) → (3,0)
+            ("G1", "G4"),  # (3,0) → (3,-3)
+            ("D1", "D7"),  # (0,3) → (0,-3)
+            ("A1", "A4"),  # (-3,3) → (-3,0)
+            ("D4", "D4"),  # (0,0) → (0,0) - center stays fixed
+        ],
+    )
     def test_mirror_positions(self, small_board, start_pos, expected_pos):
         """Test that mirror reflection produces expected position."""
         board = copy.deepcopy(small_board)
@@ -141,14 +162,15 @@ class TestHexMirror:
         y, x = board.str_to_index(start_pos)
         test_state = np.zeros_like(board.state)
         test_state[board.RING_LAYER] = board.state[board.RING_LAYER]
-        test_state[board.MARBLE_TO_LAYER['w'], y, x] = 1
+        test_state[board.MARBLE_TO_LAYER["w"], y, x] = 1
 
         mirrored = board._transform_state_hex(test_state, mirror=True)
-        (end_y, end_x) = np.argwhere(mirrored[board.MARBLE_TO_LAYER['w']] == 1)[0]
+        (end_y, end_x) = np.argwhere(mirrored[board.MARBLE_TO_LAYER["w"]] == 1)[0]
         end_pos = board.index_to_str((end_y, end_x))
 
-        assert end_pos == expected_pos, \
+        assert end_pos == expected_pos, (
             f"Mirror of {start_pos} → expected {expected_pos}, got {end_pos}"
+        )
 
     def test_mirror_is_involutive(self, small_board):
         """Test that applying mirror twice returns to original."""
@@ -160,7 +182,9 @@ class TestHexMirror:
         once = small_board._transform_state_hex(base, mirror=True)
         twice = small_board._transform_state_hex(once, mirror=True)
 
-        assert np.array_equal(base, twice), "Mirror applied twice should return original"
+        assert np.array_equal(base, twice), (
+            "Mirror applied twice should return original"
+        )
 
 
 class TestCombinedSymmetries:
@@ -175,8 +199,9 @@ class TestCombinedSymmetries:
         rot_240_via_composition = small_board._transform_state_hex(rot_120, rot60_k=2)
         rot_240_direct = small_board._transform_state_hex(base, rot60_k=4)
 
-        assert np.array_equal(rot_240_via_composition, rot_240_direct), \
+        assert np.array_equal(rot_240_via_composition, rot_240_direct), (
             "Rotation composition failed"
+        )
 
     def test_all_symmetries_unique(self, small_board):
         """Test that all 12 symmetries produce unique board states."""
@@ -187,7 +212,9 @@ class TestCombinedSymmetries:
         base = np.copy(small_board.state)
         base[1, *small_board.str_to_index("A4")] = 1  # White at corner
         base[2, *small_board.str_to_index("B3")] = 1  # Gray off-center
-        base[3, *small_board.str_to_index("E3")] = 1  # Black at another off-center position
+        base[3, *small_board.str_to_index("E3")] = (
+            1  # Black at another off-center position
+        )
 
         states = []
         # 6 rotations
@@ -195,7 +222,9 @@ class TestCombinedSymmetries:
             states.append(small_board._transform_state_hex(base, rot60_k=k))
         # 6 mirror + rotations
         for k in range(6):
-            states.append(small_board._transform_state_hex(base, rot60_k=k, mirror=True))
+            states.append(
+                small_board._transform_state_hex(base, rot60_k=k, mirror=True)
+            )
 
         # Check all states are unique
         unique = {s.tobytes() for s in states}
@@ -206,29 +235,40 @@ class TestAllBoardSizes:
     @pytest.fixture
     def small_board(self):
         from game.zertz_board import ZertzBoard
+
         return ZertzBoard(37)
 
     @pytest.fixture
     def medium_board(self):
         from game.zertz_board import ZertzBoard
+
         return ZertzBoard(48)
 
     @pytest.fixture
     def large_board(self):
         from game.zertz_board import ZertzBoard
+
         return ZertzBoard(61)
 
-    @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
     def test_axial_map_sizes(self, request, board_fixture):
         """Test that axial maps have correct number of positions."""
         board = request.getfixturevalue(board_fixture)
         board._ensure_positions_built()
 
-        positions = [board.position_from_label(label) for label in board._positions_by_label.keys()]
-        assert len(positions) == board.rings, \
+        positions = [
+            board.position_from_label(label)
+            for label in board._positions_by_label.keys()
+        ]
+        assert len(positions) == board.rings, (
             f"Expected {board.rings} positions, got {len(positions)}"
+        )
 
-    @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
     def test_center_near_origin(self, request, board_fixture):
         """Test that the center position maps near origin (scaled by coord_scale)."""
         board = request.getfixturevalue(board_fixture)
@@ -236,7 +276,7 @@ class TestAllBoardSizes:
 
         # Find position closest to board center
         center_y, center_x = board.width // 2, board.width // 2
-        min_dist = float('inf')
+        min_dist = float("inf")
         center_pos = None
 
         for pos in board._positions.values():
@@ -252,8 +292,9 @@ class TestAllBoardSizes:
         # For D3 boards (48 rings), scale=3, so expect |q|, |r| <= 3
         q, r = center_pos
         max_expected = board._coord_scale
-        assert abs(q) <= max_expected and abs(r) <= max_expected, \
+        assert abs(q) <= max_expected and abs(r) <= max_expected, (
             f"Center position should map near (0,0) scaled by {board._coord_scale}, got ({q},{r})"
+        )
 
 
 class TestSymmetryPatterns:
@@ -267,7 +308,9 @@ class TestSymmetryPatterns:
             states.append(board._transform_state_hex(base_state, rot60_k=k))
         # 6 mirror + rotations
         for k in range(6):
-            states.append(board._transform_state_hex(base_state, rot60_k=k, mirror=True))
+            states.append(
+                board._transform_state_hex(base_state, rot60_k=k, mirror=True)
+            )
 
         unique = {s.tobytes() for s in states}
         return len(unique)
@@ -280,7 +323,9 @@ class TestSymmetryPatterns:
         base = np.copy(small_board.state)
 
         unique_count = self.count_unique_symmetries(small_board, base)
-        assert unique_count == 1, f"Empty board should have 1 unique state, got {unique_count}"
+        assert unique_count == 1, (
+            f"Empty board should have 1 unique state, got {unique_count}"
+        )
 
     def test_center_marble_has_one_symmetry(self, small_board):
         """A single marble at center has 6-fold rotational symmetry → 1 unique state."""
@@ -290,7 +335,9 @@ class TestSymmetryPatterns:
         base[1, *small_board.str_to_index("D4")] = 1  # Single marble at center
 
         unique_count = self.count_unique_symmetries(small_board, base)
-        assert unique_count == 1, f"Center marble should have 1 unique state, got {unique_count}"
+        assert unique_count == 1, (
+            f"Center marble should have 1 unique state, got {unique_count}"
+        )
 
     def test_six_fold_pattern_has_one_symmetries(self, small_board):
         """A pattern with 6-fold rotational symmetry should have 2 unique states."""
@@ -302,7 +349,9 @@ class TestSymmetryPatterns:
             base[1, *small_board.str_to_index(corner)] = 1
 
         unique_count = self.count_unique_symmetries(small_board, base)
-        assert unique_count == 1, f"6-fold symmetric pattern should have 1 unique state, got {unique_count}"
+        assert unique_count == 1, (
+            f"6-fold symmetric pattern should have 1 unique state, got {unique_count}"
+        )
 
     def test_three_fold_pattern_has_two_symmetries(self, small_board):
         """A pattern with 3-fold rotational symmetry should have 4 unique states."""
@@ -315,7 +364,9 @@ class TestSymmetryPatterns:
         base[1, *small_board.str_to_index("D1")] = 1  # 240°
 
         unique_count = self.count_unique_symmetries(small_board, base)
-        assert unique_count == 2, f"3-fold symmetric pattern should have 2 unique states, got {unique_count}"
+        assert unique_count == 2, (
+            f"3-fold symmetric pattern should have 2 unique states, got {unique_count}"
+        )
 
     def test_two_fold_pattern_has_three_symmetries(self, small_board):
         """A pattern with 2-fold rotational symmetry should have 6 unique states."""
@@ -327,7 +378,9 @@ class TestSymmetryPatterns:
         base[1, *small_board.str_to_index("G1")] = 1  # 180°
 
         unique_count = self.count_unique_symmetries(small_board, base)
-        assert unique_count == 3, f"2-fold symmetric pattern should have 3 unique states, got {unique_count}"
+        assert unique_count == 3, (
+            f"2-fold symmetric pattern should have 3 unique states, got {unique_count}"
+        )
 
     def test_vertical_mirror_pattern_has_six_symmetries(self, small_board):
         """A pattern with only vertical mirror symmetry should have 6 unique states."""
@@ -342,7 +395,9 @@ class TestSymmetryPatterns:
 
         unique_count = self.count_unique_symmetries(small_board, base)
         # This should have 6 unique states (not 12) due to the mirror symmetry
-        assert unique_count == 6, f"Mirror symmetric pattern should have 6 unique states, got {unique_count}"
+        assert unique_count == 6, (
+            f"Mirror symmetric pattern should have 6 unique states, got {unique_count}"
+        )
 
     def test_asymmetric_pattern_has_twelve_symmetries(self, small_board):
         """A completely asymmetric pattern should have 12 unique states."""
@@ -355,7 +410,9 @@ class TestSymmetryPatterns:
         base[3, *small_board.str_to_index("E3")] = 1
 
         unique_count = self.count_unique_symmetries(small_board, base)
-        assert unique_count == 12, f"Asymmetric pattern should have 12 unique states, got {unique_count}"
+        assert unique_count == 12, (
+            f"Asymmetric pattern should have 12 unique states, got {unique_count}"
+        )
 
     # def test_single_off_center_marble_has_twelve_symmetries(self, small_board):
     #     """A single marble not at center should have no symmetry → 12 unique states."""
@@ -398,22 +455,26 @@ class TestSymmetryPatterns:
         total_unique = len(rotation_states | mirror_states)
 
         # Assertions
-        assert len(rotation_states) == 6, \
+        assert len(rotation_states) == 6, (
             f"Expected 6 unique rotation states, got {len(rotation_states)}"
+        )
 
-        assert len(mirror_states) == 6, \
+        assert len(mirror_states) == 6, (
             f"Expected 6 unique mirror states, got {len(mirror_states)}"
+        )
 
         # The critical test: if mirror is a true reflection, there should be NO overlap
         # between rotation states and mirror states (except possibly for states with
         # inherent symmetry, which this pattern doesn't have)
-        assert len(overlap) == 0, \
-            f"Mirror states should be distinct from rotation states, but {len(overlap)} overlap. " \
+        assert len(overlap) == 0, (
+            f"Mirror states should be distinct from rotation states, but {len(overlap)} overlap. "
             f"This indicates the mirror transformation is equivalent to a rotation, not a true reflection."
+        )
 
-        assert total_unique == 12, \
-            f"Expected 12 total unique states for asymmetric pattern, got {total_unique}. " \
+        assert total_unique == 12, (
+            f"Expected 12 total unique states for asymmetric pattern, got {total_unique}. "
             f"Mirror appears to be producing the same states as rotations."
+        )
 
     def test_asymmetric_three_marble_pattern(self, small_board):
         """
@@ -434,8 +495,9 @@ class TestSymmetryPatterns:
 
         # With a true reflection, this should give 12 unique states
         # If we only get 6, then the "mirror" is actually a rotation
-        assert unique_count == 12, \
+        assert unique_count == 12, (
             f"Asymmetric 3-marble pattern should have 12 unique states, got {unique_count}"
+        )
 
     def test_line_through_center_has_three_symmetries(self, small_board):
         """A line through center has 2-fold rotational symmetry → 3 unique states."""
@@ -454,19 +516,26 @@ class TestSymmetryPatterns:
         unique_count = self.count_unique_symmetries(small_board, base)
 
         # Line has 2-fold symmetry: 6 rotations ÷ 2 = 3 unique states
-        assert unique_count == 3, \
+        assert unique_count == 3, (
             f"Line through center should have 3 unique states, got {unique_count}"
+        )
 
-    @pytest.mark.parametrize("marble_count,expected_range", [
-        (1, (2, 12)),  # 1 marble: 2 if centered, 12 if off-center
-        (2, (2, 12)),  # 2 marbles: varies by placement
-        (3, (2, 12)),  # 3 marbles: could have various symmetries
-        (6, (1, 12)),  # 6 marbles: could be symmetric or not
-        (37, (1, 1)),  # All positions filled: always 1
-    ])
-    def test_random_patterns_have_valid_symmetry_count(self, small_board, marble_count, expected_range):
+    @pytest.mark.parametrize(
+        "marble_count,expected_range",
+        [
+            (1, (2, 12)),  # 1 marble: 2 if centered, 12 if off-center
+            (2, (2, 12)),  # 2 marbles: varies by placement
+            (3, (2, 12)),  # 3 marbles: could have various symmetries
+            (6, (1, 12)),  # 6 marbles: could be symmetric or not
+            (37, (1, 1)),  # All positions filled: always 1
+        ],
+    )
+    def test_random_patterns_have_valid_symmetry_count(
+        self, small_board, marble_count, expected_range
+    ):
         """Random patterns should have between 1 and 12 unique states."""
         import random
+
         random.seed(42)  # Reproducible test
 
         small_board._build_axial_maps()
@@ -491,9 +560,9 @@ class TestSymmetryPatterns:
 
         unique_count = self.count_unique_symmetries(small_board, base)
         min_expected, max_expected = expected_range
-        assert min_expected <= unique_count <= max_expected, \
+        assert min_expected <= unique_count <= max_expected, (
             f"Pattern with {marble_count} marbles should have {min_expected}-{max_expected} unique states, got {unique_count}"
-
+        )
 
 
 class TestSpiralMirror:
@@ -560,7 +629,9 @@ class TestSpiralMirror:
                 results[name] = pattern_after
 
                 # Check if it's involutive (applying twice returns original)
-                double_mirrored = small_board._transform_state_hex(mirrored, mirror=True)
+                double_mirrored = small_board._transform_state_hex(
+                    mirrored, mirror=True
+                )
                 is_involutive = np.array_equal(double_mirrored, base)
 
                 # Check if it matches any rotation (it shouldn't for a true mirror)
@@ -572,9 +643,9 @@ class TestSpiralMirror:
                         break
 
                 results[name] = {
-                    'pattern': pattern_after,
-                    'involutive': is_involutive,
-                    'matches_rotation': matches_rotation
+                    "pattern": pattern_after,
+                    "involutive": is_involutive,
+                    "matches_rotation": matches_rotation,
                 }
 
             finally:
@@ -584,24 +655,26 @@ class TestSpiralMirror:
         # Verify properties of a true mirror
         valid_mirrors = []
         for name, result in results.items():
-            if result['involutive'] and result['matches_rotation'] is None:
+            if result["involutive"] and result["matches_rotation"] is None:
                 valid_mirrors.append(name)
 
         # At least one should be a valid mirror
-        assert len(valid_mirrors) > 0, \
-            "No candidate produces a valid mirror transformation. " \
+        assert len(valid_mirrors) > 0, (
+            "No candidate produces a valid mirror transformation. "
             "All candidates either aren't involutive or match a rotation."
+        )
 
         # The current implementation should be checked
-        current_result = results['current']
-        if current_result['matches_rotation'] is not None:
+        current_result = results["current"]
+        if current_result["matches_rotation"] is not None:
             pytest.fail(
                 f"Current mirror implementation is equivalent to a {current_result['matches_rotation']}° rotation, "
                 f"not a true reflection. Valid mirrors found: {valid_mirrors}"
             )
 
-        assert current_result['involutive'], \
+        assert current_result["involutive"], (
             "Current mirror implementation is not involutive (applying twice doesn't return original)"
+        )
 
     def test_mirror_produces_expected_spiral_reflection(self, small_board):
         """
@@ -637,7 +710,9 @@ class TestSpiralMirror:
         if was_marble_at_f4:
             # Find where white marbles are in the mirrored version
             white_positions = np.argwhere(mirrored[1] == 1)
-            mirrored_positions = [small_board.index_to_str(tuple(pos)) for pos in white_positions]
+            mirrored_positions = [
+                small_board.index_to_str(tuple(pos)) for pos in white_positions
+            ]
 
             # Compute expected mirror target of F4 using axial transformation
             f4_axial = small_board.position_from_label("F4").axial
@@ -649,15 +724,19 @@ class TestSpiralMirror:
             # But it should NOT be the same as any rotation
             for k in range(1, 6):  # Skip identity
                 rotated = small_board._transform_state_hex(base, rot60_k=k)
-                assert not np.array_equal(mirrored, rotated), \
+                assert not np.array_equal(mirrored, rotated), (
                     f"Mirror result matches {k * 60}° rotation - not a true reflection!"
+                )
 
-            assert not np.array_equal(mirrored, base), \
+            assert not np.array_equal(mirrored, base), (
                 "Mirror result is identical to original pattern; reflection failed"
-            assert expected_label in mirrored_positions, \
+            )
+            assert expected_label in mirrored_positions, (
                 f"Expected mirrored arrow tip at {expected_label}, got {mirrored_positions}"
-            assert "F4" not in mirrored_positions, \
+            )
+            assert "F4" not in mirrored_positions, (
                 "Original arrow tip still present after mirror; pattern did not reflect"
+            )
 
     def test_spiral_chirality_changes_under_mirror(self, small_board):
         """
@@ -705,8 +784,9 @@ class TestSpiralMirror:
         # The mirrored spiral should have different chirality
         # We can't easily check the exact sequence without knowing the mirror axis,
         # but we can verify it's different from all rotations
-        assert mirrored_sequence != original_sequence, \
+        assert mirrored_sequence != original_sequence, (
             "Mirror did not change spiral chirality (sequence identical)"
+        )
 
         for k in range(1, 6):
             rotated = small_board._transform_state_hex(base, rot60_k=k)
@@ -714,16 +794,18 @@ class TestSpiralMirror:
             # it's not a true mirror
             if np.array_equal(mirrored, rotated):
                 all_rotations_same_chirality = False
-                pytest.fail(f"Mirror equals {k * 60}° rotation - chirality not reversed!")
+                pytest.fail(
+                    f"Mirror equals {k * 60}° rotation - chirality not reversed!"
+                )
 
         # Also verify involution
         double_mirrored = small_board._transform_state_hex(mirrored, mirror=True)
-        assert np.array_equal(double_mirrored, base), \
+        assert np.array_equal(double_mirrored, base), (
             "Mirror is not involutive - applying twice doesn't return original"
+        )
 
 
 class TestCanonicalTransform:
-
     def test_mirror_rotation_composition_and_inverses(self, small_board):
         """
         Test that composition of mirror and rotation works correctly
@@ -749,13 +831,16 @@ class TestCanonicalTransform:
 
         # Apply the inverse
         if inverse_name not in transforms:
-            pytest.fail(f"Inverse transform {inverse_name} not found in available transforms")
+            pytest.fail(
+                f"Inverse transform {inverse_name} not found in available transforms"
+            )
 
         recovered = transforms[inverse_name](mr120)
 
         # Verify it recovers the original
-        assert np.array_equal(recovered, base), \
+        assert np.array_equal(recovered, base), (
             f"Transform MR120 with calculated inverse {inverse_name} doesn't recover original"
+        )
 
     def test_verify_transform_order_of_operations(self, small_board):
         """
@@ -791,7 +876,6 @@ class TestCanonicalTransform:
 
         return order
 
-
     def test_all_transform_inverses(self, small_board):
         """
         Test that all 18 transformations have correct inverses.
@@ -819,7 +903,9 @@ class TestCanonicalTransform:
 
             # Check the inverse exists
             if inverse_name not in transforms:
-                failures.append(f"{transform_name}: inverse {inverse_name} not found in transforms")
+                failures.append(
+                    f"{transform_name}: inverse {inverse_name} not found in transforms"
+                )
                 continue
 
             # Apply the inverse
@@ -827,7 +913,9 @@ class TestCanonicalTransform:
 
             # Verify it recovers the original
             if not np.array_equal(recovered, base):
-                failures.append(f"{transform_name} with inverse {inverse_name} doesn't recover original")
+                failures.append(
+                    f"{transform_name} with inverse {inverse_name} doesn't recover original"
+                )
 
         if failures:
             pytest.fail("Inverse calculation failures:\n" + "\n".join(failures))
@@ -852,10 +940,13 @@ class TestCanonicalTransform:
 
         if inverse_transform in transforms:
             recovered = transforms[inverse_transform](canonical)
-            assert np.array_equal(recovered, base), \
+            assert np.array_equal(recovered, base), (
                 f"Transform {transform_used} with inverse {inverse_transform} doesn't recover original"
+            )
         else:
-            pytest.fail(f"Inverse transform {inverse_transform} not found in available transforms")
+            pytest.fail(
+                f"Inverse transform {inverse_transform} not found in available transforms"
+            )
 
 
 class TestBoardSizeSymmetries:
@@ -868,11 +959,18 @@ class TestBoardSizeSymmetries:
         transforms = dict(small_board._get_all_symmetry_transforms())
 
         # Should have exactly 18 transforms
-        assert len(transforms) == 18, \
+        assert len(transforms) == 18, (
             f"37-ring board should have 18 transforms (D6), got {len(transforms)}"
+        )
 
         # Count each type
-        r_count = sum(1 for name in transforms if name.startswith("R") and not name.startswith("MR") and not name.endswith("M"))
+        r_count = sum(
+            1
+            for name in transforms
+            if name.startswith("R")
+            and not name.startswith("MR")
+            and not name.endswith("M")
+        )
         mr_count = sum(1 for name in transforms if name.startswith("MR"))
         rm_count = sum(1 for name in transforms if name.endswith("M"))
 
@@ -887,11 +985,18 @@ class TestBoardSizeSymmetries:
         transforms = dict(medium_board._get_all_symmetry_transforms())
 
         # Should have exactly 9 transforms
-        assert len(transforms) == 9, \
+        assert len(transforms) == 9, (
             f"48-ring board should have 9 transforms (D3), got {len(transforms)}"
+        )
 
         # Count each type
-        r_count = sum(1 for name in transforms if name.startswith("R") and not name.startswith("MR") and not name.endswith("M"))
+        r_count = sum(
+            1
+            for name in transforms
+            if name.startswith("R")
+            and not name.startswith("MR")
+            and not name.endswith("M")
+        )
         mr_count = sum(1 for name in transforms if name.startswith("MR"))
         rm_count = sum(1 for name in transforms if name.endswith("M"))
 
@@ -900,9 +1005,16 @@ class TestBoardSizeSymmetries:
         assert rm_count == 3, f"Expected 3 RM transforms, got {rm_count}"
 
         # Verify only 120° multiples (0°, 120°, 240°)
-        r_angles = [int(name[1:]) for name in transforms if name.startswith("R") and not name.startswith("MR") and not name.endswith("M")]
-        assert set(r_angles) == {0, 120, 240}, \
+        r_angles = [
+            int(name[1:])
+            for name in transforms
+            if name.startswith("R")
+            and not name.startswith("MR")
+            and not name.endswith("M")
+        ]
+        assert set(r_angles) == {0, 120, 240}, (
             f"48-ring board should only have 0°, 120°, 240° rotations, got {r_angles}"
+        )
 
     def test_61_ring_board_has_d6_symmetry(self, large_board):
         """61-ring board should have D6 symmetry (18 transforms: 6R + 6MR + 6RM)."""
@@ -911,11 +1023,18 @@ class TestBoardSizeSymmetries:
         transforms = dict(large_board._get_all_symmetry_transforms())
 
         # Should have exactly 18 transforms
-        assert len(transforms) == 18, \
+        assert len(transforms) == 18, (
             f"61-ring board should have 18 transforms (D6), got {len(transforms)}"
+        )
 
         # Count each type
-        r_count = sum(1 for name in transforms if name.startswith("R") and not name.startswith("MR") and not name.endswith("M"))
+        r_count = sum(
+            1
+            for name in transforms
+            if name.startswith("R")
+            and not name.startswith("MR")
+            and not name.endswith("M")
+        )
         mr_count = sum(1 for name in transforms if name.startswith("MR"))
         rm_count = sum(1 for name in transforms if name.endswith("M"))
 
@@ -923,20 +1042,26 @@ class TestBoardSizeSymmetries:
         assert mr_count == 6, f"Expected 6 MR transforms, got {mr_count}"
         assert rm_count == 6, f"Expected 6 RM transforms, got {rm_count}"
 
-    @pytest.mark.parametrize("board_fixture,expected_count", [
-        ("small_board", 18),
-        ("medium_board", 9),
-        ("large_board", 18),
-    ])
-    def test_all_inverses_exist_for_board_size(self, request, board_fixture, expected_count):
+    @pytest.mark.parametrize(
+        "board_fixture,expected_count",
+        [
+            ("small_board", 18),
+            ("medium_board", 9),
+            ("large_board", 18),
+        ],
+    )
+    def test_all_inverses_exist_for_board_size(
+        self, request, board_fixture, expected_count
+    ):
         """Test that all transforms have inverses in the transform dictionary."""
         board = request.getfixturevalue(board_fixture)
         board._build_axial_maps()
 
         transforms = dict(board._get_all_symmetry_transforms())
 
-        assert len(transforms) == expected_count, \
+        assert len(transforms) == expected_count, (
             f"Expected {expected_count} transforms, got {len(transforms)}"
+        )
 
         # Every transform should have an inverse that exists in the dictionary
         missing_inverses = []
@@ -945,10 +1070,13 @@ class TestBoardSizeSymmetries:
             if inverse_name not in transforms:
                 missing_inverses.append(f"{transform_name} -> {inverse_name}")
 
-        assert len(missing_inverses) == 0, \
+        assert len(missing_inverses) == 0, (
             "Missing inverses in transform dictionary:\n" + "\n".join(missing_inverses)
+        )
 
-    @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
     def test_all_transforms_are_involutive(self, request, board_fixture):
         """Test that applying any transform and its inverse returns to original."""
         board = request.getfixturevalue(board_fixture)
@@ -983,8 +1111,10 @@ class TestBoardSizeSymmetries:
                 if not np.array_equal(recovered, base):
                     failures.append(f"{transform_name} -> {inverse_name}")
 
-        assert len(failures) == 0, \
-            "These transform/inverse pairs failed to recover original:\n" + "\n".join(failures)
+        assert len(failures) == 0, (
+            "These transform/inverse pairs failed to recover original:\n"
+            + "\n".join(failures)
+        )
 
     def test_48_ring_asymmetric_pattern_has_six_symmetries(self, medium_board):
         """48-ring board with D3 symmetry should have 6 unique states for asymmetric pattern."""
@@ -1005,8 +1135,9 @@ class TestBoardSizeSymmetries:
 
         # With D3 symmetry (9 transforms), an asymmetric pattern should produce 6 unique states
         # (not 9 because some transforms produce the same result for this pattern)
-        assert len(unique_states) <= 9, \
+        assert len(unique_states) <= 9, (
             f"48-ring board should have at most 9 unique states, got {len(unique_states)}"
+        )
 
     def test_61_ring_board_transforms_work_like_37_ring(self, small_board, large_board):
         """61-ring and 37-ring boards should both have D6 symmetry with same structure."""
@@ -1017,15 +1148,18 @@ class TestBoardSizeSymmetries:
         large_transforms = set(dict(large_board._get_all_symmetry_transforms()).keys())
 
         # Both should have identical transform names
-        assert small_transforms == large_transforms, \
-            f"37-ring and 61-ring boards should have same transform names.\n" \
+        assert small_transforms == large_transforms, (
+            f"37-ring and 61-ring boards should have same transform names.\n"
             f"Difference: {small_transforms.symmetric_difference(large_transforms)}"
+        )
+
 
 def test_center_equidistant_from_three_middle_rings(medium_board):
     """
     The geometric center of the 48-ring board (pointy-top hex) lies between D5, D4, E4.
     It should be equidistant from those three rings.
     """
+
     # Helper to get Cartesian coordinates from array indices using pointy-top hex geometry
     def coord(y, x):
         # Convert to axial first (standard formula from visualize_board_coords.py)
