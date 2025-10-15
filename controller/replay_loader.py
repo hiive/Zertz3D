@@ -70,7 +70,7 @@ class ReplayLoader:
                 if line.startswith("Player "):
                     parts = line.split(": ", 1)
                     player_num = int(parts[0].split()[1])
-                    action_dict = ast.literal_eval(parts[1])
+                    action_dict = ast.literal_eval(parts[1])  # Safe: literal_eval only parses literals
 
                     all_actions.append(action_dict)
                     if player_num == 1:

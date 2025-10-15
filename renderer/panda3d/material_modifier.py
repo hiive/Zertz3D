@@ -75,5 +75,5 @@ class MaterialModifier:
         new_highlight_color = tuple(
             _convert(this_highlight_color, other_highlight_color)  # noqa
         )
-        new_emission_color = tuple(_convert(this_emission_color, other_emission_color)) # noqa
-        return MaterialModifier(new_highlight_color, new_emission_color) # noqa
+        new_emission_color = tuple(_convert(this_emission_color, other_emission_color))  # noqa
+        return MaterialModifier(new_highlight_color, new_emission_color)  # noqa

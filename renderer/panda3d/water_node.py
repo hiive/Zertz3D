@@ -64,8 +64,8 @@ class WaterNode:
         # Load and set the GLSL shader
         shader = Shader.load(
             Shader.SL_GLSL,
-            vertex="shaders/water.vert.glsl",
-            fragment="shaders/water.frag.glsl",
+            vertex="renderer/panda3d/shaders/water.vert",
+            fragment="renderer/panda3d/shaders/water.frag",
         )
         if not shader:
             raise RuntimeError("Failed to load GLSL shader.")

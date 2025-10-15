@@ -27,8 +27,8 @@ class OutlineManager:
             try:
                 OutlineManager._shader = Shader.load(
                     Shader.SL_GLSL,
-                    "renderer/shaders/outline.vert",
-                    "renderer/shaders/outline.frag",
+                    "renderer/panda3d/shaders/outline.vert",
+                    "renderer/panda3d/shaders/outline.frag",
                 )
             except Exception as exc:
                 OutlineManager._shader = None

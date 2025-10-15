@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TextIO
 
 from controller.zertz_game_controller import ZertzGameController
-from renderer.zertz_renderer import ZertzRenderer
+from renderer.panda_renderer import PandaRenderer
 from renderer.text_renderer import TextRenderer
 from renderer.composite_renderer import CompositeRenderer
 from shared.interfaces import IRenderer
@@ -44,7 +44,7 @@ class ZertzFactory:
                 board_layout = ZertzBoard.generate_standard_board_layout(
                     controller.session.rings
                 )
-                renderer = ZertzRenderer(
+                renderer = PandaRenderer(
                     rings=controller.session.rings,
                     board_layout=board_layout,
                     show_coords=controller.show_coords,
