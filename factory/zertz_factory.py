@@ -25,19 +25,21 @@ class ZertzFactory:
         replay_file: str | None = None,
         seed: int | None = None,
         log_to_file: bool = False,
+        log_to_screen: bool = False,
+        log_notation_to_file: bool = False,
+        log_notation_to_screen: bool = False,
         partial_replay: bool = False,
         headless: bool = False,
         max_games: int | None = None,
         highlight_choices: bool = False,
         show_coords: bool = False,
-        log_notation: bool = False,
         blitz: bool = False,
         move_duration: float = 0.666,
         human_players: tuple[int, ...] | None = None,
     ) -> ZertzGameController:
         """Create a fully-wired ZertzGameController with appropriate renderers."""
 
-        def renderer_factory(controller: ZertzGameController) -> IRenderer:
+        def renderer_factory(controller: ZertzGameController) -> IRenderer | None:
             renderers: list[IRenderer] = []
 
             if not headless:
@@ -54,9 +56,14 @@ class ZertzFactory:
                 )
                 renderers.append(renderer)
 
-            text_renderer = TextRenderer(stream=self._text_stream)
-            renderers.append(text_renderer)
+            # Only create TextRenderer if transcript screen output is requested
+            # (NotationWriter handles notation screen output via logger)
+            if log_to_screen:
+                text_renderer = TextRenderer(stream=self._text_stream)
+                renderers.append(text_renderer)
 
+            if len(renderers) == 0:
+                return None
             if len(renderers) == 1:
                 return renderers[0]
             return CompositeRenderer(renderers)
@@ -66,11 +73,13 @@ class ZertzFactory:
             replay_file=replay_file,
             seed=seed,
             log_to_file=log_to_file,
+            log_to_screen=log_to_screen,
+            log_notation_to_file=log_notation_to_file,
+            log_notation_to_screen=log_notation_to_screen,
             partial_replay=partial_replay,
             max_games=max_games,
             highlight_choices=highlight_choices,
             show_coords=show_coords,
-            log_notation=log_notation,
             blitz=blitz,
             move_duration=move_duration,
             renderer_or_factory=renderer_factory,

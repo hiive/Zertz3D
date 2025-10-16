@@ -5,9 +5,11 @@ from queue import SimpleQueue, Empty
 from typing import Optional, Callable
 
 import numpy as np
-from panda3d.core import Material, LVector4
+from panda3d.core import Material
 
 from renderer.panda3d.material_modifier import MaterialModifier
+from renderer.panda3d.material_manager import MaterialManager
+from renderer.panda3d.entity_resolver import EntityResolver
 from shared.materials_modifiers import PLACEMENT_HIGHLIGHT_MATERIAL_MOD
 
 
@@ -154,55 +156,16 @@ class HighlightingManager:
             pulse_factor = math.sin((elapsed_time / duration) * math.pi)
 
             # Update material for each entity in the highlight
-            for pos_str, mat_info in original_materials.items():
-                (
-                    original_mat,
-                    entity_type,
-                    original_color,
-                    original_emission,
-                    original_metallic,
-                    original_roughness,
-                ) = mat_info
-
-                # Get the entity based on type
-                entity = None
-                if entity_type == "marble" and pos_str in self.renderer.pos_to_marble:
-                    entity = self.renderer.pos_to_marble[pos_str]
-                elif entity_type == "ring" and pos_str in self.renderer.pos_to_base:
-                    entity = self.renderer.pos_to_base[pos_str]
-                elif entity_type == "supply_marble":
-                    try:
-                        marble_id = int(pos_str.split(":", 1)[1])
-                    except (IndexError, ValueError):
-                        marble_id = None
-                    if marble_id is not None:
-                        entity = self.renderer._marble_registry.get(marble_id)
-                elif entity_type == "captured_marble":
-                    try:
-                        marble_id = int(pos_str.split(":", 1)[1])
-                    except (IndexError, ValueError):
-                        marble_id = None
-                    if marble_id is not None:
-                        entity = self.renderer._marble_registry.get(marble_id)
-
+            for pos_str, (saved_material, entity_type) in original_materials.items():
+                entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
                 if entity is not None:
-                    # Blend between original and target colors
-                    blended_material_mod = MaterialModifier.blend_vectors_with_mod(
-                        original_color,
-                        original_emission,
+                    # Update material colors in-place for pulsing effect (efficient!)
+                    MaterialManager.update_material_colors_inplace(
+                        entity,
+                        saved_material,
                         target_material_mod,
                         pulse_factor,
                     )
-                    blended_color = LVector4(*blended_material_mod.highlight_color)
-                    blended_emission = LVector4(*blended_material_mod.emission_color)
-                    # Create and apply blended material
-                    blended_mat = Material()
-                    blended_mat.setMetallic(original_metallic)
-                    blended_mat.setRoughness(original_roughness)
-                    blended_mat.setBaseColor(blended_color)
-                    blended_mat.setEmission(blended_emission)
-                    model = entity.model if hasattr(entity, "model") else entity
-                    model.setMaterial(blended_mat, 1)
 
         # Remove completed highlight animations
         for anim_item in to_remove:
@@ -224,64 +187,12 @@ class HighlightingManager:
         original_materials = {}
 
         for pos_str in entities_list:
-            # Try to highlight marble first, then ring
-            entity = None
-            entity_type = None
-
-            if pos_str in self.renderer.pos_to_marble:
-                # Highlight the marble at this position
-                entity = self.renderer.pos_to_marble[pos_str]
-                entity_type = "marble"
-            elif pos_str in self.renderer.pos_to_base:
-                # Highlight the ring at this position
-                entity = self.renderer.pos_to_base[pos_str]
-                entity_type = "ring"
-            elif isinstance(pos_str, str) and pos_str.startswith("supply:"):
-                try:
-                    marble_id = int(pos_str.split(":", 1)[1])
-                except (IndexError, ValueError):
-                    marble_id = None
-                if marble_id is not None:
-                    entity = self.renderer._marble_registry.get(marble_id)
-                    if entity is not None:
-                        entity_type = "supply_marble"
-            elif isinstance(pos_str, str) and pos_str.startswith("captured:"):
-                try:
-                    marble_id = int(pos_str.split(":", 1)[1])
-                except (IndexError, ValueError):
-                    marble_id = None
-                if marble_id is not None:
-                    entity = self.renderer._marble_registry.get(marble_id)
-                    if entity is not None:
-                        entity_type = "captured_marble"
-
+            # Discover entity and its type from position string
+            entity, entity_type = EntityResolver.discover(self.renderer, pos_str)
             if entity is not None:
-                # For supply/captured marbles, entity is a model object with .model NodePath
-                # For rings/board marbles, entity is already the NodePath
-                model = entity.model if hasattr(entity, "model") else entity
-                original_mat = model.getMaterial()
-
-                # Store original material properties for blending
-                if original_mat is not None:
-                    original_color = original_mat.getBaseColor()
-                    original_emission = original_mat.getEmission()
-                    original_metallic = original_mat.getMetallic()
-                    original_roughness = original_mat.getRoughness()
-                else:
-                    # Default properties if no material exists
-                    original_color = LVector4(0.8, 0.8, 0.8, 1.0)
-                    original_emission = LVector4(0.0, 0.0, 0.0, 1.0)
-                    original_metallic = 0.9
-                    original_roughness = 0.1
-
-                original_materials[pos_str] = (
-                    original_mat,
-                    entity_type,
-                    original_color,
-                    original_emission,
-                    original_metallic,
-                    original_roughness,
-                )
+                # Save original material properties for blending
+                saved_material = MaterialManager.save_material(entity)
+                original_materials[pos_str] = (saved_material, entity_type)
 
         # Store original materials and target colors for later blending
         highlight_info["original_materials"] = original_materials
@@ -291,6 +202,21 @@ class HighlightingManager:
         )
         highlight_info["target_material_mod"] = material_mod
 
+        # Apply a NEW highlight material to each entity (we'll modify it in-place during pulsing)
+        for pos_str, (saved_material, entity_type) in original_materials.items():
+            entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
+            if entity is not None:
+                # Extract metallic/roughness from saved material
+                _, _, metallic, roughness = MaterialManager.get_material_properties(saved_material)
+
+                # Create and apply a new material that we'll modify in-place during pulsing
+                MaterialManager.apply_material(
+                    entity,
+                    material_mod,
+                    metallic,
+                    roughness,
+                )
+
     def _clear_highlight(self, highlight_info):
         """Clear a highlight and restore original materials.
 
@@ -299,36 +225,11 @@ class HighlightingManager:
         """
         original_materials = highlight_info.get("original_materials", {})
 
-        for pos_str, mat_info in original_materials.items():
-            original_mat, entity_type, _, _, _, _ = mat_info
-
-            # Get the entity based on type
-            entity = None
-            if entity_type == "marble" and pos_str in self.renderer.pos_to_marble:
-                entity = self.renderer.pos_to_marble[pos_str]
-            elif entity_type == "ring" and pos_str in self.renderer.pos_to_base:
-                entity = self.renderer.pos_to_base[pos_str]
-            elif entity_type == "supply_marble":
-                try:
-                    marble_id = int(pos_str.split(":", 1)[1])
-                except (IndexError, ValueError):
-                    marble_id = None
-                if marble_id is not None:
-                    entity = self.renderer._marble_registry.get(marble_id)
-            elif entity_type == "captured_marble":
-                try:
-                    marble_id = int(pos_str.split(":", 1)[1])
-                except (IndexError, ValueError):
-                    marble_id = None
-                if marble_id is not None:
-                    entity = self.renderer._marble_registry.get(marble_id)
-
+        for pos_str, (saved_material, entity_type) in original_materials.items():
+            entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
             if entity is not None:
-                model = entity.model if hasattr(entity, "model") else entity
-                if original_mat is not None:
-                    model.setMaterial(original_mat, 1)
-                else:
-                    model.clearMaterial()
+                # Restore original material
+                MaterialManager.restore_material(entity, saved_material)
 
     def set_context_highlights(
         self,
@@ -360,50 +261,14 @@ class HighlightingManager:
         material_mod = highlight_info.get("material_mod", PLACEMENT_HIGHLIGHT_MATERIAL_MOD)
         original_materials = highlight_info.get("original_materials", {})
 
-        for pos_str, mat_info in original_materials.items():
-            (
-                original_mat,
-                entity_type,
-                original_color,
-                original_emission,
-                original_metallic,
-                original_roughness,
-            ) = mat_info
-
-            # Get the entity based on type
-            entity = None
-            if entity_type == "marble" and pos_str in self.renderer.pos_to_marble:
-                entity = self.renderer.pos_to_marble[pos_str]
-            elif entity_type == "ring" and pos_str in self.renderer.pos_to_base:
-                entity = self.renderer.pos_to_base[pos_str]
-            elif entity_type == "supply_marble":
-                try:
-                    marble_id = int(pos_str.split(":", 1)[1])
-                except (IndexError, ValueError):
-                    marble_id = None
-                if marble_id is not None:
-                    entity = self.renderer._marble_registry.get(marble_id)
-            elif entity_type == "captured_marble":
-                try:
-                    marble_id = int(pos_str.split(":", 1)[1])
-                except (IndexError, ValueError):
-                    marble_id = None
-                if marble_id is not None:
-                    entity = self.renderer._marble_registry.get(marble_id)
-
+        for pos_str, (saved_material, entity_type) in original_materials.items():
+            entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
             if entity is not None:
+                # Extract metallic/roughness from saved material
+                _, _, metallic, roughness = MaterialManager.get_material_properties(saved_material)
+
                 # Apply highlight material (full intensity, no pulsing)
-                highlight_color = LVector4(*material_mod.highlight_color)
-                highlight_emission = LVector4(*material_mod.emission_color)
-
-                highlight_mat = Material()
-                highlight_mat.setMetallic(original_metallic)
-                highlight_mat.setRoughness(original_roughness)
-                highlight_mat.setBaseColor(highlight_color)
-                highlight_mat.setEmission(highlight_emission)
-
-                model = entity.model if hasattr(entity, "model") else entity
-                model.setMaterial(highlight_mat, 1)
+                MaterialManager.apply_material(entity, material_mod, metallic, roughness)
 
     def clear_context_highlights(self, context: str | None = None) -> None:
         """Clear context highlights for a specific context or all contexts.

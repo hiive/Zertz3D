@@ -166,7 +166,7 @@ A faster, more aggressive version of the game.
 
 - Board: 37 rings  
 - Marbles:  
-  - 5 white  
+  - 5 white
   - 7 grey  
   - 9 black  
 - Win by capturing:

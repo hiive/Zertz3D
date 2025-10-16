@@ -1,8 +1,7 @@
 """
 Unit tests for GameLogger.
 
-Tests the logging system where notation is generated once
-with complete information (including isolation) and logged directly.
+Tests the pluggable writer system for logging game actions in different formats.
 """
 
 import pytest
@@ -11,30 +10,20 @@ import tempfile
 import os
 import numpy as np
 from pathlib import Path
+from io import StringIO
 from unittest.mock import Mock
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from controller.game_logger import GameLogger
+from game.writers import TranscriptWriter, NotationWriter
 from game.zertz_game import ZertzGame
 
 
 # ============================================================================
 # Fixtures
 # ============================================================================
-
-
-@pytest.fixture
-def logger():
-    """Create a GameLogger with both logging types enabled."""
-    return GameLogger(log_to_file=True, log_notation=True)
-
-
-@pytest.fixture
-def logger_no_files():
-    """Create a GameLogger with file logging disabled."""
-    return GameLogger(log_to_file=False, log_notation=False)
 
 
 @pytest.fixture
@@ -51,103 +40,78 @@ def game():
 
 
 # ============================================================================
-# Open/Close Log Files Tests
+# GameLogger Basic Tests
 # ============================================================================
 
 
-def test_open_log_files_creates_files(logger, temp_dir):
-    """Test that open_log_files creates both log files."""
+def test_logger_with_no_writers():
+    """Test that logger works with no writers."""
+    logger = GameLogger()
+    logger.start_game(seed=12345, rings=37)
+    logger.log_action(player_num=1, action_dict={"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"})
+    logger.end_game()
+    # Should not crash
+
+
+def test_logger_start_game_writes_headers(temp_dir):
+    """Test that start_game writes headers to all writers."""
     os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
 
-    assert logger.log_file is not None
-    assert logger.notation_file is not None
-    assert os.path.exists(logger.log_filename)
-    assert os.path.exists(logger.notation_filename)
+    # Create writers
+    transcript_file = open("test_transcript.txt", "w")
+    notation_file = open("test_notation.txt", "w")
 
-    # Clean up
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
+    writers = [
+        TranscriptWriter(transcript_file),
+        NotationWriter(notation_file)
+    ]
 
+    logger = GameLogger(writers=writers)
+    logger.start_game(seed=12345, rings=37, blitz=False)
 
-def test_open_log_files_writes_headers(logger, temp_dir):
-    """Test that log files have correct headers."""
-    os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
+    # Close writers manually to ensure flush
+    for writer in writers:
+        writer.close()
 
-    # Flush files to ensure content is written
-    logger.log_file.flush()
-    logger.notation_file.flush()
-
-    # Check action log header
-    with open(logger.log_filename, "r") as f:
+    # Check transcript header
+    with open("test_transcript.txt", "r") as f:
         content = f.read()
         assert "# Seed: 12345" in content
         assert "# Rings: 37" in content
 
-    # Check notation log header
-    with open(logger.notation_filename, "r") as f:
+    # Check notation header
+    with open("test_notation.txt", "r") as f:
         content = f.read()
         assert content.strip() == "37"
 
-    # Clean up
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
 
-
-def test_open_log_files_blitz_variant(logger, temp_dir):
+def test_logger_start_game_blitz_variant(temp_dir):
     """Test that blitz variant is correctly noted in files."""
     os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37, blitz=True)
 
-    # Flush files to ensure content is written
-    logger.log_file.flush()
-    logger.notation_file.flush()
+    transcript_file = open("test_transcript.txt", "w")
+    notation_file = open("test_notation.txt", "w")
 
-    # Check action log
-    with open(logger.log_filename, "r") as f:
+    writers = [
+        TranscriptWriter(transcript_file),
+        NotationWriter(notation_file)
+    ]
+
+    logger = GameLogger(writers=writers)
+    logger.start_game(seed=12345, rings=37, blitz=True)
+
+    for writer in writers:
+        writer.close()
+
+    # Check transcript
+    with open("test_transcript.txt", "r") as f:
         content = f.read()
         assert "# Variant: Blitz" in content
 
-    # Check notation log
-    with open(logger.notation_filename, "r") as f:
+    # Check notation
+    with open("test_notation.txt", "r") as f:
         content = f.read()
         assert "37 Blitz" in content
-
-    # Clean up
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
-
-
-def test_close_log_files_appends_game_state(logger, temp_dir):
-    """Test that closing log files appends final game state."""
-    os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
-
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
-
-    with open(logger.log_filename, "r") as f:
-        content = f.read()
-        assert "# Final game state:" in content
-        assert "# Board state:" in content
-
-
-def test_close_log_files_clears_file_handles(logger, temp_dir):
-    """Test that closing files clears file handles."""
-    os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
-
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
-
-    assert logger.log_file is None
-    assert logger.notation_file is None
 
 
 # ============================================================================
@@ -155,76 +119,164 @@ def test_close_log_files_clears_file_handles(logger, temp_dir):
 # ============================================================================
 
 
-def test_log_action_writes_to_file(logger, temp_dir):
-    """Test that log_action writes action to file."""
+def test_log_action_writes_to_transcript(temp_dir):
+    """Test that log_action writes action to transcript file."""
     os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
+
+    transcript_file = open("test_transcript.txt", "w")
+    writer = TranscriptWriter(transcript_file)
+
+    logger = GameLogger(writers=[writer])
+    logger.start_game(seed=12345, rings=37)
 
     action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
     logger.log_action(player_num=1, action_dict=action_dict)
 
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
+    logger.end_game()
+    writer.close()
 
-    with open(logger.log_filename, "r") as f:
+    with open("test_transcript.txt", "r") as f:
         content = f.read()
         assert "Player 1:" in content
         assert "'action': 'PUT'" in content
 
 
-def test_log_action_disabled_when_no_file(logger_no_files):
-    """Test that log_action doesn't crash when logging is disabled."""
-    action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
-    # Should not crash
-    logger_no_files.log_action(player_num=1, action_dict=action_dict)
-
-
-# ============================================================================
-# Log Notation Tests
-# ============================================================================
-
-
-def test_log_notation_writes_to_file(logger, temp_dir):
-    """Test that log_notation writes notation to file."""
+def test_log_action_writes_to_notation(temp_dir):
+    """Test that log_action writes notation to notation file."""
     os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
 
-    logger.log_notation("Wd4,b2")
-    logger.log_notation("Ge5,c3")
+    notation_file = open("test_notation.txt", "w")
+    writer = NotationWriter(notation_file)
 
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
+    logger = GameLogger(writers=[writer])
+    logger.start_game(seed=12345, rings=37)
 
-    with open(logger.notation_filename, "r") as f:
+    # Simple PUT action
+    action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
+    logger.log_action(player_num=1, action_dict=action_dict, action_result=None)
+
+    logger.end_game()
+    writer.close()
+
+    with open("test_notation.txt", "r") as f:
         lines = [l.strip() for l in f.readlines()]
         moves = [l for l in lines[1:] if l]  # Skip header line
         assert "Wd4,b2" in moves
-        assert "Ge5,c3" in moves
 
 
-def test_log_notation_with_isolation(logger, temp_dir):
-    """Test that notation with isolation is logged correctly."""
+def test_log_action_with_pass(temp_dir):
+    """Test that PASS actions are logged correctly."""
     os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
 
-    # Notation with isolation marker
-    logger.log_notation("Wd4,b2 x Wa1Wb2")
+    notation_file = open("test_notation.txt", "w")
+    writer = NotationWriter(notation_file)
 
+    logger = GameLogger(writers=[writer])
+    logger.start_game(seed=12345, rings=37)
+
+    action_dict = {"action": "PASS"}
+    logger.log_action(player_num=1, action_dict=action_dict)
+
+    logger.end_game()
+    writer.close()
+
+    with open("test_notation.txt", "r") as f:
+        content = f.read()
+        assert "-" in content
+
+
+def test_log_action_multiple_writers(temp_dir):
+    """Test that actions are logged to multiple writers simultaneously."""
+    os.chdir(temp_dir)
+
+    transcript_file = open("test_transcript.txt", "w")
+    notation_file = open("test_notation.txt", "w")
+
+    writers = [
+        TranscriptWriter(transcript_file),
+        NotationWriter(notation_file)
+    ]
+
+    logger = GameLogger(writers=writers)
+    logger.start_game(seed=12345, rings=37)
+
+    action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
+    logger.log_action(player_num=1, action_dict=action_dict)
+
+    logger.end_game()
+    for writer in writers:
+        writer.close()
+
+    # Check both files
+    with open("test_transcript.txt", "r") as f:
+        assert "Player 1:" in f.read()
+
+    with open("test_notation.txt", "r") as f:
+        assert "Wd4,b2" in f.read()
+
+
+# ============================================================================
+# Screen Output Tests
+# ============================================================================
+
+
+def test_logger_with_string_io():
+    """Test that logger works with StringIO for screen output."""
+    transcript_stream = StringIO()
+    notation_stream = StringIO()
+
+    writers = [
+        TranscriptWriter(transcript_stream),
+        NotationWriter(notation_stream)
+    ]
+
+    logger = GameLogger(writers=writers)
+    logger.start_game(seed=12345, rings=37)
+
+    action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
+    logger.log_action(player_num=1, action_dict=action_dict)
+
+    # Get output BEFORE calling end_game (which closes the streams)
+    transcript_output = transcript_stream.getvalue()
+    notation_output = notation_stream.getvalue()
+
+    logger.end_game()
+
+    # Check transcript output
+    assert "# Seed: 12345" in transcript_output
+    assert "Player 1:" in transcript_output
+
+    # Check notation output
+    assert "37" in notation_output
+    assert "Wd4,b2" in notation_output
+
+
+# ============================================================================
+# End Game Tests
+# ============================================================================
+
+
+def test_end_game_writes_footer(temp_dir):
+    """Test that end_game writes footer to transcript file."""
+    os.chdir(temp_dir)
+
+    transcript_file = open("test_transcript.txt", "w")
+    writer = TranscriptWriter(transcript_file)
+
+    logger = GameLogger(writers=[writer])
+    logger.start_game(seed=12345, rings=37)
+
+    # Create a mock game with state
     mock_game = Mock()
     mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
 
-    with open(logger.notation_filename, "r") as f:
+    logger.end_game(game=mock_game)
+    writer.close()
+
+    with open("test_transcript.txt", "r") as f:
         content = f.read()
-        assert "Wd4,b2 x Wa1Wb2" in content
-
-
-def test_log_notation_disabled_when_no_file(logger_no_files):
-    """Test that log_notation doesn't crash when logging is disabled."""
-    # Should not crash
-    logger_no_files.log_notation("Wd4,b2")
+        assert "# Final game state:" in content
+        assert "# Board state:" in content
 
 
 # ============================================================================
@@ -232,64 +284,65 @@ def test_log_notation_disabled_when_no_file(logger_no_files):
 # ============================================================================
 
 
-def test_notation_sequence_simple(logger, temp_dir):
-    """Test logging a sequence of notations."""
+def test_notation_sequence(temp_dir):
+    """Test logging a sequence of actions in notation format."""
     os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
 
-    # Log multiple notations
-    logger.log_notation("Wd4,b2")
-    logger.log_notation("Ge5,c3")
-    logger.log_notation("Bf6,d1")
+    notation_file = open("test_notation.txt", "w")
+    writer = NotationWriter(notation_file)
 
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
+    logger = GameLogger(writers=[writer])
+    logger.start_game(seed=12345, rings=37)
+
+    # Log multiple actions
+    logger.log_action(1, {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"})
+    logger.log_action(2, {"action": "PUT", "marble": "g", "dst": "E5", "remove": "C3"})
+    logger.log_action(1, {"action": "PUT", "marble": "b", "dst": "F6", "remove": "D1"})
+
+    logger.end_game()
+    writer.close()
 
     # Verify all notations written in order
-    with open(logger.notation_filename, "r") as f:
+    with open("test_notation.txt", "r") as f:
         lines = [l.strip() for l in f.readlines()]
         moves = [l for l in lines[1:] if l]  # Skip header
-        assert moves == ["Wd4,b2", "Ge5,c3", "Bf6,d1"]
+        assert "Wd4,b2" in moves[0]
+        assert "Ge5,c3" in moves[1]
+        assert "Bf6,d1" in moves[2]
 
 
-def test_notation_with_mixed_actions(logger, temp_dir):
-    """Test logging notations including captures and isolation."""
-    os.chdir(temp_dir)
-    logger.open_log_files(seed=12345, rings=37)
+def test_add_writer_dynamically():
+    """Test adding writers dynamically after logger creation."""
+    logger = GameLogger()
 
-    # Mixed action types
-    logger.log_notation("Wd4,b2")  # PUT
-    logger.log_notation("x c4Wa2")  # CAP
-    logger.log_notation("Ge5,c3 x Wa1")  # PUT with isolation
-    logger.log_notation("-")  # PASS
+    stream = StringIO()
+    writer = TranscriptWriter(stream)
+    logger.add_writer(writer)
 
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
+    logger.start_game(seed=12345, rings=37)
+    logger.log_action(1, {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""})
 
-    with open(logger.notation_filename, "r") as f:
-        lines = [l.strip() for l in f.readlines()]
-        moves = [l for l in lines[1:] if l]
-        assert moves == ["Wd4,b2", "x c4Wa2", "Ge5,c3 x Wa1", "-"]
+    # Get output BEFORE calling end_game (which closes the stream)
+    output = stream.getvalue()
+
+    logger.end_game()
+
+    assert "# Seed: 12345" in output
+    assert "Player 1:" in output
 
 
-def test_multiple_games_same_logger(logger, temp_dir):
-    """Test that logger can handle multiple game sessions."""
-    os.chdir(temp_dir)
+def test_remove_writer():
+    """Test removing writers from logger."""
+    stream = StringIO()
+    writer = TranscriptWriter(stream)
 
-    # First game
-    logger.open_log_files(seed=12345, rings=37)
-    logger.log_notation("Wd4,b2")
-    mock_game = Mock()
-    mock_game.board.state = np.zeros((20, 7, 7))
-    logger.close_log_files(mock_game)
+    logger = GameLogger(writers=[writer])
+    logger.remove_writer(writer)
 
-    # Second game
-    logger.open_log_files(seed=67890, rings=37)
-    logger.log_notation("Ge5,c3")
-    logger.close_log_files(mock_game)
+    logger.start_game(seed=12345, rings=37)
+    logger.log_action(1, {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""})
+    logger.end_game()
 
-    # Both files should exist
-    assert os.path.exists("zertzlog_12345_notation.txt")
-    assert os.path.exists("zertzlog_67890_notation.txt")
+    # Stream should be empty since writer was removed
+    output = stream.getvalue()
+    assert output == ""

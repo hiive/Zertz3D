@@ -1,11 +1,12 @@
-"""Replay loader for Zertz 3D game.
+"""Transcript loader for Zertz3D game.
 
-Handles loading and parsing replay files, including board size detection
+Handles loading and parsing transcript files, including board size detection
 and variant detection.
 """
 
-import ast
 from typing import Callable
+
+from game.formatters import TranscriptFormatter
 from game.zertz_board import ZertzBoard
 from game.zertz_game import (
     BLITZ_MARBLES,
@@ -15,45 +16,43 @@ from game.zertz_game import (
 )
 
 
-class ReplayLoader:
-    """Loads and parses replay files for Zertz games."""
+class TranscriptLoader:
+    """Loads and parses transcript files for Zertz games."""
 
     def __init__(
         self,
-        replay_file,
-        blitz=False,
+        transcript_file,
         status_reporter: Callable[[str], None] | None = None,
     ):
-        """Initialize the replay loader.
+        """Initialize the transcript loader.
 
         Args:
-            replay_file: Path to the replay file
-            blitz: Whether blitz mode is enabled via command line
+            transcript_file: Path to the transcript file
+            status_reporter: Optional callback for status messages
         """
-        self.replay_file = replay_file
-        self.blitz = blitz
+        self.transcript_file = transcript_file
         self.detected_rings = None
-        self.detected_blitz = False
+        self.blitz = False
         self.marbles = None
         self.win_condition = None
         self._status_reporter: Callable[[str], None] | None = status_reporter
 
     def load(self):
-        """Load replay actions from the file.
+        """Load transcript actions from the file.
 
         Returns:
             Tuple of (player1_actions, player2_actions)
 
         Side effects:
-            Sets self.detected_rings, self.detected_blitz, self.marbles,
+            Sets self.detected_rings, self.blitz, self.marbles,
             and self.win_condition based on file contents.
         """
-        self._report(f"Loading replay from: {self.replay_file}")
+        self._report(f"Loading transcript from: {self.transcript_file}")
         player1_actions = []
         player2_actions = []
         all_actions = []
 
-        with open(self.replay_file, "r") as f:
+        with open(self.transcript_file, "r") as f:
             for line in f:
                 line = line.strip()
 
@@ -61,7 +60,7 @@ class ReplayLoader:
                 if line.startswith("# Variant:"):
                     variant = line.split(":", 1)[1].strip().lower()
                     if variant == "blitz":
-                        self.detected_blitz = True
+                        self.blitz = True
 
                 if not line or line.startswith("#"):
                     continue
@@ -70,7 +69,7 @@ class ReplayLoader:
                 if line.startswith("Player "):
                     parts = line.split(": ", 1)
                     player_num = int(parts[0].split()[1])
-                    action_dict = ast.literal_eval(parts[1])  # Safe: literal_eval only parses literals
+                    action_dict = TranscriptFormatter.transcript_to_action_dict(parts[1])
 
                     all_actions.append(action_dict)
                     if player_num == 1:
@@ -82,22 +81,9 @@ class ReplayLoader:
         self.detected_rings = self._detect_board_size(all_actions)
         self._report(f"Detected board size: {self.detected_rings} rings")
 
-        # Determine final variant (file takes precedence over command line)
-        if self.detected_blitz:
-            self._report("Detected blitz variant from replay file")
-            if self.blitz:
-                self._report("  (--blitz flag also specified)")
-            else:
-                self._report("  (automatically enabling blitz mode)")
-            self.blitz = True
-        elif self.blitz:
-            self._report(
-                "Warning: --blitz flag specified but replay file is standard mode"
-            )
-            self._report("         Using blitz rules anyway")
-
-        # Always set marbles and win_condition based on final variant
+        # Set variant based on file detection
         if self.blitz:
+            self._report("Detected blitz variant from transcript file")
             self.marbles = BLITZ_MARBLES
             self.win_condition = BLITZ_WIN_CONDITIONS
         else:
@@ -147,6 +133,7 @@ class ReplayLoader:
         self._status_reporter = reporter
 
     def _report(self, message: str | None) -> None:
+        """Report status message via callback or print."""
         if message is None:
             return
         if self._status_reporter is not None:

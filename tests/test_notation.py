@@ -26,9 +26,7 @@ class TestNotationGeneration:
         game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
         action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""}
-        action_result = ActionResult(
-            captured_marbles=None, newly_frozen_positions=set()
-        )
+        action_result = ActionResult(captured_marbles=None)
 
         notation = game.action_to_notation(action_dict, action_result)
 
@@ -39,9 +37,7 @@ class TestNotationGeneration:
         game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
         action_dict = {"action": "PUT", "marble": "g", "dst": "D4", "remove": "B2"}
-        action_result = ActionResult(
-            captured_marbles=None, newly_frozen_positions=set()
-        )
+        action_result = ActionResult(captured_marbles=None)
 
         notation = game.action_to_notation(action_dict, action_result)
 
@@ -58,8 +54,7 @@ class TestNotationGeneration:
             captured_marbles=[
                 {"marble": "w", "pos": "A1"},
                 {"marble": "g", "pos": "B2"},
-            ],
-            newly_frozen_positions=set(),
+            ]
         )
 
         notation = game.action_to_notation(action_dict, action_result)
@@ -84,7 +79,7 @@ class TestNotationGeneration:
             "capture": "g",
             "cap": "D4",
         }
-        action_result = ActionResult(captured_marbles="g", newly_frozen_positions=set())
+        action_result = ActionResult(captured_marbles="g")
 
         notation = game.action_to_notation(action_dict, action_result)
 
@@ -95,9 +90,7 @@ class TestNotationGeneration:
         game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
         action_dict = {"action": "PASS"}
-        action_result = ActionResult(
-            captured_marbles=None, newly_frozen_positions=set()
-        )
+        action_result = ActionResult(captured_marbles=None)
 
         notation = game.action_to_notation(action_dict, action_result)
 
@@ -112,10 +105,7 @@ class TestNotationImmediacy:
         game = ZertzGame(rings=ZertzBoard.SMALL_BOARD_37)
 
         action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "C3"}
-        action_result = ActionResult(
-            captured_marbles=[{"marble": "w", "pos": "A1"}],
-            newly_frozen_positions=set(),
-        )
+        action_result = ActionResult(captured_marbles=[{"marble": "w", "pos": "A1"}])
 
         # Should be able to generate notation immediately with result
         notation = game.action_to_notation(action_dict, action_result)
@@ -132,12 +122,12 @@ class TestNotationImmediacy:
         actions_and_expected = [
             (
                 {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""},
-                ActionResult(None, set()),
+                ActionResult(None),
                 "Wd4",
             ),
             (
                 {"action": "PUT", "marble": "g", "dst": "E5", "remove": "C3"},
-                ActionResult(None, set()),
+                ActionResult(None),
                 "Ge5,c3",
             ),
             (
@@ -149,7 +139,7 @@ class TestNotationImmediacy:
                     "capture": "g",
                     "cap": "C3",
                 },
-                ActionResult("g", set()),
+                ActionResult("g"),
                 "x b2Gd4",
             ),
         ]

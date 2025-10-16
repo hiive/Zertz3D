@@ -1,6 +1,6 @@
 """Helper class for managing mouse picking, hover detection, and user interaction."""
 
-from typing import Callable, Optional, Any
+from typing import Callable, Optional
 
 from panda3d.core import (
     BitMask32,
@@ -10,8 +10,6 @@ from panda3d.core import (
     CollisionHandlerQueue,
     NodePath,
 )
-
-from shared.materials_modifiers import HOVER_PRIMARY_MATERIAL_MOD
 
 
 class InteractionHelper:
@@ -40,7 +38,6 @@ class InteractionHelper:
         self._selection_callback: Optional[Callable[[dict], None]] = None
         self._hover_callback: Optional[Callable[[dict | None], None]] = None
         self._hover_target_token: Optional[tuple] = None
-        self._raw_hover_token: Optional[tuple] = None
 
     def set_selection_callback(
         self, callback: Optional[Callable[[dict], None]]
@@ -62,7 +59,6 @@ class InteractionHelper:
         """
         self._hover_callback = callback
         self._hover_target_token = None
-        self._raw_hover_token = None
 
     def on_mouse_click(self) -> None:
         """Handle mouse click events and trigger selection callback if applicable."""
@@ -94,46 +90,42 @@ class InteractionHelper:
 
         Called each frame from the renderer's update loop.
         """
+        # Early exit if no callback or no mouse watcher
         if self._hover_callback is None or self.renderer.mouseWatcherNode is None:
-            if self._hover_target_token is not None:
+            if self._hover_target_token is not None and self._hover_callback is not None:
                 self._hover_target_token = None
                 self._hover_callback(None)
-            if self._raw_hover_token is not None:
-                self._raw_hover_token = None
-                self.renderer.clear_context_highlights("hover_pointer_raw")
             return
 
+        # Check if mouse is in window
         if not self.renderer.mouseWatcherNode.hasMouse():
             if self._hover_target_token is not None:
                 self._hover_target_token = None
                 self._hover_callback(None)
-            if self._raw_hover_token is not None:
-                self._raw_hover_token = None
-                self.renderer.clear_context_highlights("hover_pointer_raw")
             return
 
+        # Perform collision detection
         mouse_pos = self.renderer.mouseWatcherNode.getMouse()
         self._clear_picker_queue()
         self._picker_ray.setFromLens(
             self.renderer.camNode, mouse_pos.getX(), mouse_pos.getY()
         )
         self._picker.traverse(self.renderer.render)
+
+        # No collision - clear hover
         if self._picker_queue.getNumEntries() == 0:
             if self._hover_target_token is not None:
                 self._hover_target_token = None
                 self._hover_callback(None)
-            if self._raw_hover_token is not None:
-                self._raw_hover_token = None
-                self.renderer.clear_context_highlights("hover_pointer_raw")
             return
 
+        # Get closest collision
         self._picker_queue.sortEntries()
         entry = self._picker_queue.getEntry(0)
-
         selection = self._decode_selection(entry.getIntoNodePath())
-        self._apply_direct_hover(selection)
+
+        # Notify callback if hover target changed
         token = self._make_hover_token(selection)
-        # print(f"_dispatch_hover_target::token: {token}")
         if token != self._hover_target_token:
             self._hover_target_token = token
             self._hover_callback(selection)
@@ -167,15 +159,17 @@ class InteractionHelper:
             self.renderer.clear_context_highlights("hover_secondary")
 
         if supply_colors:
-            supply_positions: list[str] = []
+            # Use individual supply contexts (supply_w, supply_g, supply_b) for proper color
+            # instead of "hover_supply" which uses the wrong material
             for color in supply_colors:
-                supply_positions.extend(self.renderer._supply_highlight_keys(color))
-            if supply_positions:
-                self.renderer.set_context_highlights("hover_supply", supply_positions)
-            else:
-                self.renderer.clear_context_highlights("hover_supply")
+                supply_positions = self.renderer._supply_highlight_keys(color)
+                context = self.renderer.SUPPLY_HIGHLIGHT_CONTEXTS.get(color)
+                if supply_positions and context:
+                    self.renderer.set_context_highlights(context, supply_positions)
         else:
-            self.renderer.clear_context_highlights("hover_supply")
+            # Clear all supply contexts
+            for context in self.renderer.SUPPLY_HIGHLIGHT_CONTEXTS.values():
+                self.renderer.clear_context_highlights(context)
 
         if captured_targets:
             captured_positions: list[str] = []
@@ -196,9 +190,10 @@ class InteractionHelper:
         """Clear all hover-related highlights."""
         self.renderer.clear_context_highlights("hover_primary")
         self.renderer.clear_context_highlights("hover_secondary")
-        self.renderer.clear_context_highlights("hover_supply")
+        # Clear all individual supply contexts
+        for context in self.renderer.SUPPLY_HIGHLIGHT_CONTEXTS.values():
+            self.renderer.clear_context_highlights(context)
         self.renderer.clear_context_highlights("hover_captured")
-        self.renderer.clear_context_highlights("hover_pointer_raw")
 
     def _clear_picker_queue(self) -> None:
         """Clear all entries from the picker queue."""
@@ -281,38 +276,3 @@ class InteractionHelper:
             selection.get("supply_key"),
             selection.get("captured_key"),
         )
-
-    def _apply_direct_hover(self, selection: Optional[dict]) -> None:
-        """Apply visual highlight to the entity directly under the cursor.
-
-        Args:
-            selection: Selection dict from _decode_selection
-        """
-        token = self._make_hover_token(selection)
-        if token == self._raw_hover_token:
-            return
-        self._raw_hover_token = token
-        if selection is None:
-            self.renderer.clear_context_highlights("hover_pointer_raw")
-            return
-
-        hover_positions: list[str] = []
-        sel_type = selection.get("type")
-        label = selection.get("label")
-        if sel_type in ("ring", "board_marble") and label:
-            hover_positions.append(label)
-        elif sel_type == "supply_marble":
-            key = selection.get("supply_key")
-            if key:
-                hover_positions.append(key)
-        elif sel_type == "captured_marble":
-            key = selection.get("captured_key")
-            if key:
-                hover_positions.append(key)
-
-        if hover_positions:
-            self.renderer.set_context_highlights(
-                "hover_pointer_raw", hover_positions, HOVER_PRIMARY_MATERIAL_MOD
-            )
-        else:
-            self.renderer.clear_context_highlights("hover_pointer_raw")

@@ -244,9 +244,6 @@ class ZertzBoard:
         self.letter_layout = None
         self.flattened_letters = None
         self.board_layout = None
-        self.frozen_positions = (
-            set()
-        )  # Set of (y, x) tuples for frozen isolated regions
 
         # Position cache manager (built lazily)
         self.positions = ZertzPositionCollection(self)
@@ -258,7 +255,6 @@ class ZertzBoard:
             self.CAPTURE_LAYER = clone.CAPTURE_LAYER
             self.state = np.copy(clone.state)
             self.global_state = np.copy(clone.global_state)
-            self.frozen_positions = set(clone.frozen_positions)  # Copy frozen positions
             if hasattr(clone, "letter_layout") and clone.letter_layout is not None:
                 self.letter_layout = np.copy(clone.letter_layout)
             if (
@@ -514,63 +510,54 @@ class ZertzBoard:
                 f"No {marble_type} marbles in supply. Cannot use captured marbles until entire pool is empty."
             )
 
-        # Track isolated regions that are removed (both rings and marbles)
-        isolated_removals = []
-
         # Remove the ring from the board
+        captured_marbles = None
         if rem_index is not None:
             self.state[self.RING_LAYER][rem_index] = 0
-            # Check if the board has been separated into multiple regions
-            regions = self._get_regions()
-            if len(regions) > 1:
-                # Find the largest region (this is the main board that stays)
-                largest_region = max(regions, key=len)
-
-                # Process smaller isolated regions according to official rules
-                for region in regions:
-                    if region is largest_region:
-                        continue
-
-                    # Check if this isolated region has ANY vacant rings (rings without marbles)
-                    has_vacant = any(
-                        np.sum(self.state[self.BOARD_LAYERS, y, x])
-                        == 1  # ring only, no marble
-                        for (y, x) in region
-                    )
-
-                    if has_vacant:
-                        # Region has vacant rings: DO NOT capture or remove
-                        # Per official rules: "marbles in isolated regions are not reusable once disconnected"
-                        # "They stay on the board as inert pieces, unplayable and uncapturable"
-                        # These rings and marbles remain in state but are inaccessible
-                        # Mark all positions in this frozen region for visual fade effect
-                        for pos in region:
-                            self.frozen_positions.add(pos)
-                    else:
-                        # All rings in region are occupied: capture all marbles and remove all rings
-                        for index in region:
-                            y, x = index
-                            pos_str = self.index_to_str(index)
-
-                            # All rings must have marbles (verified by has_vacant check)
-                            captured_type = self.get_marble_type_at(index)
-                            captured_idx = self._get_captured_index(
-                                captured_type, self.get_cur_player()
-                            )
-                            self.global_state[captured_idx] += 1
-                            # Record ring removal with marble capture
-                            isolated_removals.append(
-                                {"pos": pos_str, "marble": captured_type}
-                            )
-
-                            # Set the ring and marble layers all to 0
-                            self.state[self.BOARD_LAYERS, y, x] = 0
-
-        # Update current player
+            # Check for isolated regions and handle captures per official rules
+            captured_marbles = self._check_for_isolation_capture()
         self._next_player()
+        return captured_marbles
 
-        # Return isolated removals if any occurred
-        return isolated_removals if isolated_removals else None
+    def _check_for_isolation_capture(self):
+        captured_marbles = []
+        regions = self._get_regions()
+        if len(regions) > 1:
+            # Multiple regions exist - check each isolated region
+            main_region = max(regions, key=len)
+
+            for region in regions:
+                if region == main_region:
+                    continue  # Skip the main region
+
+                # Check if ALL rings in this isolated region are occupied
+                all_occupied = all(
+                    np.sum(self.state[self.MARBLE_LAYERS, y, x]) == 1
+                    for y, x in region
+                )
+
+                if all_occupied:
+                    # Capture all marbles in this fully-occupied isolated region
+                    for y, x in region:
+                        marble_type = self.get_marble_type_at((y, x))
+                        pos_str = self.index_to_str((y, x))
+
+                        # Add to current player's captured marbles
+                        captured_idx = self._get_captured_index(
+                            marble_type, self.get_cur_player()
+                        )
+                        self.global_state[captured_idx] += 1
+
+                        # Remove marble from board
+                        self.state[self.MARBLE_LAYERS, y, x] = 0
+
+                        # Remove ring from board
+                        self.state[self.RING_LAYER, y, x] = 0
+
+                        # Add to captured list for return value
+                        captured_marbles.append({"marble": marble_type, "pos": pos_str})
+
+        return captured_marbles if captured_marbles else None
 
     def take_capture_action(self, action):
         # Capture actions have dimension (6 x w x w)

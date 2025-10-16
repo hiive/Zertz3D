@@ -8,7 +8,7 @@ from factory import ZertzFactory
 def main() -> None:
     parser = argparse.ArgumentParser(description="Zertz 3D Game")
     parser.add_argument(
-        "--replay", type=str, help="Path to replay file (board size auto-detected)"
+        "--replay", type=str, help="Path to transcript/notationre file (board size auto-detected)"
     )
     parser.add_argument(
         "--rings",
@@ -22,7 +22,7 @@ def main() -> None:
         help="Random seed for reproducible games (ignored if --replay is used)",
     )
     parser.add_argument(
-        "--log",
+        "--transcript-file",
         action="store_true",
         help="Log game actions to zertzlog_<seed>.txt (ignored if --replay is used)",
     )
@@ -48,9 +48,19 @@ def main() -> None:
         help="Show coordinate labels on rings in 3D view",
     )
     parser.add_argument(
-        "--log-notation",
+        "--notation-file",
         action="store_true",
-        help="Log game moves using official Zèrtz notation",
+        help="Log game moves using official Zèrtz notation to file",
+    )
+    parser.add_argument(
+        "--transcript-screen",
+        action="store_true",
+        help="Output transcript format game actions to screen",
+    )
+    parser.add_argument(
+        "--notation-screen",
+        action="store_true",
+        help="Output official Zèrtz notation to screen",
     )
     parser.add_argument(
         "--blitz",
@@ -75,13 +85,15 @@ def main() -> None:
         rings=args.rings,
         replay_file=args.replay,
         seed=args.seed,
-        log_to_file=args.log,
+        log_to_file=args.transcript_file,
+        log_to_screen=args.transcript_screen,
+        log_notation_to_file=args.notation_file,
+        log_notation_to_screen=args.notation_screen,
         partial_replay=args.partial,
         headless=args.headless,
         max_games=args.games,
         highlight_choices=args.highlight_choices,
         show_coords=args.show_coords,
-        log_notation=args.log_notation,
         blitz=args.blitz,
         move_duration=args.move_duration,
         human_players=(1,) if args.human else None,

@@ -206,8 +206,8 @@ class HumanZertzPlayer(ZertzPlayer):
             state["placement_color"] = color
             state["placement_color_idx"] = color_idx
             state["placement_source"] = "supply"
-            if "pool_key" in selection:
-                state["placement_pool_key"] = selection["pool_key"]
+            if "supply_key" in selection:
+                state["placement_supply_key"] = selection["supply_key"]
             state.pop("placement_dst", None)
             state.pop("placement_dst_flat", None)
             state.pop("placement_pending_removals", None)
@@ -406,8 +406,8 @@ class HumanZertzPlayer(ZertzPlayer):
                 self._selection_state.pop("hover", None)
                 return False
             hover_entry["color"] = color
-            if "pool_key" in selection:
-                hover_entry["pool_key"] = selection["pool_key"]
+            if "supply_key" in selection:
+                hover_entry["supply_key"] = selection["supply_key"]
         elif selection_type == "captured_marble":
             color = selection.get("color")
             owner = selection.get("owner")
@@ -543,7 +543,7 @@ class ReplayZertzPlayer(ZertzPlayer):
             else:
                 action_str = f"PUT {action_dict['marble']} {action_dict['dst']}"
         elif action_dict["action"] == "CAP":
-            action_str = f"CAP {action_dict['marble']} {action_dict['src']} {action_dict['capture']} {action_dict['dst']}"
+            action_str = f"CAP {action_dict['src']} {action_dict['capture']} {action_dict['dst']}"
         else:
             raise ValueError(f"Unknown action type: {action_dict['action']}")
 

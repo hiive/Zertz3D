@@ -251,17 +251,60 @@ policy = PolicyHead(combined)
 - Updated visualization tool to flip Y-axis for correct display
 
 ## Future Enhancements
-- Extract highlight state machine into its own module with tests
+- Add unit tests for ActionVisualizationSequencer (highlight state machine)
 - Add unit coverage for `CompositeRenderer.attach_update_loop` and clarify multi-renderer main loop contract
 - Continue slimming `ZertzGameController` (e.g., extract post-action/logging helpers)
 - Document status reporter/TextRenderer defaults and provide a way to silence text output for service deployments
 - Allow `ZertzFactory` to opt out of the text renderer when running non-interactive builds
 
+## Recently Completed (2025-10-15)
+
+### ✅ Detailed Game End Reasons
+- Added `get_game_end_reason()` method to `ZertzGame` class
+- Displays specific reasons for game ending:
+  - "Captured required marbles: 4 white" (or 5 gray, 6 black, 3 of each)
+  - "Both players immobilized: 4 white" (with winning condition)
+  - "Both players immobilized with no winner" (tie)
+  - "Move loop detected (repeated position)" (tie)
+  - "Board completely filled with marbles"
+  - "Opponent has no marbles left to place"
+- Updated `ZertzGameController._handle_game_ending()` to display reasons
+- Comprehensive test suite in `test_game_end_reasons.py` (12 test cases)
+
+### ✅ Capture Flash Animation
+- Captured marbles now flash yellow before animating to capture pool
+- Works for both direct captures (CAP actions) and isolation captures
+- Added `CAPTURE_FLASH_MATERIAL_MOD` with bright yellow highlight (0.9, 0.9, 0.1) and strong glow
+- Flash duration: 0.3 seconds before capture animation starts
+- Implementation leverages existing `highlighting_manager` infrastructure
+- Uses marble's captured key ("captured:id") for proper entity tracking
+
+## Recently Completed (2025-10-15 - Continued)
+
+### ✅ MaterialManager Extraction
+- Created `MaterialManager` class in `renderer/panda3d/material_manager.py`
+- Centralized all Panda3D material operations:
+  - `save_material(entity)` - Save current material properties
+  - `restore_material(entity, saved_material)` - Restore saved material
+  - `apply_material(entity, material_mod, metallic, roughness)` - Apply MaterialModifier to entity
+  - `create_blended_material(...)` - Create blended material for pulsing animations
+  - `get_model_from_entity(entity)` - Handle both NodePath and .model objects
+- Updated `HighlightingManager` to use MaterialManager:
+  - Removed duplicated material creation/application code (4+ places)
+  - Removed manual Material object construction
+  - Cleaner imports (removed unused LVector4 and Material)
+- Benefits:
+  - Eliminated ~60 lines of duplicated material handling code
+  - Single source of truth for material operations
+  - Easier to extend with new material effects
+  - Better separation of concerns (highlighting logic vs Panda3D materials)
+
 ## Andrew's notes (DO NOT DELETE)
 - Add unit tests for tagging system.
 - Allow board to be rotated around its geometric center round an axis perpendicular to the board.
-- Add "how the player won" (or how they drew) to the end of the standard text output.
-- Extract out entities from renderer (marbles and rings with a base).
-- Extract out SelectionHandler class from renderer.
-- Extract out "Materials" using for various forms of highlighting (base color, emission color)
-- 
+- ✅ Add "how the player won" (or how they drew) to the end of the standard text output.
+- Extract out entities from renderer (marbles and rings with a base). (WON'T DO - TOOK DIFFERENT APPROACH)
+- ✅ Extract out SelectionHandler class from renderer - COMPLETED: InteractionHelper class in renderer/panda3d/interaction_helper.py handles all mouse picking, collision detection, hover state, and selection callbacks
+- ✅ Extract out "Materials" using for various forms of highlighting (base color, emission color) - COMPLETED: MaterialModifier dataclass in renderer/panda3d/material_modifier.py, material constants in shared/materials_modifiers.py, MaterialManager class in renderer/panda3d/material_manager.py handles all Panda3D material operations
+- ✅ Extract highlight state machine into its own module - COMPLETED: ActionVisualizationSequencer class in renderer/panda3d/action_sequencer.py handles all multi-phase highlighting sequences (tests still TODO)
+-     

@@ -56,6 +56,37 @@ class _BaseModel(ABC):
         if self.model is not None:
             self.model.hide()
 
+    def set_collide_mask(self, mask):
+        """Set collision mask for this model (public wrapper for _set_collide_mask)."""
+        self._set_collide_mask(mask)
+
+    def set_python_tag(self, tag_name, value):
+        """Set a Python tag on the model."""
+        if self.model is not None:
+            self.model.setPythonTag(tag_name, value)
+
+    def clear_python_tag(self, tag_name):
+        """Clear a Python tag from the model."""
+        if self.model is not None:
+            self.model.clearPythonTag(tag_name)
+
+    def clear_visual_effects(self):
+        """Clear all visual effects (material, color scale, transparency)."""
+        if self.model is not None:
+            self.model.clearMaterial()
+            self.model.clearColorScale()
+            self.model.clearTransparency()
+
+    def set_color_scale(self, r, g, b, alpha):
+        """Set color scale for the model."""
+        if self.model is not None:
+            self.model.setColorScale(r, g, b, alpha)
+
+    def set_transparency(self, mode):
+        """Set transparency mode for the model."""
+        if self.model is not None:
+            self.model.setTransparency(mode)
+
 
 class SkyBox(_BaseModel):
     def __init__(self, renderer):
@@ -77,19 +108,21 @@ class SkyBox(_BaseModel):
 
 def make_marble(renderer, color):
     if color == "w":
-        return WhiteBallModel(renderer)
+        return WhiteBallModel(renderer, color)
     elif color == "b":
-        return BlackBallModel(renderer)
+        return BlackBallModel(renderer, color)
     elif color == "g":
-        return GrayBallModel(renderer)
+        return GrayBallModel(renderer, color)
     return None
 
 
 class _BallBase(_BaseModel):
-    def __init__(self, renderer, color):
+    def __init__(self, renderer, rgba_color, marble_color):
         model_name = "models/ball_lo.bam"
-        super().__init__(renderer, model_name, color)
+        super().__init__(renderer, model_name, rgba_color)
         # self.model.flattenStrong()
+        # Store marble color as readonly property (set once at creation)
+        self.zertz_color = marble_color
         # Each marble gets its own unseeded RNG for visual randomness
         # This keeps marble rotations independent from game logic RNG
         self.rng = random.Random()
@@ -118,23 +151,69 @@ class _BallBase(_BaseModel):
     def set_scale(self, scale):
         self.model.setScale(scale)
 
+    def configure_as_supply_marble(self, key, scale):
+        """Configure this marble as a supply marble (available to both players).
+
+        Args:
+            key: Unique identifier for this marble in the supply
+            scale: Scale factor for the marble
+        """
+        self.set_scale(scale)
+        self.set_python_tag("zertz_entity", "supply_marble")
+        self.set_python_tag("zertz_color", self.zertz_color)
+        self.set_python_tag("zertz_key", key)
+        self.set_collide_mask(BitMask32.bit(1))
+
+    def configure_as_board_marble(self, label, scale, key=None):
+        """Configure this marble as a board marble (placed on the board).
+
+        Args:
+            label: Position label (e.g., 'A1', 'B2')
+            scale: Scale factor for the marble
+            key: Optional unique identifier (defaults to 'board:{label}')
+        """
+        if key is None:
+            key = f"board:{label}"
+        self.set_scale(scale)
+        self.set_python_tag("zertz_entity", "board_marble")
+        self.set_python_tag("zertz_label", label)
+        self.set_python_tag("zertz_color", self.zertz_color)
+        self.set_python_tag("zertz_key", key)
+        self.set_collide_mask(BitMask32.bit(1))
+
+    def configure_as_captured_marble(self, owner, key, scale):
+        """Configure this marble as a captured marble (owned by a player).
+
+        Args:
+            owner: Player number (1 or 2)
+            key: Unique identifier for this captured marble
+            scale: Scale factor for the marble
+        """
+        self.set_scale(scale)
+        self.set_python_tag("zertz_entity", "captured_marble")
+        self.clear_python_tag("zertz_label")
+        self.set_python_tag("zertz_color", self.zertz_color)
+        self.set_python_tag("zertz_owner", owner)
+        self.set_python_tag("zertz_key", key)
+        self.set_collide_mask(BitMask32.allOff())
+
 
 class BlackBallModel(_BallBase):
-    def __init__(self, renderer):
-        color = (0.25, 0.25, 0.25, 1)
-        super().__init__(renderer, color)
+    def __init__(self, renderer, marble_color):
+        rgba_color = (0.25, 0.25, 0.25, 1)
+        super().__init__(renderer, rgba_color, marble_color)
 
 
 class GrayBallModel(_BallBase):
-    def __init__(self, renderer):
-        color = (1.25, 1.25, 1.25, 1)
-        super().__init__(renderer, color)
+    def __init__(self, renderer, marble_color):
+        rgba_color = (1.25, 1.25, 1.25, 1)
+        super().__init__(renderer, rgba_color, marble_color)
 
 
 class WhiteBallModel(_BallBase):
-    def __init__(self, renderer):
-        color = (1.5, 1.5, 1.2, 1)
-        super().__init__(renderer, color)
+    def __init__(self, renderer, marble_color):
+        rgba_color = (1.5, 1.5, 1.2, 1)
+        super().__init__(renderer, rgba_color, marble_color)
         for c in self.model.findAllMatches("**/+GeomNode"):
             gn = c.node()
             for i in range(gn.getNumGeoms()):
@@ -159,3 +238,12 @@ class BasePiece(_BaseModel):
     def set_pos(self, coord):
         x, y, z = coord
         self._set_pos((x, y, z))
+
+    def configure_as_ring(self, label):
+        """Configure this base piece as a board ring.
+
+        Args:
+            label: Position label (e.g., 'A1', 'B2')
+        """
+        self.set_python_tag("zertz_entity", "ring")
+        self.set_python_tag("zertz_label", label)

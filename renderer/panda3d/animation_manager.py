@@ -1,4 +1,4 @@
-"""Manager class for handling entity animations (moves and freeze effects)."""
+"""Manager class for handling entity animations."""
 
 import math
 from queue import SimpleQueue, Empty
@@ -8,7 +8,7 @@ from panda3d.core import TransparencyAttrib
 
 
 class AnimationManager:
-    """Manages non-highlight animations (moves and freeze effects)."""
+    """Manages non-highlight animations (move animations)."""
 
     def __init__(self, renderer):
         """Initialize the animation manager.
@@ -25,11 +25,10 @@ class AnimationManager:
         """Add an animation to the queue.
 
         Args:
-            anim_type: 'move' or 'freeze'
+            anim_type: Animation type (currently only 'move' is supported)
             defer: Delay before starting (seconds)
             **kwargs: Type-specific parameters
                 For 'move': entity, src, dst, scale, duration
-                For 'freeze': positions, duration
         """
         anim_item = {"type": anim_type, "defer": defer, **kwargs}
         self.animation_queue.put(anim_item)
@@ -94,36 +93,23 @@ class AnimationManager:
 
             # Check if animation has ended
             if task.time >= anim_item["end_time"]:
-                if anim_type == "move":
-                    # Set final position and scale
-                    entity = anim_item["entity"]
-                    dst_scale = anim_item.get("dst_scale")
-                    dst = anim_item.get("dst")
-                    if dst_scale is not None:
-                        entity.set_scale(dst_scale)
-                    if dst is not None:
-                        entity.set_pos(dst)
-                    else:
-                        # dst=None means this is a removal animation - hide the entity
-                        entity.hide()
-                elif anim_type == "freeze":
-                    # Ensure final alpha is set
-                    positions = anim_item.get("positions", [])
-                    target_alpha = 0.7
-                    for pos_str in positions:
-                        if pos_str in self.renderer.pos_to_base:
-                            base_piece = self.renderer.pos_to_base[pos_str]
-                            base_piece.model.setColorScale(1, 1, 1, target_alpha)
-                            base_piece.model.setTransparency(TransparencyAttrib.MAlpha)
+                # Set final position and scale
+                entity = anim_item["entity"]
+                dst_scale = anim_item.get("dst_scale")
+                dst = anim_item.get("dst")
+                if dst_scale is not None:
+                    entity.set_scale(dst_scale)
+                if dst is not None:
+                    entity.set_pos(dst)
+                else:
+                    # dst=None means this is a removal animation - hide the entity
+                    entity.hide()
 
                 to_remove.append(anim_item)
                 continue
 
             # Update animation
-            if anim_type == "move":
-                self._update_move_animation(anim_item, task.time)
-            elif anim_type == "freeze":
-                self._update_freeze_animation(anim_item, task.time)
+            self._update_move_animation(anim_item, task.time)
 
         # Remove completed animations
         for anim_item in to_remove:
@@ -163,23 +149,3 @@ class AnimationManager:
 
         x, y, z = self.renderer.get_current_pos(anim_factor, dst, src, jump=jump)
         entity.set_pos((x, y, z))
-
-    def _update_freeze_animation(self, anim_item, current_time):
-        """Update a freeze animation (alpha fade from 1.0 to 0.7)."""
-        positions = anim_item.get("positions", [])
-        target_alpha = 0.7
-        start_alpha = 1.0
-        duration = anim_item["duration"]
-        start_time = anim_item["start_time"]
-        elapsed_time = current_time - start_time
-        anim_factor = elapsed_time / duration
-
-        # Linear interpolation from 1.0 to 0.7
-        current_alpha = start_alpha + (target_alpha - start_alpha) * anim_factor
-
-        # Apply alpha to all frozen rings
-        for pos_str in positions:
-            if pos_str in self.renderer.pos_to_base:
-                base_piece = self.renderer.pos_to_base[pos_str]
-                base_piece.model.setColorScale(1, 1, 1, current_alpha)
-                base_piece.model.setTransparency(TransparencyAttrib.MAlpha)

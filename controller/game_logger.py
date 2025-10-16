@@ -1,115 +1,94 @@
 """Game logging for Zertz 3D.
 
-Handles logging game actions and notation to files.
+Handles logging game actions and notation using pluggable writers.
 """
 
 from typing import Callable
 
+from game.writers import GameWriter, NotationWriter, TranscriptWriter
+
 
 class GameLogger:
-    """Handles logging to files (actions + notation)."""
+    """Manages multiple game action writers for flexible logging.
+
+    Uses the Strategy pattern to support multiple output formats and destinations
+    simultaneously (e.g., replay to file, notation to screen).
+    """
 
     def __init__(
         self,
-        log_to_file=False,
-        log_notation=False,
+        writers: list[GameWriter] | None = None,
         status_reporter: Callable[[str], None] | None = None,
     ):
         """Initialize the game logger.
 
         Args:
-            log_to_file: Whether to log actions to file
-            log_notation: Whether to log notation to file
+            writers: Optional list of GameWriter instances
+            status_reporter: Optional callback for status messages
         """
-        self.log_to_file_enabled = log_to_file
-        self.log_notation_enabled = log_notation
-        self.log_file = None
-        self.log_filename = None
-        self.notation_file = None
-        self.notation_filename = None
+        self.writers: list[GameWriter] = writers if writers is not None else []
         self._status_reporter: Callable[[str], None] | None = status_reporter
+        self._game_active = False
 
-    def open_log_files(self, seed, rings, blitz=False):
-        """Open new log files for the current game.
+    def add_writer(self, writer: GameWriter) -> None:
+        """Add a writer to the logger.
+
+        Args:
+            writer: GameWriter instance to add
+        """
+        self.writers.append(writer)
+
+    def remove_writer(self, writer: GameWriter) -> None:
+        """Remove a writer from the logger.
+
+        Args:
+            writer: GameWriter instance to remove
+        """
+        if writer in self.writers:
+            self.writers.remove(writer)
+
+    def start_game(self, seed: int, rings: int, blitz: bool = False) -> None:
+        """Start logging for a new game and write headers to all writers.
 
         Args:
             seed: Random seed for this game
             rings: Number of rings on the board
             blitz: Whether this is a blitz game
         """
-        variant = "_blitz" if blitz else ""
+        for writer in self.writers:
+            writer.write_header(seed, rings, blitz)
+        self._game_active = True
 
-        if self.log_to_file_enabled:
-            self.log_filename = f"zertzlog{variant}_{seed}.txt"
-            self.log_file = open(self.log_filename, "w")
-            self.log_file.write(f"# Seed: {seed}\n")
-            self.log_file.write(f"# Rings: {rings}\n")
-            if blitz:
-                self.log_file.write("# Variant: Blitz\n")
-            self.log_file.write("#\n")
-            self._report(f"Logging game to: {self.log_filename}")
-
-        if self.log_notation_enabled:
-            self.notation_filename = f"zertzlog{variant}_{seed}_notation.txt"
-            self.notation_file = open(self.notation_filename, "w")
-            # First line: rings and variant
-            variant_text = " Blitz" if blitz else ""
-            self.notation_file.write(f"{rings}{variant_text}\n")
-            self._report(f"Logging notation to: {self.notation_filename}")
-
-    def close_log_files(self, game):
-        """Close the current log files and append final game state.
+    def end_game(self, game=None) -> None:
+        """End logging for the current game, write footers and close all writers.
 
         Args:
-            game: ZertzGame instance to get final state from
+            game: Optional ZertzGame instance for final state
         """
-        if self.log_file is not None:
-            # Append final game state as comments
-            self.log_file.write("#\n")
-            self.log_file.write("# Final game state:\n")
-            self.log_file.write("# ---------------\n")
-            self.log_file.write("# Board state:\n")
-            board_state = (
-                game.board.state[0]
-                + game.board.state[1]
-                + game.board.state[2] * 2
-                + game.board.state[3] * 3
-            )
-            for row in board_state:
-                self.log_file.write(f"# {row}\n")
-            self.log_file.write("# ---------------\n")
-            self.log_file.write("# Marble supply:\n")
-            self.log_file.write(f"# {game.board.state[-10:-1, 0, 0]}\n")
-            self.log_file.write("# ---------------\n")
-            self.log_file.close()
-            self.log_file = None
-            self._report(f"Game log saved to: {self.log_filename}")
+        for writer in self.writers:
+            writer.write_footer(game)
+            writer.close()
+        self._game_active = False
 
-        if self.notation_file is not None:
-            self.notation_file.close()
-            self.notation_file = None
-            self._report(f"Notation log saved to: {self.notation_filename}")
-
-    def log_action(self, player_num, action_dict):
-        """Log an action to the file if logging is enabled.
+    def log_action(self, player_num: int, action_dict: dict, action_result=None) -> None:
+        """Log an action to all writers.
 
         Args:
             player_num: Player number (1 or 2)
             action_dict: Dictionary containing action details
+            action_result: Optional ActionResult (for isolation captures in notation)
         """
-        if self.log_file is not None:
-            self.log_file.write(f"Player {player_num}: {action_dict}\n")
-            self.log_file.flush()
+        for writer in self.writers:
+            writer.write_action(player_num, action_dict, action_result)
 
-    def log_notation(self, notation):
-        """Log a move in official notation to the notation file.
+    def log_comment(self, message: str) -> None:
+        """Log a status/comment message to all writers.
 
         Args:
-            notation: Notation string to log
+            message: Status message to log as a comment
         """
-        if self.notation_file is not None:
-            self.notation_file.write(f"{notation}\n")
-            self.notation_file.flush()
+        for writer in self.writers:
+            writer.write_comment(message)
 
     def set_status_reporter(self, reporter: Callable[[str], None] | None) -> None:
         """Set or update the status reporter callback."""

@@ -19,7 +19,7 @@ class TestActionResult:
 
     def test_action_result_no_isolation(self):
         """Test ActionResult with no isolation."""
-        result = ActionResult(captured_marbles="w", newly_frozen_positions=set())
+        result = ActionResult(captured_marbles="w")
 
         assert not result.is_isolation(), "Single capture should not be isolation"
         assert result.captured_marbles == "w"
@@ -30,8 +30,7 @@ class TestActionResult:
             captured_marbles=[
                 {"marble": "w", "pos": "A1"},
                 {"marble": "b", "pos": "B2"},
-            ],
-            newly_frozen_positions=set(),
+            ]
         )
 
         assert result.is_isolation(), "Multiple captures should indicate isolation"
@@ -39,21 +38,14 @@ class TestActionResult:
 
     def test_action_result_no_captures(self):
         """Test ActionResult with no captures."""
-        result = ActionResult(captured_marbles=None, newly_frozen_positions=set())
+        result = ActionResult(captured_marbles=None)
 
         assert not result.is_isolation(), "No captures should not be isolation"
         assert result.captured_marbles is None
 
-    def test_action_result_frozen_positions(self):
-        """Test ActionResult tracks frozen positions."""
-        frozen = {"D4", "E5"}
-        result = ActionResult(captured_marbles=None, newly_frozen_positions=frozen)
-
-        assert result.newly_frozen_positions == frozen
-
     def test_action_result_empty_isolation_list(self):
         """Test ActionResult with empty isolation list."""
-        result = ActionResult(captured_marbles=[], newly_frozen_positions=set())
+        result = ActionResult(captured_marbles=[])
 
         # Empty list should still be treated as isolation (even though it's degenerate)
         assert result.is_isolation(), "Empty list should indicate isolation structure"
@@ -62,8 +54,7 @@ class TestActionResult:
     def test_action_result_single_isolation_capture(self):
         """Test ActionResult with single item in isolation list."""
         result = ActionResult(
-            captured_marbles=[{"marble": "w", "pos": "A1"}],
-            newly_frozen_positions=set(),
+            captured_marbles=[{"marble": "w", "pos": "A1"}]
         )
 
         assert result.is_isolation(), "List structure should indicate isolation"

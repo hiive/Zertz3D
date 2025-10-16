@@ -842,39 +842,105 @@ class TestCanonicalTransform:
             f"Transform MR120 with calculated inverse {inverse_name} doesn't recover original"
         )
 
-    def test_verify_transform_order_of_operations(self, small_board):
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
+    def test_verify_transform_order_of_operations(self, request, board_fixture):
         """
-        Verify the order in which _transform_state_hex applies transformations.
+        Verify that _transform_state_hex applies transformations in the correct order.
+
+        Tests both composition orders:
+        - MR(k): rotate by k, THEN mirror (mirror_first=False)
+        - R(k)M: mirror, THEN rotate by k (mirror_first=True)
+
+        These should produce different results for asymmetric patterns.
+
+        Tests all board sizes (37, 48, 61 rings).
         """
-        small_board._build_axial_maps()
+        board = request.getfixturevalue(board_fixture)
+        board._build_axial_maps()
 
-        # Create test pattern
-        base = np.copy(small_board.state)
-        base[1, *small_board.str_to_index("A4")] = 1
+        # Create asymmetric test pattern using positions that exist on all board sizes
+        base = np.copy(board.state)
+        if board.rings == 37:
+            base[1, *board.str_to_index("A4")] = 1
+            base[2, *board.str_to_index("B3")] = 1
+        elif board.rings == 48:
+            base[1, *board.str_to_index("A5")] = 1
+            base[2, *board.str_to_index("B4")] = 1
+        else:  # 61 rings
+            base[1, *board.str_to_index("A5")] = 1
+            base[2, *board.str_to_index("B4")] = 1
 
-        # Test combined MR60
-        combined = small_board._transform_state_hex(base, rot60_k=1, mirror=True)
+        # Test all angles to ensure consistency
+        # For 48-ring board (D3), only test 120°, 240° angles (k=2, 4)
+        # For D6 boards (37, 61), test 60°, 120°, 180° angles (k=1, 2, 3)
+        test_angles = [2, 4] if board.rings == 48 else [1, 2, 3]
 
-        # Test rotation then mirror
-        rotated = small_board._transform_state_hex(base, rot60_k=1)
-        rot_then_mirror = small_board._transform_state_hex(rotated, mirror=True)
+        for k in test_angles:
+            # === Test MR(k): rotate-then-mirror (default behavior) ===
+            mr_combined = board._transform_state_hex(
+                base, rot60_k=k, mirror=True, mirror_first=False
+            )
 
-        # Test mirror then rotation
-        mirrored = small_board._transform_state_hex(base, mirror=True)
-        mirror_then_rot = small_board._transform_state_hex(mirrored, rot60_k=1)
+            # Manual two-step: rotate then mirror
+            rotated = board._transform_state_hex(base, rot60_k=k)
+            rot_then_mirror = board._transform_state_hex(rotated, mirror=True)
 
-        # Which order matches the combined operation?
-        if np.array_equal(combined, rot_then_mirror):
-            order = "rotate_then_mirror"
-            print("✓ MR(k) means: rotate by k, THEN mirror")
-        elif np.array_equal(combined, mirror_then_rot):
-            order = "mirror_then_rotate"
-            print("✓ MR(k) means: mirror, THEN rotate by k")
-        else:
-            order = "unknown"
-            pytest.fail("Combined MR operation doesn't match either order!")
+            # MR(k) should match manual rotate-then-mirror
+            assert np.array_equal(mr_combined, rot_then_mirror), (
+                f"{board.rings}-ring: MR({k*60}°) should apply rotation first, then mirror. "
+                f"If this fails, the transform order doesn't match the inverse calculation."
+            )
 
-        return order
+            # === Test R(k)M: mirror-then-rotate ===
+            rm_combined = board._transform_state_hex(
+                base, rot60_k=k, mirror=True, mirror_first=True
+            )
+
+            # Manual two-step: mirror then rotate
+            mirrored = board._transform_state_hex(base, mirror=True)
+            mirror_then_rot = board._transform_state_hex(mirrored, rot60_k=k)
+
+            # R(k)M should match manual mirror-then-rotate
+            assert np.array_equal(rm_combined, mirror_then_rot), (
+                f"{board.rings}-ring: R({k*60}°)M should apply mirror first, then rotation. "
+                f"If this fails, the mirror_first parameter doesn't work correctly."
+            )
+
+            # === Verify the two orders produce DIFFERENT results (except for 180° where they commute) ===
+            # For 180° rotation, MR(180°) = R(180°)M due to D6 symmetry properties
+            if k == 3:  # 180°
+                # For 180° rotation, the order doesn't matter (operations commute)
+                assert np.array_equal(mr_combined, rm_combined), (
+                    f"{board.rings}-ring: MR(180°) and R(180°)M should produce the SAME result (they commute)"
+                )
+            else:
+                # For other angles, order matters
+                assert not np.array_equal(mr_combined, rm_combined), (
+                    f"{board.rings}-ring: MR({k*60}°) and R({k*60}°)M should produce different results for asymmetric pattern. "
+                    f"Order of operations matters!"
+                )
+
+        # === Test that pure rotation and pure mirror work correctly ===
+        # Pure rotation (no mirror)
+        for k in test_angles:
+            pure_rot = board._transform_state_hex(base, rot60_k=k, mirror=False)
+            assert np.sum(pure_rot) == np.sum(base), (
+                f"{board.rings}-ring: Pure rotation R({k*60}°) should preserve marble count"
+            )
+
+        # Pure mirror (no rotation)
+        pure_mirror = board._transform_state_hex(base, rot60_k=0, mirror=True)
+        assert np.sum(pure_mirror) == np.sum(base), (
+            f"{board.rings}-ring: Pure mirror should preserve marble count"
+        )
+
+        # Verify pure mirror is involutive (applying twice returns original)
+        double_mirror = board._transform_state_hex(pure_mirror, rot60_k=0, mirror=True)
+        assert np.array_equal(base, double_mirror), (
+            f"{board.rings}-ring: Mirror applied twice should return to original"
+        )
 
     def test_all_transform_inverses(self, small_board):
         """

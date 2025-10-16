@@ -6,11 +6,13 @@ Manages game loop, player actions, renderer updates, and game state.
 from __future__ import annotations
 
 from typing import Optional
+import sys
 
 import numpy as np
 
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
-from controller.replay_loader import ReplayLoader
+from game.loaders import TranscriptLoader, NotationLoader
+from game.writers import NotationWriter, TranscriptWriter
 from controller.game_logger import GameLogger
 from controller.action_text_formatter import ActionTextFormatter
 from controller.action_processor import ActionProcessor
@@ -24,17 +26,46 @@ class ZertzGameController:
     # Fraction of move_duration used for animations (leaves buffer before next turn)
     ANIMATION_DURATION_RATIO = 60.0 / 100.0  # 1% of 60fps
 
+    @staticmethod
+    def _detect_file_format(filepath: str) -> str:
+        """Detect whether a file is transcript or notation format.
+
+        Transcript files start with '# Seed' or 'Player'.
+        Notation files start with a digit (board size).
+
+        Args:
+            filepath: Path to the file to detect
+
+        Returns:
+            "transcript" or "notation"
+        """
+        with open(filepath, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:  # Skip empty lines
+                    continue
+                # Transcript files start with '#' (comments) or 'Player'
+                if line.startswith('#') or line.startswith('Player'):
+                    return "transcript"
+                # Notation files start with a digit (board size like "37" or "37 Blitz")
+                if line[0].isdigit():
+                    return "notation"
+        # Default to transcript if we can't determine
+        return "transcript"
+
     def __init__(
         self,
         rings=37,
         replay_file=None,
         seed=None,
         log_to_file=False,
+        log_to_screen=False,
+        log_notation_to_file=False,
+        log_notation_to_screen=False,
         partial_replay=False,
         max_games=None,
         highlight_choices=False,
         show_coords=False,
-        log_notation=False,
         blitz=False,
         move_duration=0.666,
         renderer_or_factory: IRenderer | IRendererFactory | None = None,
@@ -54,21 +85,28 @@ class ZertzGameController:
             False  # Track if current game ending has been processed
         )
 
-        # Initialize logger and move formatter
-        self.logger = GameLogger(
-            log_to_file=log_to_file,
-            log_notation=log_notation,
-            status_reporter=self._report,
-        )
         self.move_formatter = ActionTextFormatter()
+
+        # Create logger early (before session) so _report() can use it during initialization
+        # Start with empty writers list - we'll add them after session is created
+        self.logger = GameLogger(writers=[], status_reporter=self._report)
+        self._log_filenames = []  # Track filenames for status reporting
+        self._log_to_file = log_to_file
+        self._log_to_screen = log_to_screen
+        self._log_notation_to_file = log_notation_to_file
+        self._log_notation_to_screen = log_notation_to_screen
 
         # Load replay first to detect board size and variant if needed
         replay_actions = None
         loader = None
         if replay_file is not None:
-            loader = ReplayLoader(
-                replay_file, blitz=blitz, status_reporter=self._report
-            )
+            # Auto-detect file format (transcript or notation)
+            file_format = self._detect_file_format(replay_file)
+            if file_format == "notation":
+                loader = NotationLoader(replay_file, status_reporter=self._report)
+            else:  # transcript format
+                loader = TranscriptLoader(replay_file, status_reporter=self._report)
+
             replay_actions = loader.load()
             # Use loader's authoritative configuration
             rings = loader.detected_rings
@@ -85,6 +123,29 @@ class ZertzGameController:
             status_reporter=self._report,
             human_players=human_players,
         )
+
+        # Now that session exists, configure logger with appropriate writers
+        writers = []
+
+        # File writers (only for non-replay mode)
+        if self._log_to_file and not self.session.is_replay_mode():
+            variant = "_blitz" if self.session.blitz else ""
+            filename = f"zertzlog{variant}_{self.session.get_seed()}.txt"
+            self._log_filenames.append(filename)
+            writers.append(TranscriptWriter(open(filename, "w")))
+        if self._log_notation_to_file and not self.session.is_replay_mode():
+            variant = "_blitz" if self.session.blitz else ""
+            filename = f"zertzlog{variant}_{self.session.get_seed()}_notation.txt"
+            self._log_filenames.append(filename)
+            writers.append(NotationWriter(open(filename, "w")))
+
+        # Screen writers (for all modes including replay)
+        if self._log_to_screen:
+            writers.append(TranscriptWriter(sys.stdout))
+        if self._log_notation_to_screen:
+            writers.append(NotationWriter(sys.stdout))
+
+        self.logger.writers = writers
 
         if isinstance(renderer_or_factory, IRenderer):
             self.renderer = renderer_or_factory
@@ -111,24 +172,30 @@ class ZertzGameController:
         if loader is not None:
             loader.set_status_reporter(self._report)
 
-        # Open log file for first game (if not in replay mode)
-        if not self.session.is_replay_mode():
-            self.logger.open_log_files(
+        # Report log filenames for first game
+        for filename in self._log_filenames:
+            self._report(f"Logging to: {filename}")
+
+        # Start logging for first game (screen writers work in all modes)
+        if self.logger.writers:
+            self.logger.start_game(
                 self.session.get_seed(), self.session.rings, self.session.blitz
             )
 
     def _close_log_file(self):
         """Close the current log file and append final game state."""
-        if self.logger.log_file is not None or self.logger.notation_file is not None:
-            self.logger.close_log_files(self.session.game)
+        if self.logger.writers:
+            self.logger.end_game(self.session.game)
 
-    def _log_action(self, player_num, action_dict):
-        """Log an action to the file if logging is enabled."""
-        self.logger.log_action(player_num, action_dict)
+    def _log_action(self, player_num, action_dict, action_result=None):
+        """Log an action to all writers.
 
-    def _log_notation(self, notation):
-        """Log a move in official notation to the notation file."""
-        self.logger.log_notation(notation)
+        Args:
+            player_num: Player number (1 or 2)
+            action_dict: Dictionary containing action details
+            action_result: Optional ActionResult for notation formatting
+        """
+        self.logger.log_action(player_num, action_dict, action_result)
 
     def run(self):
         # self._game_loop = GameLoop(self, self.renderer, self.move_duration)
@@ -145,13 +212,38 @@ class ZertzGameController:
         # Reset game session (creates new game instance and players)
         self.session.reset_game()
 
+        # Update writers for new game
+        writers = []
+        self._log_filenames = []
+        if self.logger.writers:
+            # Recreate writers - file writers get new files, screen writers persist
+            for writer in self.logger.writers:
+                # Screen writers (stdout) persist across games
+                if writer.output == sys.stdout:
+                    writers.append(writer)
+                    continue
+
+                # File writers get new files for each game
+                variant = "_blitz" if self.session.blitz else ""
+                if isinstance(writer, TranscriptWriter):
+                    filename = f"zertzlog{variant}_{self.session.get_seed()}.txt"
+                    self._log_filenames.append(filename)
+                    writers.append(TranscriptWriter(open(filename, "w")))
+                    self._report(f"Logging to: {filename}")
+                elif isinstance(writer, NotationWriter):
+                    filename = f"zertzlog{variant}_{self.session.get_seed()}_notation.txt"
+                    self._log_filenames.append(filename)
+                    writers.append(NotationWriter(open(filename, "w")))
+                    self._report(f"Logging notation to: {filename}")
+            self.logger.writers = writers
+
         # Reset renderer if present
         if self.renderer is not None:
             self.renderer.reset_board()
 
-        # Open log file for new game (if not in replay mode)
-        if not self.session.is_replay_mode():
-            self.logger.open_log_files(
+        # Start logging for new game (screen writers work in all modes)
+        if self.logger.writers:
+            self.logger.start_game(
                 self.session.get_seed(), self.session.rings, self.session.blitz
             )
 
@@ -219,14 +311,26 @@ class ZertzGameController:
                     if idx < len(counts) and counts[idx] > 0:
                         supply_colors.add(marble)
             else:
-                if color:
-                    supply_colors.add(color)
-                if (
-                    player_id is not None
-                    and state.get("placement_source") == "captured"
-                    and color
-                ):
-                    captured_targets.add((player_id, color))
+                # Check if a specific marble is selected (has supply_key or captured_key)
+                supply_key = state.get("placement_supply_key")
+                captured_key = state.get("placement_captured_key")
+
+                if supply_key:
+                    # Highlight the specific supply marble, not all marbles of that color
+                    primary.add(supply_key)
+                elif captured_key:
+                    # Highlight the specific captured marble, not all marbles of that color
+                    primary.add(captured_key)
+                else:
+                    # Fallback: highlight all marbles of the selected color
+                    if color:
+                        supply_colors.add(color)
+                    if (
+                        player_id is not None
+                        and state.get("placement_source") == "captured"
+                        and color
+                    ):
+                        captured_targets.add((player_id, color))
             if player_id is not None and options.get("supply_total", 0) == 0:
                 for marble in options.get("supply_colors", set()):
                     captured_targets.add((player_id, marble))
@@ -295,17 +399,10 @@ class ZertzGameController:
                         secondary.add(label)
                     else:
                         primary.add(label)
-            elif h_type in ("supply_marble", "captured_marble"):
-                color = hover_state.get("color")
-                if color:
-                    if state.get("placement_color_idx") is None:
-                        supply_colors = {color}
-                    else:
-                        supply_colors.add(color)
-                    if h_type == "captured_marble":
-                        owner = hover_state.get("owner", player_id)
-                        if owner is not None:
-                            captured_targets.add((int(owner), color))
+            # Note: Supply/captured marble hovering is now handled above by checking
+            # for specific marble keys (supply_key/captured_key) and adding them to
+            # primary highlights instead of supply_colors/captured_targets, which
+            # would highlight ALL marbles of that color instead of just the selected one.
 
         if not primary and not secondary and not supply_colors and not captured_targets:
             self._clear_hover_feedback()
@@ -426,16 +523,13 @@ class ZertzGameController:
         if self.highlight_choices:
             self._display_valid_moves(player)
 
-        # Convert action to string and log
+        # Convert action to string
         try:
             _, action_dict = self.session.game.action_to_str(ax, ay)
         except IndexError as e:
             self._report(f"Error converting action to string: {e}")
             self._report(f"Action type: {ax}, Action: {ay}")
             raise
-
-        # Log action to normal log
-        self._log_action(player.n, action_dict)
 
         # Get render data BEFORE executing action (so board state is pre-action)
         # This encapsulates all data transformations in the game layer (Recommendation 1)
@@ -445,11 +539,11 @@ class ZertzGameController:
         action_result = self.session.game.take_action(ax, ay)
 
         # Generate complete notation WITH action_result (includes isolation in one pass)
-        notation = self.session.game.action_to_notation(action_dict, action_result)
-        self._report(f"Player {player.n}: {action_dict} ({notation})")
-
-        # Log notation directly (no buffering needed)
-        self._log_notation(notation)
+        # notation = self.session.game.action_to_notation(action_dict, action_result)
+        # self._report(f"Player {player.n}: {action_dict} ({notation})")
+        # 
+        # Log action with action_result (used by NotationWriter for isolation captures)
+        self._log_action(player.n, action_dict, action_result)
 
         # Dispatch to renderer (if present) and wait for callback
         if self.renderer:
@@ -526,14 +620,18 @@ class ZertzGameController:
 
         winner = game_over if game_over in [PLAYER_1_WIN, PLAYER_2_WIN] else None
 
+        # Get detailed reason for game ending
+        reason = self.session.game.get_game_end_reason()
+
         self._report("")
         if winner:
             # Convert winner constant to player number for display
             player_num = 1 if winner == PLAYER_1_WIN else 2
-            self._report(f"Winner: Player {player_num}")
+            self._report(f"Winner: Player {player_num} ({reason})")
         else:
-            self._report("Game ended in a tie")
-        self.session.game.print_state(self._report)
+            self._report(f"Game ended in a tie ({reason})")
+        # Note: Board state is written by TranscriptWriter.write_footer()
+        # to avoid duplication
 
         self._report(f"Player 1 captures: {self.session.player1.captured}")
         self._report(f"Player 2 captures: {self.session.player2.captured}")
@@ -558,11 +656,20 @@ class ZertzGameController:
         return task.again
 
     def _report(self, message: str | None) -> None:
-        """Forward status messages to the active renderer(s) or stdout."""
+        """Forward status messages to logger (sole handler for all text output).
+
+        Logger is the central hub for all text output:
+        - TranscriptWriter (file): writes as comments to log files
+        - TranscriptWriter (stdout): writes as comments to screen
+        - NotationWriter: ignores comments (no-op)
+
+        Note: Renderer is NOT sent status messages to avoid duplication when
+        both transcript-screen and notation-screen are used together.
+        TextRenderer only outputs "Executing action" via its execute_action method.
+        """
         if message is None:
             return
         text = str(message)
-        if self.renderer is not None:
-            self.renderer.report_status(text)
-        else:
-            print(text)
+
+        # Logger is the sole handler for all text output
+        self.logger.log_comment(text)

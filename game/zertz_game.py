@@ -3,6 +3,7 @@ import numpy as np
 
 from .zertz_board import ZertzBoard
 from .action_result import ActionResult
+from .formatters import NotationFormatter
 from shared.render_data import RenderData
 from shared.constants import MARBLE_TYPES
 
@@ -318,6 +319,111 @@ class ZertzGame:
             temp_game = ZertzGame(clone=self, clone_state=cur_state)
             return temp_game.get_game_ended()
 
+    def get_game_end_reason(self):
+        """Returns detailed reason for why the game ended.
+
+        Returns:
+            str: Human-readable description of why the game ended
+            None: Game not over
+        """
+        if not self._is_game_over():
+            return None
+
+        # Check for tie conditions first
+        if self._has_move_loop():
+            return "Move loop detected (repeated position)"
+
+        if self._both_players_immobilized():
+            # Both players immobilized → determine winner by captured marbles
+            p1_captured = self.board.global_state[self.board.P1_CAP_SLICE]
+            p2_captured = self.board.global_state[self.board.P2_CAP_SLICE]
+
+            # Check each win condition
+            for win_con in self.win_con:
+                required = np.zeros(3)
+                for i, marble_type in enumerate(MARBLE_TYPES):
+                    if marble_type in win_con:
+                        required[i] = win_con[marble_type]
+
+                if np.all(p1_captured >= required):
+                    return self._format_win_condition(p1_captured, "Both players immobilized")
+                if np.all(p2_captured >= required):
+                    return self._format_win_condition(p2_captured, "Both players immobilized")
+
+            # Neither player met win condition → tie
+            return "Both players immobilized with no winner"
+
+        # Check if board is full
+        if np.all(np.sum(self.board.state[self.board.BOARD_LAYERS], axis=0) != 1):
+            return "Board completely filled with marbles"
+
+        # Check if current player has no marbles
+        pool_marbles = self.board.global_state[self.board.SUPPLY_SLICE]
+        if self.board.get_cur_player() == self.board.PLAYER_1:
+            captured_marbles = self.board.global_state[self.board.P1_CAP_SLICE]
+        else:
+            captured_marbles = self.board.global_state[self.board.P2_CAP_SLICE]
+
+        if np.all(pool_marbles + captured_marbles == 0):
+            return "Opponent has no marbles left to place"
+
+        # Standard win by captured marbles
+        p1_captured = self.board.global_state[self.board.P1_CAP_SLICE]
+        p2_captured = self.board.global_state[self.board.P2_CAP_SLICE]
+
+        for win_con in self.win_con:
+            required = np.zeros(3)
+            for i, marble_type in enumerate(MARBLE_TYPES):
+                if marble_type in win_con:
+                    required[i] = win_con[marble_type]
+
+            if np.all(p1_captured >= required):
+                return self._format_win_condition(p1_captured, "Captured required marbles")
+            if np.all(p2_captured >= required):
+                return self._format_win_condition(p2_captured, "Captured required marbles")
+
+        return "Game ended"
+
+    def _format_win_condition(self, captured_marbles, prefix=""):
+        """Format a win condition message based on captured marbles.
+
+        Args:
+            captured_marbles: Array of captured marble counts [w, g, b]
+            prefix: Optional prefix for the message
+
+        Returns:
+            str: Formatted message like "Captured 4 white" or "Captured 3 of each color"
+        """
+        w, g, b = int(captured_marbles[0]), int(captured_marbles[1]), int(captured_marbles[2])
+
+        # Check which win condition was met
+        for win_con in self.win_con:
+            required = np.zeros(3)
+            for i, marble_type in enumerate(MARBLE_TYPES):
+                if marble_type in win_con:
+                    required[i] = win_con[marble_type]
+
+            if np.all(captured_marbles >= required):
+                # Format the specific condition
+                if len(win_con) == 3:
+                    # 3 of each
+                    msg = f"{int(required[0])} of each color"
+                elif "w" in win_con:
+                    msg = f"{int(required[0])} white"
+                elif "g" in win_con:
+                    msg = f"{int(required[1])} gray"
+                elif "b" in win_con:
+                    msg = f"{int(required[2])} black"
+                else:
+                    msg = f"w={w}, g={g}, b={b}"
+
+                if prefix:
+                    return f"{prefix}: {msg}"
+                return msg
+
+        # Fallback
+        return f"Captured w={w}, g={g}, b={b}"
+
     def get_symmetries(self, cur_state=None):
         # There are many symmetries in Zertz
         # First, there are rotational symmetry in that every board position can be rotated in
@@ -381,8 +487,8 @@ class ZertzGame:
                 rem = self.board.width**2
             action = (layer, put, rem)
         elif action_type == "CAP":
-            if len(args) == 5:
-                _a, src_str, _b, dst_str = args[1:]
+            if len(args) == 4:
+                src_str, _b, dst_str = args[1:]
             else:
                 return "", None
             src = self.board.str_to_index(src_str)
@@ -433,7 +539,6 @@ class ZertzGame:
         elif action_type == "CAP":
             direction, y, x = action
             src = (y, x)
-            src_marble = self.board.get_marble_type_at(src)
             src_str = self.board.position_from_yx(src).label
 
             dy, dx = self.board.DIRECTIONS[direction]
@@ -443,12 +548,11 @@ class ZertzGame:
             dst = self.board.get_jump_destination(src, cap)
             dst_str = self.board.position_from_yx(dst).label
 
-            action_str = "{} {} {} {} {}".format(
-                action_type, src_marble, src_str, cap_marble, dst_str
+            action_str = "{} {} {} {}".format(
+                action_type, src_str, cap_marble, dst_str
             )
             action_dict = {
                 "action": action_type,
-                "marble": src_marble,
                 "src": str(src_str),
                 "dst": str(dst_str),
                 "capture": cap_marble,
@@ -459,14 +563,7 @@ class ZertzGame:
     def action_to_notation(self, action_dict, action_result=None):
         """Convert action_dict to official Zèrtz notation.
 
-        Notation format from http://www.gipf.com/zertz/notations/notation.html:
-        - Placement: [Color][coord] or [Color][coord],[removed_coord]
-          Examples: "Wd4" or "Bd7,b2"
-        - Placement with isolation: [Color][coord],[removed_coord] x [Color][pos]...
-          Example: "Bd7,b2 x Wa1Wa2"
-        - Capture: x [src][captured_color][dst]
-          Example: "x e3Wg3"
-        - Pass: "-"
+        Delegates to NotationFormatter for conversion.
 
         Args:
             action_dict: Dictionary with action details
@@ -475,43 +572,7 @@ class ZertzGame:
         Returns:
             str: Notation string
         """
-        if action_dict["action"] == "PASS":
-            return "-"
-
-        if action_dict["action"] == "PUT":
-            # Convert marble color to uppercase
-            marble = action_dict["marble"].upper()
-            # Convert destination to lowercase
-            dst = action_dict["dst"].lower()
-
-            # Check if a ring was removed
-            if action_dict["remove"]:
-                remove = action_dict["remove"].lower()
-                notation = f"{marble}{dst},{remove}"
-            else:
-                notation = f"{marble}{dst}"
-
-            # Add isolation captures if any
-            if action_result and action_result.is_isolation():
-                isolated_parts = []
-                for removal in action_result.captured_marbles:
-                    if removal["marble"]:
-                        color = removal["marble"].upper()
-                        pos = removal["pos"].lower()
-                        isolated_parts.append(f"{color}{pos}")
-                if isolated_parts:
-                    notation += " x " + "".join(isolated_parts)
-
-            return notation
-
-        elif action_dict["action"] == "CAP":
-            # Convert to lowercase and get captured marble as uppercase
-            src = action_dict["src"].lower()
-            dst = action_dict["dst"].lower()
-            captured = action_dict["capture"].upper()
-            return f"x {src}{captured}{dst}"
-
-        return ""
+        return NotationFormatter.action_to_notation(action_dict, action_result)
 
     def get_placement_positions(self, placement_array):
         """Convert placement array to list of position strings.
@@ -658,7 +719,7 @@ class ZertzGame:
             action: Action tuple (or None for PASS)
 
         Returns:
-            ActionResult: Encapsulates captured marbles and newly frozen positions
+            ActionResult: Encapsulates captured marbles
         """
         # Record the move for loop detection
         self.move_history.append((action_type, action))
@@ -666,25 +727,8 @@ class ZertzGame:
         if action_type == "PASS":
             # Player passes (no valid moves), switch player
             self.board._next_player()
-            return ActionResult(captured_marbles=None, newly_frozen_positions=set())
+            return ActionResult(captured_marbles=None)
         else:
-            # Capture frozen positions BEFORE action (Recommendation 1)
-            frozen_before = set(self.board.frozen_positions)
-
             # Execute the action
             captured = self.board.take_action(action, action_type)
-
-            # Get NEWLY frozen positions after action
-            frozen_after = set(self.board.frozen_positions)
-            newly_frozen = frozen_after - frozen_before
-
-            # Convert positions to strings
-            frozen_position_strs = {
-                self.board.index_to_str(pos)
-                for pos in newly_frozen
-                if self.board.index_to_str(pos)
-            }
-
-            return ActionResult(
-                captured_marbles=captured, newly_frozen_positions=frozen_position_strs
-            )
+            return ActionResult(captured_marbles=captured)
