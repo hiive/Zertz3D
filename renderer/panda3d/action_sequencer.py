@@ -53,6 +53,7 @@ class ActionVisualizationSequencer:
         self.capture_moves = None  # List of capture move dicts
         self.removal_positions = None  # List of removable position strings
         self.task_delay_time = 0  # Animation duration from controller's task
+        self.start_delay = renderer.start_delay
 
     def is_active(self):
         """Check if the state machine is currently active."""
@@ -65,6 +66,7 @@ class ActionVisualizationSequencer:
             player: Player making the move
             render_data: RenderData value object with action_dict and highlight data
             task_delay_time: Animation duration from controller's task
+            start_delay: Animation delay from controller's task
         """
         self.pending_player = player
         self.pending_action_dict = render_data.action_dict
@@ -85,6 +87,7 @@ class ActionVisualizationSequencer:
         elif action_type == "PASS":
             # PASS has no visuals, action already executed by controller
             self.phase = None  # Done immediately (no highlight phases)
+        self.start_delay = 0
 
     def update(self, task):
         """Update the state machine. Called each frame.
@@ -134,6 +137,7 @@ class ActionVisualizationSequencer:
                 rings=placement_positions,
                 material_mod=PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
                 duration=self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS],
+                defer=self.start_delay,
             )
 
     def _queue_removal_highlights(self, removal_positions, defer=0):

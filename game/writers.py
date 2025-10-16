@@ -72,7 +72,11 @@ class GameWriter(ABC):
         self.output.flush()
 
     def close(self) -> None:
-        """Close the output stream."""
+        """Close the output stream (but never close stdout/stderr)."""
+        import sys
+        # Never close stdout or stderr - they should persist for the entire program
+        if self.output in (sys.stdout, sys.stderr):
+            return
         if hasattr(self.output, 'close'):
             self.output.close()
 

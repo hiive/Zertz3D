@@ -74,7 +74,7 @@ class AnimationManager:
                 if anim_type == "move":
                     # For move animations, store initial scale
                     entity = anim_item["entity"]
-                    if "src_scale" not in anim_item:
+                    if entity is not None and "src_scale" not in anim_item:
                         anim_item["src_scale"] = entity.get_scale()
                     anim_item["dst_scale"] = anim_item.get("scale")
 
@@ -93,23 +93,25 @@ class AnimationManager:
 
             # Check if animation has ended
             if task.time >= anim_item["end_time"]:
-                # Set final position and scale
+                # Set final position and scale (if entity exists)
                 entity = anim_item["entity"]
-                dst_scale = anim_item.get("dst_scale")
-                dst = anim_item.get("dst")
-                if dst_scale is not None:
-                    entity.set_scale(dst_scale)
-                if dst is not None:
-                    entity.set_pos(dst)
-                else:
-                    # dst=None means this is a removal animation - hide the entity
-                    entity.hide()
+                if entity is not None:
+                    dst_scale = anim_item.get("dst_scale")
+                    dst = anim_item.get("dst")
+                    if dst_scale is not None:
+                        entity.set_scale(dst_scale)
+                    if dst is not None:
+                        entity.set_pos(dst)
+                    else:
+                        # dst=None means this is a removal animation - hide the entity
+                        entity.hide()
 
                 to_remove.append(anim_item)
                 continue
 
-            # Update animation
-            self._update_move_animation(anim_item, task.time)
+            # Update animation (skip if no entity - dummy animation)
+            if anim_item["entity"] is not None:
+                self._update_move_animation(anim_item, task.time)
 
         # Remove completed animations
         for anim_item in to_remove:

@@ -36,6 +36,7 @@ class ZertzFactory:
         blitz: bool = False,
         move_duration: float = 0.666,
         human_players: tuple[int, ...] | None = None,
+        start_delay: float = 0.0,
     ) -> ZertzGameController:
         """Create a fully-wired ZertzGameController with appropriate renderers."""
 
@@ -53,6 +54,7 @@ class ZertzFactory:
                     highlight_choices=controller.highlight_choices,
                     update_callback=controller.update_game,
                     move_duration=controller.move_duration,
+                    start_delay=start_delay,
                 )
                 renderers.append(renderer)
 

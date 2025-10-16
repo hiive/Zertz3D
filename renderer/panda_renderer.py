@@ -17,6 +17,7 @@ from panda3d.core import (
     loadPrcFileData,
     TextNode,
 )
+from sympy import capture
 
 from renderer.panda3d.action_sequencer import ActionVisualizationSequencer
 from renderer.panda3d.animation_manager import AnimationManager
@@ -50,14 +51,24 @@ class PandaRenderer(ShowBase):
     # Rendering constants
     BASE_SIZE_X = 0.8
     BASE_SIZE_Y = 0.7
-    SUPPLY_MARBLE_SCALE = 0.25
-    BOARD_MARBLE_SCALE = 0.35
+
+    BASE_SCALE_FACTOR = 0.8
+    SUPPLY_MARBLE_SCALE = 0.275 * BASE_SCALE_FACTOR
+    BOARD_MARBLE_SCALE = 0.35 * BASE_SCALE_FACTOR
     CAPTURED_MARBLE_SCALE = 0.9 * BOARD_MARBLE_SCALE
-    PLAYER_POOL_OFFSET_SCALE = 0.8
-    PLAYER_POOL_MEMBER_OFFSET_X = 0.6
+    CAPTURE_POOL_OFFSET_SCALE = 0.9 * BASE_SCALE_FACTOR
+    CAPTURE_POOL_MEMBER_OFFSET_X = 0.9 * BASE_SCALE_FACTOR
 
     # Animation timing
     CAPTURE_FLASH_DURATION = 0.3  # Duration of yellow flash before capture
+
+    # Shadow configuration
+    SHADOW_MAP_RESOLUTION = 2048  # Resolution for shadow maps (higher = better quality, more VRAM)
+    # SHADOW_BIAS: Adjust if shadow artifacts occur
+    #   - Too low (< 0.001): "Shadow acne" (self-shadowing artifacts)
+    #   - Too high (> 0.02): "Peter panning" (shadows detach from objects)
+    #   - Default works well for most cases; uncomment and adjust if needed
+    # SHADOW_BIAS = 0.005
 
     # Local copies keep renderer-specific tweaks isolated from shared constants.
     # todo check if these are read only usages. Can we freeze the source constants?
@@ -96,6 +107,7 @@ class PandaRenderer(ShowBase):
         highlight_choices=False,
         update_callback=None,
         move_duration=0.666,
+        start_delay=0.0,
     ):
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
@@ -104,6 +116,7 @@ class PandaRenderer(ShowBase):
         self.highlight_choices = highlight_choices
         self.update_callback = update_callback
         self.move_duration = move_duration
+        self.start_delay = start_delay
 
         props = WindowProperties()
         # props.setSize(1364, 768)
@@ -149,11 +162,11 @@ class PandaRenderer(ShowBase):
                 f"Supported sizes are {ZertzBoard.SMALL_BOARD_37}, {ZertzBoard.MEDIUM_BOARD_48}, and {ZertzBoard.LARGE_BOARD_61}."
             )
 
-        self.player_pool_offset_scale = self.PLAYER_POOL_OFFSET_SCALE
-        self.player_pool_member_offset = (self.PLAYER_POOL_MEMBER_OFFSET_X, 0, 0)
+        self.capture_pool_offset_scale = self.CAPTURE_POOL_OFFSET_SCALE
+        self.capture_pool_member_offset = (self.CAPTURE_POOL_MEMBER_OFFSET_X, 0, 0)
 
-        self.player_pools = None
-        self.player_pool_coords = None
+        self.capture_pools = None
+        self.capture_pool_coords = None
 
         # Initialize interaction helper for mouse picking and hover detection
         self.interaction_helper = InteractionHelper(self)
@@ -161,6 +174,13 @@ class PandaRenderer(ShowBase):
         self.pipeline = simplepbr.init()
         self.pipeline.enable_shadows = True
         self.pipeline.use_330 = True
+        # Increase shadow map resolution for better intra-object shadows (marbles, rings)
+        self.pipeline.max_lights = 2  # Limit to 2 shadow-casting lights
+
+        # Configure shadow quality
+        # Note: Shadow bias can be adjusted if shadow acne or peter-panning occurs
+        # Lower values (0.001-0.005): Less peter-panning, more shadow acne risk
+        # Higher values (0.01-0.02): Less shadow acne, more peter-panning risk
 
         self.accept("escape", sys.exit)  # Escape quits
         self.accept("aspectRatioChanged", self._setup_water)
@@ -343,8 +363,8 @@ class PandaRenderer(ShowBase):
         )  # (0, 0, .5, 0))
 
     def _build_players_marble_supply(self):
-        self.player_pools = {1: self._make_marble_dict(), 2: self._make_marble_dict()}
-        self.player_pool_coords = {1: [], 2: []}
+        self.capture_pools = {1: self._make_marble_dict(), 2: self._make_marble_dict()}
+        self.capture_pool_coords = {1: [], 2: []}
 
         # Find corner positions dynamically based on board size
         # Top-left corner: first letter, highest number in that column
@@ -406,28 +426,28 @@ class PandaRenderer(ShowBase):
         tl_adj = np.array(tl_adj)
         tr_coord = np.array(tr_coord)
         tr_adj = np.array(tr_adj)
-        player_pool_member_offset = np.array(self.player_pool_member_offset)
+        capture_pool_member_offset = np.array(self.capture_pool_member_offset)
 
-        d_ul = (tl_coord - tl_adj) * self.player_pool_offset_scale
+        d_ul = (tl_coord - tl_adj) * self.capture_pool_offset_scale
         p_ul = tl_coord + d_ul
 
         # For player 2 (right side), we want the pool closer and further from camera
         # Use a smaller offset and add extra Y offset to move away from camera
-        d_ur = (tr_coord - tr_adj) * self.player_pool_offset_scale
+        d_ur = (tr_coord - tr_adj) * self.capture_pool_offset_scale
         p_ur = tr_coord + d_ur
 
         # Create 12 positions per player (6 + 6 with offset)
         for r in range(2):
             for i in range(6):
                 pp1 = (
-                    p_ul + (-d_ur * (i / 1.5)) + (-player_pool_member_offset * (r + 1))
+                    p_ul + (-d_ur * (i / 1.5)) + (-capture_pool_member_offset * (r + 1))
                 )
                 pp1[2] += 0.25
-                self.player_pool_coords[1].append(tuple(pp1))
+                self.capture_pool_coords[1].append(tuple(pp1))
 
-                pp2 = p_ur + (-d_ul * (i / 1.5)) + (player_pool_member_offset * (r + 1))
+                pp2 = p_ur + (-d_ul * (i / 1.5)) + (capture_pool_member_offset * (r + 1))
                 pp2[2] += 0.25
-                self.player_pool_coords[2].append(tuple(pp2))
+                self.capture_pool_coords[2].append(tuple(pp2))
 
         self._update_capture_marble_colliders()
 
@@ -492,31 +512,55 @@ class PandaRenderer(ShowBase):
             logger.debug(f"Board row {i}: {self.pos_array[i]}")
 
     def setup_lights(self):
-        # point light
+        """Setup lighting with shadow-casting directional lights.
+
+        Configures two directional lights with shadow mapping for better
+        intra-object shadows (self-shadowing on curved surfaces like marbles).
+        """
+        from panda3d.core import OrthographicLens
+
+        # Main directional light (primary shadow caster)
         p_light = DirectionalLight("p_light")
         p_node = self.render.attachNewNode(p_light)
-        p_node.setPos(-12, -2, 12)  # Set the camera
+        p_node.setPos(-12, -2, 12)
         p_node.lookAt(0, 0, 0)
         p_light.setColor((1, 1, 1, 1))
+        # Enable shadow casting with configurable resolution
+        p_light.setShadowCaster(True, self.SHADOW_MAP_RESOLUTION, self.SHADOW_MAP_RESOLUTION)
+
+        # Configure shadow camera lens to cover the board area
+        # Use orthographic lens for directional light shadows
+        # Film size needs to cover largest board (61 rings) plus player pools and marble supplies
+        lens = p_light.getLens()
+        lens.setFilmSize(40, 40)  # Large enough for all board sizes (37, 48, 61 rings)
+        lens.setNearFar(1, 50)    # Near/far planes for shadow depth range
+
         self.render.setLight(p_node)
         p_node.hide(BitMask32(1))
 
-        # light 1
+        # Secondary directional light (also casts shadows)
         s_light1 = DirectionalLight("s_light1")
         s_light1.setColor((0.75, 0.75, 0.75, 1))
-
         s_node1 = self.render.attachNewNode(s_light1)
         s_node1.setPos(0, 0, 20)
         s_node1.lookAt(0, 0, 0)
+        # Enable shadow casting for fill light
+        s_light1.setShadowCaster(True, self.SHADOW_MAP_RESOLUTION, self.SHADOW_MAP_RESOLUTION)
+
+        # Configure shadow camera lens for secondary light
+        lens1 = s_light1.getLens()
+        lens1.setFilmSize(40, 40)  # Match main light coverage
+        lens1.setNearFar(5, 50)
+
         s_node1.hide(BitMask32(1))
         self.render.setLight(s_node1)
 
-        # ambient light
+        # Ambient light (no shadows, provides base illumination)
+        # Higher ambient light makes shadows more subtle/softer
         a_light = AmbientLight("a_light")
-        a_light.setColor((0.0125, 0.025, 0.035, 1.00))
+        a_light.setColor((0.06, 0.08, 0.10, 1.00))
         a_node = self.render.attachNewNode(a_light)
         a_node.hide(BitMask32(1))
-
         self.render.setLight(a_node)
 
     def _animate_marble_to_capture_pool(
@@ -533,11 +577,16 @@ class PandaRenderer(ShowBase):
             action_duration: Animation duration (0 for instant positioning)
         """
         # Add to player's captured marbles
-        captured_marbles = self.player_pools[player.n][marble_color]
+        captured_marbles = self.capture_pools[player.n][marble_color]
         captured_count = sum(
-            [len(k) for k in self.player_pools[player.n].values()]
+            [len(k) for k in self.capture_pools[player.n].values()]
         )
         captured_marbles.append(captured_marble)
+
+        # Store current scale before configure (marble is at BOARD_MARBLE_SCALE)
+        current_scale = captured_marble.model.getScale()[0]  # Get current scale (uniform)
+
+        # Configure marble's metadata (tags, collision masks, etc.) which also sets target scale
         captured_marble.configure_as_captured_marble(
             player.n,
             self._captured_key(captured_marble),
@@ -546,20 +595,23 @@ class PandaRenderer(ShowBase):
         self._update_capture_marble_colliders()
 
         # Clamp captured count if needed
-        if captured_count >= len(self.player_pool_coords[player.n]):
-            if captured_count > len(self.player_pool_coords[player.n]):
+        if captured_count >= len(self.capture_pool_coords[player.n]):
+            if captured_count > len(self.capture_pool_coords[player.n]):
                 logger.error(
-                    f"Captured marbles count ({captured_count}) exceeds available coords ({len(self.player_pool_coords[player.n])}) for player {player.n}"
+                    f"Captured marbles count ({captured_count}) exceeds available coords ({len(self.capture_pool_coords[player.n])}) for player {player.n}"
                 )
-            captured_count = len(self.player_pool_coords[player.n]) - 1
+            captured_count = len(self.capture_pool_coords[player.n]) - 1
 
-        player_pool_coords = self.player_pool_coords[player.n][captured_count]
+        capture_pool_coords = self.capture_pool_coords[player.n][captured_count]
 
         # Either instantly position or animate to capture pool
         if action_duration == 0:
-            captured_marble.set_pos(player_pool_coords)
+            captured_marble.set_pos(capture_pool_coords)
             captured_marble.set_scale(self.CAPTURED_MARBLE_SCALE)
         else:
+            # Restore original scale so animation can interpolate from current → target
+            captured_marble.set_scale(current_scale)
+
             # Wait for capturing marble to complete its jump before moving captured marble
             capture_animation_defer = action_duration
 
@@ -569,7 +621,7 @@ class PandaRenderer(ShowBase):
                 marble_key = self._captured_key(captured_marble)
 
                 # Queue the flash highlight to start when capturing marble lands
-                self.highlighting_manager.queue_highlight(
+                self.queue_highlight(
                     [marble_key],
                     self.CAPTURE_FLASH_DURATION,
                     material_mod=CAPTURE_FLASH_MATERIAL_MOD,
@@ -579,11 +631,12 @@ class PandaRenderer(ShowBase):
                 # Defer the capture animation so it starts after the flash
                 capture_animation_defer = action_duration + self.CAPTURE_FLASH_DURATION
 
+            # Queue animation which will interpolate scale from current to CAPTURED_MARBLE_SCALE
             self.animation_manager.queue_animation(
                 anim_type="move",
                 entity=captured_marble,
                 src=src_coords,
-                dst=player_pool_coords,
+                dst=capture_pool_coords,
                 scale=self.CAPTURED_MARBLE_SCALE,
                 duration=action_duration,
                 defer=capture_animation_defer,
@@ -623,11 +676,13 @@ class PandaRenderer(ShowBase):
                 captured_marble, pos, src_coords, player, marble_color, action_duration
             )
 
-    def show_marble_placement(self, player, action_dict, action_duration=0.):
+    def show_marble_placement(self, player, action_dict, action_duration=0., delay=0.):
         """Place a marble on the board (PUT action only, no ring removal).
 
         Args:
+            action_dict: Dictionary of actions to place.
             action_duration: Animation duration
+            delay: Delay in seconds
         """
         action_marble_color = action_dict["marble"]
         dst = action_dict["dst"]
@@ -636,7 +691,7 @@ class PandaRenderer(ShowBase):
         # add marble from supply
         supply = self.marble_supply[action_marble_color]
         if len(supply) == 0:
-            supply = self.player_pools[player.n][action_marble_color]
+            supply = self.capture_pools[player.n][action_marble_color]
         if len(supply) == 0:
             logger.error(
                 f"No marbles available in supply for player {player.n}, color {action_marble_color}"
@@ -648,10 +703,22 @@ class PandaRenderer(ShowBase):
         if put_marble not in [p for p, _ in mip]:
             mip.append((put_marble, src_coords))
 
+        # Store current scale before configure (marble is at SUPPLY_MARBLE_SCALE or player pool scale)
+        current_scale = put_marble.model.getScale()[0]  # Get current scale (uniform)
+
+        # Configure marble's metadata (tags, collision masks, etc.) and position tracking
+        self.pos_to_marble[dst] = put_marble
+        put_marble.configure_as_board_marble(dst, self.BOARD_MARBLE_SCALE, f"board:{dst}")
+        self._update_capture_marble_colliders()
+
         if action_duration == 0:
             put_marble.set_pos(dst_coords)
             put_marble.set_scale(self.BOARD_MARBLE_SCALE)
         else:
+            # Restore original scale so animation can interpolate from current → target
+            put_marble.set_scale(current_scale)
+
+            # Queue animation which will interpolate scale from current to BOARD_MARBLE_SCALE
             self.animation_manager.queue_animation(
                 anim_type="move",
                 entity=put_marble,
@@ -659,18 +726,16 @@ class PandaRenderer(ShowBase):
                 dst=dst_coords,
                 scale=self.BOARD_MARBLE_SCALE,
                 duration=action_duration,
-                defer=0,
+                defer=delay,
             )
-        self.pos_to_marble[dst] = put_marble
-        put_marble.configure_as_board_marble(dst, self.BOARD_MARBLE_SCALE, f"board:{dst}")
-        self._update_capture_marble_colliders()
 
-    def show_ring_removal(self, action_dict, action_duration=0.):
+    def show_ring_removal(self, action_dict, action_duration=0., delay=0.):
         """Remove a ring from the board (PUT action only).
 
         Args:
             action_dict: Action dictionary with 'remove' key
             action_duration: Animation duration (already scaled by controller)
+            delay: Delay (in seconds)
         """
         base_piece_id = action_dict["remove"]
         if base_piece_id != "":
@@ -681,7 +746,7 @@ class PandaRenderer(ShowBase):
                     base_piece.hide()
                 else:
                     # Queue ring removal animation
-                    removal_defer = action_duration
+                    removal_defer = action_duration + delay
                     self.animation_manager.queue_animation(
                         anim_type="move",
                         entity=base_piece,
@@ -721,9 +786,9 @@ class PandaRenderer(ShowBase):
 
         if action == "PUT":
             # Call the split methods (duration already scaled by controller)
-            self.show_marble_placement(player, action_dict, action_duration)
-            self.show_ring_removal(action_dict, action_duration)
-
+            self.show_marble_placement(player, action_dict, action_duration, self.start_delay)
+            self.show_ring_removal(action_dict, action_duration, self.start_delay)
+            self.start_delay = 0
         elif action == "CAP":
             src = action_dict["src"]
             src_coords = self.pos_to_coords[src]
@@ -944,9 +1009,9 @@ class PandaRenderer(ShowBase):
         return f"captured:{id(marble)}"
 
     def _captured_highlight_keys(self, owner: int, color: str) -> list[str]:
-        if not self.player_pools or owner not in self.player_pools:
+        if not self.capture_pools or owner not in self.capture_pools:
             return []
-        marbles = self.player_pools[owner].get(color, [])
+        marbles = self.capture_pools[owner].get(color, [])
         return [self._captured_key(marble) for marble in marbles if marble is not None]
 
     def _clear_supply_highlights(self) -> None:
@@ -971,9 +1036,9 @@ class PandaRenderer(ShowBase):
     def _update_capture_marble_colliders(self) -> None:
         enabled = self._is_supply_empty()
         mask = BitMask32.bit(1) if enabled else BitMask32.allOff()
-        if not self.player_pools:
+        if not self.capture_pools:
             return
-        for pool in self.player_pools.values():
+        for pool in self.capture_pools.values():
             for marbles in pool.values():
                 for marble in marbles:
                     marble.model.setCollideMask(mask)
