@@ -143,12 +143,10 @@ policy = PolicyHead(combined)
 - `controller/move_highlight_state_machine.py`: No changes needed (backward compatibility)
 - Maintains existing API through wrapper methods
 
-### ✅ Frozen Region Visual Effect
-- Rings in frozen isolated regions (regions with vacant rings) now appear faded
-- Uses 70% opacity (TransparencyAttrib.MAlpha) for subtle washed-out appearance
-- Marbles in frozen regions remain fully visible (only rings fade)
-- Visual feedback applied immediately when region becomes frozen
-- Implementation: `board.frozen_positions` set tracks frozen positions, `renderer.update_frozen_regions()` applies visual effect
+### ~~❌ Frozen Region Visual Effect~~ (REMOVED - based on rules misunderstanding)
+- Originally implemented faded appearance for "frozen" isolated regions
+- Feature removed after clarifying game rules - isolated regions with vacant rings are simply removed, not frozen
+- Related code has been cleaned up from board and renderer
 
 ### ✅ Test Coverage Improvements
 - **Marble Supply Logic**: 5 comprehensive tests in `test_marble_supply.py`
@@ -257,6 +255,73 @@ policy = PolicyHead(combined)
 - Document status reporter/TextRenderer defaults and provide a way to silence text output for service deployments
 - Allow `ZertzFactory` to opt out of the text renderer when running non-interactive builds
 
+## Architecture Recommendations (from architecture_report8.md)
+
+### High Priority (Weeks 1-3) - 12-16 hours total
+
+1. **Variant Configuration Object** (1-2 hours) - Easy win
+   - Create `VariantConfig` dataclass with marble counts, rules, constraints
+   - Centralize variant-specific parameters currently scattered across codebase
+   - Benefits: Single source of truth, easier to add new variants, better testability
+   - **Impact**: Medium | **Effort**: Low
+
+2. **Extract HoverFeedbackCoordinator** (4-6 hours) - Reduces controller complexity
+   - Move hover feedback logic (~400 lines) from `ZertzGameController` to dedicated class
+   - Reduces controller from ~1,200 to ~800 lines
+   - Encapsulates hover state management, coordinate calculation, highlight coordination
+   - Benefits: Better separation of concerns, easier testing, improved maintainability
+   - **Impact**: High | **Effort**: Medium
+
+3. **Refactor update_game() Method** (4-6 hours) - Improves maintainability
+   - Break down complex method into smaller, focused methods:
+     - `_get_player_action()` - Get action from current player
+     - `_execute_action()` - Execute action and handle results
+     - `_handle_post_action()` - Process captures, isolation, logging
+     - `_check_game_end()` - Check win conditions
+   - Benefits: Easier to understand, test, and modify
+   - **Impact**: Medium | **Effort**: Medium
+
+### Medium Priority (Week 4+)
+
+4. **Player Factory Pattern** (2-3 hours)
+   - Create `PlayerFactory` to encapsulate player creation logic
+   - Support player type registry for easy addition of new player types
+   - Benefits: Better extensibility, cleaner main.py
+   - **Impact**: Low | **Effort**: Low
+
+5. **Test Fixture Builders** (3-4 hours)
+   - Create fixture builders for common test scenarios:
+     - `BoardBuilder` - Build boards with specific configurations
+     - `GameBuilder` - Build games with specific states
+     - `ActionBuilder` - Build action dictionaries
+   - Benefits: More readable tests, reduced duplication, easier test maintenance
+   - **Impact**: Medium | **Effort**: Medium
+
+6. **Placement State Machine** (6-8 hours)
+   - Extract placement action handling into state machine
+   - Phases: select marble → select position → select removal ring → execute
+   - Benefits: Better UX for interactive play, clearer code structure
+   - **Impact**: Medium | **Effort**: High
+
+### Low Priority (Future)
+
+7. **Command Pattern for Actions** (4-6 hours)
+   - Implement Command pattern for undo/redo support
+   - Create `ActionCommand` base class with `execute()` and `undo()` methods
+   - Benefits: Undo/redo functionality, better action encapsulation
+   - **Impact**: Low (nice-to-have) | **Effort**: Medium
+
+8. **Event System** (6-8 hours)
+   - Implement event bus for game events (marble captured, ring removed, etc.)
+   - Benefits: Better decoupling, easier to add features like sound effects
+   - **Impact**: Low | **Effort**: High
+
+### Total Estimated Investment
+- **High Priority**: 12-16 hours for significant improvements
+- **Medium Priority**: 11-15 hours for enhanced features
+- **Low Priority**: 10-14 hours for future enhancements
+- **TOTAL**: 33-45 hours for all recommendations
+
 ## Recently Completed (2025-10-15)
 
 ### ✅ Detailed Game End Reasons
@@ -298,6 +363,71 @@ policy = PolicyHead(combined)
   - Single source of truth for material operations
   - Easier to extend with new material effects
   - Better separation of concerns (highlighting logic vs Panda3D materials)
+
+### ✅ Marble Color Architectural Refactoring
+- **Problem**: Marble color was being passed redundantly to every `configure_as_*` method
+- **Solution**: Store color as readonly property `zertz_color` in marble object at creation
+- **Changes**:
+  - Modified `make_marble()` to pass color to marble constructors
+  - Updated `_BallBase.__init__()` to accept and store `marble_color` as `self.zertz_color`
+  - Removed `color` parameter from `configure_as_supply_marble()`, `configure_as_board_marble()`, `configure_as_captured_marble()`
+  - Updated all callsites in `panda_renderer.py` (6 locations)
+- **Benefits**:
+  - Single source of truth: color set once at creation, never changes
+  - Better encapsulation: marble objects are self-contained
+  - Cleaner API: no redundant parameters
+  - Type safety: color always available as direct property
+
+### ✅ Centralized Logging/Reporting System
+- **Architecture**: Implemented GameLogger as sole hub for all text output (hub-and-spoke pattern)
+- **Key Changes**:
+  - `_report()` method now calls ONLY `self.logger.log_comment(text)` (single responsibility)
+  - Logger routes messages to appropriate writers (TranscriptWriter, NotationWriter)
+  - Created logger early in initialization (before session creation)
+  - Removed duplicate board state printing (now only in `write_footer()`)
+- **Writer Architecture**:
+  - TranscriptWriter: verbose output with comments (status messages prefixed with `#`)
+  - NotationWriter: algebraic notation only (ignores comments via no-op)
+  - Both writers implement `write_comment()` for consistent interface
+- **Output Modes Fixed**:
+  - Headless + file-only: no stdout pollution ✓
+  - `--notation-screen`: clean notation only ✓
+  - `--transcript-screen`: full output with comments ✓
+  - Both screen flags: no duplication ✓
+
+### ✅ Notation File Replay Support
+- **Format Auto-Detection**: System detects notation vs transcript format automatically
+- **Notation Parsing**:
+  - `NotationFormatter.notation_to_action_dict()` parses official Zèrtz notation
+  - Handles lowercase coordinates from notation files (e.g., `Gb2,a4`)
+  - Converts coordinates to uppercase for game internals (e.g., `B2`, `A4`)
+  - Supports all action types: placement (`Wd4`), placement with removal (`Bd7,b2`), capture (`x e3Wg3`), pass (`-`)
+- **Testing**: Verified with notation replay in both headless and graphical modes
+- **Files Modified**:
+  - `game/formatters/notation_formatter.py`: Added uppercase conversion in `_parse_placement()` and `_parse_capture()`
+
+### ✅ Animation Sequencing Improvements
+- **Capture Flash Timing**: Yellow flash now conditional on `--highlight-choices` flag
+  - Without flag: no flash, captured marble moves immediately after capturing marble lands
+  - With flag: marble flashes yellow, then moves to capture pool
+  - Flash starts when capturing marble lands (`defer=action_duration`)
+- **Capture Animation Sequencing**: Fixed captured marble timing
+  - Captured marble now waits for capturing marble to complete jump before moving
+  - Base defer time: `action_duration` (capturing marble's jump time)
+  - With highlights: additional `CAPTURE_FLASH_DURATION` (0.3s) for flash effect
+  - Animation sequence: capturing jump → flash (if enabled) → captured marble moves to pool
+- **Code Location**: `panda_renderer.py:_animate_marble_to_capture_pool()` lines 558-590
+
+### ✅ Architecture Report 8
+- **Comprehensive Analysis**: 55,000+ word architectural review
+- **Overall Score**: 9/10 - Excellent software architecture
+- **Report Location**: `/Users/andrewrollings/Dropbox/Hiive/Hiive Games/Zertz3D/architecture_report8.md`
+- **Key Findings**:
+  - Clean three-tier architecture with no circular dependencies
+  - Recent improvements (ActionResult, RenderData, GameLogger, Writers) are high quality
+  - Excellent extensibility for board sizes (9/10), output formats (10/10), AI players (9/10)
+  - Low technical debt, minimal duplication, well-tested
+- **Recommendations Identified**: See "Architecture Recommendations" section below
 
 ## Andrew's notes (DO NOT DELETE)
 - Add unit tests for tagging system.
