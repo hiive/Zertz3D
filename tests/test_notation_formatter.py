@@ -151,10 +151,11 @@ class TestNotationFormatter:
             assert action_dict["capture"] == color.lower()
 
     def test_parse_capture_case_insensitive_positions(self):
-        """Test that capture positions are case insensitive."""
+        """Test that capture positions are case insensitive (normalized to lowercase)."""
         action_dict = NotationFormatter.notation_to_action_dict("x C2We3")
-        assert action_dict["src"] == "C2"  # Preserved as-is
+        assert action_dict["src"] == "c2"  # Normalized to lowercase per GIPF rules
         assert action_dict["dst"] == "e3"
+        assert action_dict["cap"] == "d2"  # Calculated middle position
 
     def test_parse_placement_61_ring_coordinates(self):
         """Test parsing placement with J coordinate (61-ring board)."""

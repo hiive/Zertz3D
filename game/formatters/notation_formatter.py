@@ -159,8 +159,8 @@ class NotationFormatter:
             raise ValueError(f"Invalid placement notation: {notation_str}")
 
         color = match.group(1).lower()
-        dst = match.group(2).upper()  # Convert to uppercase for game internals
-        remove = match.group(3).upper() if match.group(3) else ""  # Convert to uppercase
+        dst = match.group(2).lower()  # Keep lowercase per GIPF notation rules
+        remove = match.group(3).lower() if match.group(3) else ""  # Keep lowercase
 
         return {
             "action": "PUT",
@@ -189,12 +189,12 @@ class NotationFormatter:
         if not match:
             raise ValueError(f"Invalid capture notation: x {notation_str}")
 
-        src = match.group(1).upper()  # Convert to uppercase for game internals
+        src = match.group(1).lower()  # Keep lowercase per GIPF notation rules
         captured_color = match.group(2).lower()
-        dst = match.group(3).upper()  # Convert to uppercase for game internals
+        dst = match.group(3).lower()  # Keep lowercase per GIPF notation rules
 
         # Calculate cap position from src and dst using string interpolation
-        # Pass uppercase coordinates so cap is also uppercase
+        # Pass lowercase coordinates so cap is also lowercase
         cap = NotationFormatter._calculate_cap_position(src, dst)
 
         # cap position calculated from src/dst geometry

@@ -180,8 +180,67 @@ A faster, more aggressive version of the game.
 ---
 
 ## Summary of Key Principles
-- Marbles belong to **both players**.  
-- Capturing is **mandatory** when available.  
-- The board **shrinks** every turn.  
-- Isolating connected groups can lead to **strategic captures**.  
+- Marbles belong to **both players**.
+- Capturing is **mandatory** when available.
+- The board **shrinks** every turn.
+- Isolating connected groups can lead to **strategic captures**.
 - The game rewards **sacrifice**, **timing**, and **control**.
+
+---
+
+## Notation
+
+The official ZÈRTZ notation system follows the standard defined at [http://www.gipf.com/zertz/notations/notation.html](http://www.gipf.com/zertz/notations/notation.html).
+
+### Coordinate System
+- **Columns**: Lowercase letters `a` through `g` (for 37-ring board)
+  - 61-ring boards use `a` through `j` (skipping `i`)
+- **Rows**: Numbers counted from bottom upward (e.g., `a1` is at the bottom of column `a`)
+- **Example coordinate**: `d4`
+
+### Marble Colors
+Marble colors are represented by **uppercase** letters:
+- **W** = White
+- **G** = Grey (or Gray)
+- **B** = Black
+
+### Placement Moves
+Format: `[Color][Destination][,Removed Ring]`
+
+**Examples:**
+- `Wd4` - Place white marble on d4, no ring removed
+- `Bd7,b2` - Place black marble on d7, remove ring at b2
+
+### Capture Moves
+Format: `x [Source][Captured Color][Destination]`
+
+**Examples:**
+- `x e3Wg3` - Capture from e3 to g3, capturing white marble at f3
+- `x d1Gd3Wd5` - Multi-jump capture
+
+### Isolation Captures
+When a placement causes isolation, the notation shows the isolated marbles after an `x`:
+
+**Format:** `[Placement] x [Color][Position]...`
+
+**Example:**
+- `Bd7,b2 x Wa1Wa2` - Place black on d7, remove b2, capture isolated white marbles at a1 and a2
+
+### Pass
+A pass is represented by a single hyphen: `-`
+
+### Move Sequence Example
+```
+Wd4,d1
+Ge5,c3
+Bf6,d2
+x c2We4
+-
+```
+
+This represents:
+1. White on d4, remove d1
+2. Grey on e5, remove c3
+3. Black on f6, remove d2
+4. Capture from c2 to e4, capturing white at d3
+5. Pass

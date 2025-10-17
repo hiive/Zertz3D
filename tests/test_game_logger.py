@@ -39,22 +39,32 @@ def game():
     return ZertzGame(rings=37)
 
 
+@pytest.fixture
+def mock_session():
+    """Create a mock session for testing."""
+    session = Mock()
+    session.is_replay_mode.return_value = False
+    session.blitz = False
+    session.get_seed.return_value = 12345
+    return session
+
+
 # ============================================================================
 # GameLogger Basic Tests
 # ============================================================================
 
 
-def test_logger_with_no_writers():
+def test_logger_with_no_writers(mock_session):
     """Test that logger works with no writers."""
-    logger = GameLogger()
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    logger.start_log(seed=12345, rings=37)
     logger.log_action(player_num=1, action_dict={"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"})
-    logger.end_game()
+    logger.end_log()
     # Should not crash
 
 
-def test_logger_start_game_writes_headers(temp_dir):
-    """Test that start_game writes headers to all writers."""
+def test_logger_start_log_writes_headers(temp_dir, mock_session):
+    """Test that start_log writes headers to all writers."""
     os.chdir(temp_dir)
 
     # Create writers
@@ -66,8 +76,12 @@ def test_logger_start_game_writes_headers(temp_dir):
         NotationWriter(notation_file)
     ]
 
-    logger = GameLogger(writers=writers)
-    logger.start_game(seed=12345, rings=37, blitz=False)
+    # Create logger with session and manually add writers
+    logger = GameLogger(session=mock_session)
+    for writer in writers:
+        logger.add_writer(writer)
+
+    logger.start_log(seed=12345, rings=37, blitz=False)
 
     # Close writers manually to ensure flush
     for writer in writers:
@@ -85,7 +99,7 @@ def test_logger_start_game_writes_headers(temp_dir):
         assert content.strip() == "37"
 
 
-def test_logger_start_game_blitz_variant(temp_dir):
+def test_logger_start_log_blitz_variant(temp_dir, mock_session):
     """Test that blitz variant is correctly noted in files."""
     os.chdir(temp_dir)
 
@@ -97,8 +111,12 @@ def test_logger_start_game_blitz_variant(temp_dir):
         NotationWriter(notation_file)
     ]
 
-    logger = GameLogger(writers=writers)
-    logger.start_game(seed=12345, rings=37, blitz=True)
+    # Create logger with session and manually add writers
+    logger = GameLogger(session=mock_session)
+    for writer in writers:
+        logger.add_writer(writer)
+
+    logger.start_log(seed=12345, rings=37, blitz=True)
 
     for writer in writers:
         writer.close()
@@ -119,20 +137,21 @@ def test_logger_start_game_blitz_variant(temp_dir):
 # ============================================================================
 
 
-def test_log_action_writes_to_transcript(temp_dir):
+def test_log_action_writes_to_transcript(temp_dir, mock_session):
     """Test that log_action writes action to transcript file."""
     os.chdir(temp_dir)
 
     transcript_file = open("test_transcript.txt", "w")
     writer = TranscriptWriter(transcript_file)
 
-    logger = GameLogger(writers=[writer])
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    logger.add_writer(writer)
+    logger.start_log(seed=12345, rings=37)
 
     action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
     logger.log_action(player_num=1, action_dict=action_dict)
 
-    logger.end_game()
+    logger.end_log()
     writer.close()
 
     with open("test_transcript.txt", "r") as f:
@@ -141,21 +160,22 @@ def test_log_action_writes_to_transcript(temp_dir):
         assert "'action': 'PUT'" in content
 
 
-def test_log_action_writes_to_notation(temp_dir):
+def test_log_action_writes_to_notation(temp_dir, mock_session):
     """Test that log_action writes notation to notation file."""
     os.chdir(temp_dir)
 
     notation_file = open("test_notation.txt", "w")
     writer = NotationWriter(notation_file)
 
-    logger = GameLogger(writers=[writer])
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    logger.add_writer(writer)
+    logger.start_log(seed=12345, rings=37)
 
     # Simple PUT action
     action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
     logger.log_action(player_num=1, action_dict=action_dict, action_result=None)
 
-    logger.end_game()
+    logger.end_log()
     writer.close()
 
     with open("test_notation.txt", "r") as f:
@@ -164,20 +184,21 @@ def test_log_action_writes_to_notation(temp_dir):
         assert "Wd4,b2" in moves
 
 
-def test_log_action_with_pass(temp_dir):
+def test_log_action_with_pass(temp_dir, mock_session):
     """Test that PASS actions are logged correctly."""
     os.chdir(temp_dir)
 
     notation_file = open("test_notation.txt", "w")
     writer = NotationWriter(notation_file)
 
-    logger = GameLogger(writers=[writer])
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    logger.add_writer(writer)
+    logger.start_log(seed=12345, rings=37)
 
     action_dict = {"action": "PASS"}
     logger.log_action(player_num=1, action_dict=action_dict)
 
-    logger.end_game()
+    logger.end_log()
     writer.close()
 
     with open("test_notation.txt", "r") as f:
@@ -185,7 +206,7 @@ def test_log_action_with_pass(temp_dir):
         assert "-" in content
 
 
-def test_log_action_multiple_writers(temp_dir):
+def test_log_action_multiple_writers(temp_dir, mock_session):
     """Test that actions are logged to multiple writers simultaneously."""
     os.chdir(temp_dir)
 
@@ -197,13 +218,15 @@ def test_log_action_multiple_writers(temp_dir):
         NotationWriter(notation_file)
     ]
 
-    logger = GameLogger(writers=writers)
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    for writer in writers:
+        logger.add_writer(writer)
+    logger.start_log(seed=12345, rings=37)
 
     action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
     logger.log_action(player_num=1, action_dict=action_dict)
 
-    logger.end_game()
+    logger.end_log()
     for writer in writers:
         writer.close()
 
@@ -220,7 +243,7 @@ def test_log_action_multiple_writers(temp_dir):
 # ============================================================================
 
 
-def test_logger_with_string_io():
+def test_logger_with_string_io(mock_session):
     """Test that logger works with StringIO for screen output."""
     transcript_stream = StringIO()
     notation_stream = StringIO()
@@ -230,17 +253,19 @@ def test_logger_with_string_io():
         NotationWriter(notation_stream)
     ]
 
-    logger = GameLogger(writers=writers)
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    for writer in writers:
+        logger.add_writer(writer)
+    logger.start_log(seed=12345, rings=37)
 
     action_dict = {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"}
     logger.log_action(player_num=1, action_dict=action_dict)
 
-    # Get output BEFORE calling end_game (which closes the streams)
+    # Get output BEFORE calling end_log (which closes the streams)
     transcript_output = transcript_stream.getvalue()
     notation_output = notation_stream.getvalue()
 
-    logger.end_game()
+    logger.end_log()
 
     # Check transcript output
     assert "# Seed: 12345" in transcript_output
@@ -256,21 +281,22 @@ def test_logger_with_string_io():
 # ============================================================================
 
 
-def test_end_game_writes_footer(temp_dir):
-    """Test that end_game writes footer to transcript file."""
+def test_end_log_writes_footer(temp_dir, mock_session):
+    """Test that end_log writes footer to transcript file."""
     os.chdir(temp_dir)
 
     transcript_file = open("test_transcript.txt", "w")
     writer = TranscriptWriter(transcript_file)
 
-    logger = GameLogger(writers=[writer])
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    logger.add_writer(writer)
+    logger.start_log(seed=12345, rings=37)
 
     # Create a mock game with state
     mock_game = Mock()
     mock_game.board.state = np.zeros((20, 7, 7))
 
-    logger.end_game(game=mock_game)
+    logger.end_log(game=mock_game)
     writer.close()
 
     with open("test_transcript.txt", "r") as f:
@@ -284,22 +310,23 @@ def test_end_game_writes_footer(temp_dir):
 # ============================================================================
 
 
-def test_notation_sequence(temp_dir):
+def test_notation_sequence(temp_dir, mock_session):
     """Test logging a sequence of actions in notation format."""
     os.chdir(temp_dir)
 
     notation_file = open("test_notation.txt", "w")
     writer = NotationWriter(notation_file)
 
-    logger = GameLogger(writers=[writer])
-    logger.start_game(seed=12345, rings=37)
+    logger = GameLogger(session=mock_session)
+    logger.add_writer(writer)
+    logger.start_log(seed=12345, rings=37)
 
     # Log multiple actions
     logger.log_action(1, {"action": "PUT", "marble": "w", "dst": "D4", "remove": "B2"})
     logger.log_action(2, {"action": "PUT", "marble": "g", "dst": "E5", "remove": "C3"})
     logger.log_action(1, {"action": "PUT", "marble": "b", "dst": "F6", "remove": "D1"})
 
-    logger.end_game()
+    logger.end_log()
     writer.close()
 
     # Verify all notations written in order
@@ -311,37 +338,38 @@ def test_notation_sequence(temp_dir):
         assert "Bf6,d1" in moves[2]
 
 
-def test_add_writer_dynamically():
+def test_add_writer_dynamically(mock_session):
     """Test adding writers dynamically after logger creation."""
-    logger = GameLogger()
+    logger = GameLogger(session=mock_session)
 
     stream = StringIO()
     writer = TranscriptWriter(stream)
     logger.add_writer(writer)
 
-    logger.start_game(seed=12345, rings=37)
+    logger.start_log(seed=12345, rings=37)
     logger.log_action(1, {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""})
 
-    # Get output BEFORE calling end_game (which closes the stream)
+    # Get output BEFORE calling end_log (which closes the stream)
     output = stream.getvalue()
 
-    logger.end_game()
+    logger.end_log()
 
     assert "# Seed: 12345" in output
     assert "Player 1:" in output
 
 
-def test_remove_writer():
+def test_remove_writer(mock_session):
     """Test removing writers from logger."""
     stream = StringIO()
     writer = TranscriptWriter(stream)
 
-    logger = GameLogger(writers=[writer])
+    logger = GameLogger(session=mock_session)
+    logger.add_writer(writer)
     logger.remove_writer(writer)
 
-    logger.start_game(seed=12345, rings=37)
+    logger.start_log(seed=12345, rings=37)
     logger.log_action(1, {"action": "PUT", "marble": "w", "dst": "D4", "remove": ""})
-    logger.end_game()
+    logger.end_log()
 
     # Stream should be empty since writer was removed
     output = stream.getvalue()

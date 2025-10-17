@@ -206,6 +206,14 @@ class GameSession:
         """
         return self.replay_mode
 
+    def is_partial_replay(self):
+        """Check if session allows partial replay (continuing with random play after replay ends).
+
+        Returns:
+            bool: True if partial replay is enabled
+        """
+        return self.partial_replay
+
     def get_games_played(self):
         """Get the number of games played.
 

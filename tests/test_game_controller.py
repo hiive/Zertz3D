@@ -10,7 +10,7 @@ Tests that the game controller correctly handles:
 
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 # Add parent directory to path to import game modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,7 +27,7 @@ from game.action_result import ActionResult
 class TestGameControllerHeadless:
     """Test game controller behavior in headless mode (no renderer)."""
 
-    def test_game_ends_correctly_with_max_games_1(self):
+    def test_game_ends_correctly_with_max_games_1(self, capsys):
         """Test that game stops after exactly 1 game when max_games=1.
 
         This test verifies the fixes for:
@@ -38,27 +38,23 @@ class TestGameControllerHeadless:
         # Use a fixed seed for deterministic behavior
         seed = 12345
 
-        # Capture console output to verify correct winner display
-        output_lines = []
+        # Create controller in headless mode with max_games=1
+        controller = ZertzGameController(
+            rings=37,
+            seed=seed,
+            max_games=1,
+            highlight_choices=False,
+            show_coords=False,
+            log_to_screen=True,  # Enable screen output
+            renderer_or_factory=None,  # Headless mode
+        )
 
-        def capture_print(*args, **kwargs):
-            """Capture print statements."""
-            output_lines.append(" ".join(str(arg) for arg in args))
+        # Run the game loop
+        controller.run()
 
-        with patch("builtins.print", side_effect=capture_print):
-            # Create controller in headless mode with max_games=1
-            controller = ZertzGameController(
-                rings=37,
-                seed=seed,
-                max_games=1,
-                highlight_choices=False,
-                show_coords=False,
-                log_to_file=False,
-                renderer_or_factory=None,  # Headless mode
-            )
-
-            # Run the game loop
-            controller.run()
+        # Capture output
+        captured = capsys.readouterr()
+        output_lines = captured.out.splitlines()
 
         # Verify the game ended
         games_played = controller.session.get_games_played()
@@ -68,13 +64,14 @@ class TestGameControllerHeadless:
         )
 
         # Verify winner was reported correctly (not as -1 or 1)
-        winner_lines = [line for line in output_lines if line.startswith("Winner:")]
+        # Note: Winner lines have "# Winner:" prefix from TranscriptWriter.write_comment()
+        winner_lines = [line for line in output_lines if "Winner:" in line]
         assert len(winner_lines) == 1, (
             f"Expected exactly 1 winner announcement, but got {len(winner_lines)}. "
             f"Lines: {winner_lines}"
         )
 
-        # Winner should be displayed as "Player 1" or "Player 2", not "Player -1" or "Player 1" (constant)
+        # Winner should be displayed as "Player 1" or "Player 2", not "Player -1"
         winner_line = winner_lines[0]
         assert "Player 1" in winner_line or "Player 2" in winner_line, (
             f"Winner should be displayed as 'Player 1' or 'Player 2', got: {winner_line}"
@@ -85,7 +82,7 @@ class TestGameControllerHeadless:
 
         # Verify "Completed X game(s)" appears exactly once
         completed_lines = [
-            line for line in output_lines if line.startswith("Completed")
+            line for line in output_lines if "Completed" in line and "game(s)" in line
         ]
         assert len(completed_lines) == 1, (
             f"Expected exactly 1 'Completed' announcement, but got {len(completed_lines)}. "
@@ -95,7 +92,7 @@ class TestGameControllerHeadless:
             f"Expected 'Completed 1 game(s)', got: {completed_lines[0]}"
         )
 
-    def test_game_status_checked_after_empty_completion_queue(self):
+    def test_game_status_checked_after_empty_completion_queue(self, capsys):
         """Test that game status is checked even when completion queue is empty.
 
         This verifies the fix for the bug where game status check was skipped
@@ -103,24 +100,24 @@ class TestGameControllerHeadless:
         after a win.
         """
         seed = 54321
-        output_lines = []
 
-        def capture_print(*args, **kwargs):
-            output_lines.append(" ".join(str(arg) for arg in args))
+        controller = ZertzGameController(
+            rings=37,
+            seed=seed,
+            max_games=2,  # Allow 2 games, should stop after 2
+            highlight_choices=False,
+            log_to_screen=True,  # Enable screen output
+            renderer_or_factory=None,
+        )
 
-        with patch("builtins.print", side_effect=capture_print):
-            controller = ZertzGameController(
-                rings=37,
-                seed=seed,
-                max_games=2,  # Allow 2 games, but should stop after 2
-                highlight_choices=False,
-                renderer_or_factory=None,
-            )
+        controller.run()
 
-            controller.run()
+        # Capture output
+        captured = capsys.readouterr()
+        output_lines = captured.out.splitlines()
 
         # Count winner announcements
-        winner_lines = [line for line in output_lines if line.startswith("Winner:")]
+        winner_lines = [line for line in output_lines if "Winner:" in line]
 
         # Should have exactly 2 winner announcements (one per game)
         assert len(winner_lines) == 2, (
@@ -132,27 +129,27 @@ class TestGameControllerHeadless:
             "Expected exactly 2 games to be played"
         )
 
-    def test_winner_display_format_player_1(self):
+    def test_winner_display_format_player_1(self, capsys):
         """Test that Player 1 wins are displayed correctly."""
         # Use a seed that favors Player 1 winning quickly
         seed = 99999
-        output_lines = []
 
-        def capture_print(*args, **kwargs):
-            output_lines.append(" ".join(str(arg) for arg in args))
+        controller = ZertzGameController(
+            rings=37,
+            seed=seed,
+            max_games=1,
+            highlight_choices=False,
+            log_to_screen=True,  # Enable screen output
+            renderer_or_factory=None,
+        )
 
-        with patch("builtins.print", side_effect=capture_print):
-            controller = ZertzGameController(
-                rings=37,
-                seed=seed,
-                max_games=1,
-                highlight_choices=False,
-                renderer_or_factory=None,
-            )
+        controller.run()
 
-            controller.run()
+        # Capture output
+        captured = capsys.readouterr()
+        output_lines = captured.out.splitlines()
 
-        winner_lines = [line for line in output_lines if line.startswith("Winner:")]
+        winner_lines = [line for line in output_lines if "Winner:" in line]
 
         # Should have exactly one winner announcement
         assert len(winner_lines) == 1
