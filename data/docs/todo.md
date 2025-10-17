@@ -437,4 +437,5 @@ policy = PolicyHead(combined)
 - ✅ Extract out SelectionHandler class from renderer - COMPLETED: InteractionHelper class in renderer/panda3d/interaction_helper.py handles all mouse picking, collision detection, hover state, and selection callbacks
 - ✅ Extract out "Materials" using for various forms of highlighting (base color, emission color) - COMPLETED: MaterialModifier dataclass in renderer/panda3d/material_modifier.py, material constants in shared/materials_modifiers.py, MaterialManager class in renderer/panda3d/material_manager.py handles all Panda3D material operations
 - ✅ Extract highlight state machine into its own module - COMPLETED: ActionVisualizationSequencer class in renderer/panda3d/action_sequencer.py handles all multi-phase highlighting sequences (tests still TODO)
--     
+- Extract out game configurator (e.g. number of rings/marbles, win conditions, etc.)
+- Look for examples of technical debt.

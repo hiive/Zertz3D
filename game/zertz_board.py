@@ -255,6 +255,7 @@ class ZertzBoard:
             self.CAPTURE_LAYER = clone.CAPTURE_LAYER
             self.state = np.copy(clone.state)
             self.global_state = np.copy(clone.global_state)
+            self.last_acting_player = clone.last_acting_player if hasattr(clone, "last_acting_player") else None
             if hasattr(clone, "letter_layout") and clone.letter_layout is not None:
                 self.letter_layout = np.copy(clone.letter_layout)
             if (
@@ -348,6 +349,9 @@ class ZertzBoard:
 
             # Player captured marbles start at 0 (indices 3-8)
             # Current player starts at 0 (index 9)
+
+            # Track which player made the last action (for win detection)
+            self.last_acting_player = None
 
         # Coordinate maps are built lazily via PositionCollection
 
@@ -455,6 +459,11 @@ class ZertzBoard:
     def take_action(self, action, action_type):
         # Input: action is an index into the action space matrix
         #        action_type is 'PUT' or 'CAP'
+
+        # Capture who is acting BEFORE any player switches occur
+        # This simplifies win detection logic
+        self.last_acting_player = self.get_cur_player()
+
         # Push back the previous t states and copy the most recent state to the top layers
         layers_per_step = self.LAYERS_PER_TIMESTEP
         self.state[0 : layers_per_step * self.t] = np.concatenate(

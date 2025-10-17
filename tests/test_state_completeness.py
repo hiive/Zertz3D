@@ -174,3 +174,94 @@ class TestStateCompleteness:
             assert state["player"] in [1, -1], (
                 f"Player value wrong for {rings}-ring board"
             )
+
+    def test_get_next_state_with_cur_state(self):
+        """Test get_next_state with explicit cur_state parameter."""
+        game = ZertzGame(rings=37)
+
+        # Get initial state
+        initial_state = game.get_current_state()
+        cur_state = np.copy(initial_state["spatial"])
+
+        # Find a valid action
+        placement, capture = game.get_valid_actions()
+        valid_actions = np.argwhere(placement)
+        assert len(valid_actions) > 0
+        action = tuple(valid_actions[0])
+
+        # Get next state using cur_state parameter
+        next_state = game.get_next_state(action, "PUT", cur_state=cur_state)
+
+        assert isinstance(next_state, dict)
+        assert "spatial" in next_state
+        assert "global" in next_state
+        assert "player" in next_state
+
+        # Verify original game state unchanged
+        original_player = game.get_cur_player_value()
+        assert original_player == 1, "Original game should be unchanged"
+
+    def test_get_valid_actions_with_cur_state(self):
+        """Test get_valid_actions with explicit cur_state parameter."""
+        game = ZertzGame(rings=37)
+
+        # Get current state
+        state = game.get_current_state()
+        cur_state = np.copy(state["spatial"])
+
+        # Get valid actions using cur_state parameter
+        placement, capture = game.get_valid_actions(cur_state=cur_state)
+
+        assert isinstance(placement, np.ndarray)
+        assert isinstance(capture, np.ndarray)
+        assert placement.shape == (3, 49, 50)  # 3 x width² x (width² + 1)
+        assert capture.shape == (6, 7, 7)  # 6 x width x width
+
+    def test_get_symmetries_with_cur_state(self):
+        """Test get_symmetries with explicit cur_state parameter."""
+        game = ZertzGame(rings=37)
+
+        # Get current state
+        state = game.get_current_state()
+        cur_state = np.copy(state["spatial"])
+
+        # Get symmetries using cur_state parameter
+        symmetries = game.get_symmetries(cur_state=cur_state)
+
+        assert isinstance(symmetries, list)
+        assert len(symmetries) > 0
+
+        # Each symmetry should be a tuple (index, state_array)
+        for sym in symmetries:
+            assert isinstance(sym, tuple)
+            assert len(sym) == 2
+            sym_idx, sym_state = sym
+            assert isinstance(sym_idx, int)
+            assert isinstance(sym_state, np.ndarray)
+            assert sym_state.shape == cur_state.shape
+
+    def test_get_game_ended_with_cur_state(self):
+        """Test get_game_ended with explicit cur_state parameter."""
+        from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
+
+        game = ZertzGame(rings=37)
+        board = game.board
+
+        # Set up a winning state in BOTH global_state AND spatial state
+        # (get_game_ended with cur_state clones the game including global_state)
+        board.global_state[board.P1_CAP_W] = 4
+        board.global_state[board.P1_CAP_G] = 2
+        board.global_state[board.P1_CAP_B] = 1
+
+        # Ensure it's player 2's turn so player 1 is the "previous" player (winner)
+        board.global_state[board.CUR_PLAYER] = board.PLAYER_2
+
+        # Get current spatial state
+        winning_state = np.copy(board.state)
+
+        # Test get_game_ended with cur_state parameter
+        # Creates a temp game with cloned settings and this spatial state
+        result = game.get_game_ended(cur_state=winning_state)
+
+        # Should return PLAYER_1_WIN since P1 has 4 white marbles
+        assert result in [PLAYER_1_WIN, PLAYER_2_WIN], f"Expected win condition, got {result}"

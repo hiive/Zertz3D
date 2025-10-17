@@ -304,16 +304,11 @@ class ZertzGame:
 
             # Standard win conditions
             # The winner is the player that made the previous action
-            if np.sum(self.board.state[self.board.CAPTURE_LAYER]) == 0:
-                return (
-                    PLAYER_2_WIN if self.get_cur_player_value() == 1 else PLAYER_1_WIN
-                )
+            # Use last_acting_player which was captured before any player switches
+            if self.board.last_acting_player == self.board.PLAYER_1:
+                return PLAYER_1_WIN
             else:
-                # The game is over in the middle of the players turn during a chain capture
-                # if they have enough marbles to meet a win condition.
-                return (
-                    PLAYER_1_WIN if self.get_cur_player_value() == 1 else PLAYER_2_WIN
-                )
+                return PLAYER_2_WIN
         else:
             # Return if game is ended for an arbitrary game state
             temp_game = ZertzGame(clone=self, clone_state=cur_state)
