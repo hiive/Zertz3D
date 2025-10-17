@@ -318,8 +318,8 @@ See `pyproject.toml` for complete dependency list.
 
 ## License
 
-[Add license information]
+GNU Affero General Public License v3.0	[AGPL-3.0]
 
 ## Contributing
 
-[Add contribution guidelines]
+Fork, create a pull request. Wait until I've at least released the first version though! (unless you see a critical bug!)
