@@ -23,8 +23,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--transcript-file",
-        action="store_true",
-        help="Log game actions to zertzlog_<seed>.txt (ignored if --replay is used)",
+        nargs="?",
+        const=".",
+        default=None,
+        metavar="DIR",
+        help="Log game actions to zertzlog_<seed>.txt in DIR (default: current directory, ignored if --replay is used)",
     )
     parser.add_argument(
         "--partial",
@@ -49,8 +52,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--notation-file",
-        action="store_true",
-        help="Log game moves using official Zèrtz notation to file",
+        nargs="?",
+        const=".",
+        default=None,
+        metavar="DIR",
+        help="Log game moves using official Zèrtz notation to file in DIR (default: current directory, ignored if --replay is used)",
     )
     parser.add_argument(
         "--transcript-screen",

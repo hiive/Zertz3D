@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 import sys
+import os
 
 import numpy as np
 
@@ -58,9 +59,9 @@ class ZertzGameController:
         rings=37,
         replay_file=None,
         seed=None,
-        log_to_file=False,
+        log_to_file: str | None = None,
         log_to_screen=False,
-        log_notation_to_file=False,
+        log_notation_to_file: str | None = None,
         log_notation_to_screen=False,
         partial_replay=False,
         max_games=None,
@@ -129,15 +130,21 @@ class ZertzGameController:
 
         # File writers (only for non-replay mode)
         if self._log_to_file and not self.session.is_replay_mode():
+            # Create directory if it doesn't exist
+            os.makedirs(self._log_to_file, exist_ok=True)
             variant = "_blitz" if self.session.blitz else ""
             filename = f"zertzlog{variant}_{self.session.get_seed()}.txt"
-            self._log_filenames.append(filename)
-            writers.append(TranscriptWriter(open(filename, "w")))
+            filepath = os.path.join(self._log_to_file, filename)
+            self._log_filenames.append(filepath)
+            writers.append(TranscriptWriter(open(filepath, "w")))
         if self._log_notation_to_file and not self.session.is_replay_mode():
+            # Create directory if it doesn't exist
+            os.makedirs(self._log_notation_to_file, exist_ok=True)
             variant = "_blitz" if self.session.blitz else ""
             filename = f"zertzlog{variant}_{self.session.get_seed()}_notation.txt"
-            self._log_filenames.append(filename)
-            writers.append(NotationWriter(open(filename, "w")))
+            filepath = os.path.join(self._log_notation_to_file, filename)
+            self._log_filenames.append(filepath)
+            writers.append(NotationWriter(open(filepath, "w")))
 
         # Screen writers (for all modes including replay)
         if self._log_to_screen:
@@ -227,14 +234,16 @@ class ZertzGameController:
                 variant = "_blitz" if self.session.blitz else ""
                 if isinstance(writer, TranscriptWriter):
                     filename = f"zertzlog{variant}_{self.session.get_seed()}.txt"
-                    self._log_filenames.append(filename)
-                    writers.append(TranscriptWriter(open(filename, "w")))
-                    self._report(f"Logging to: {filename}")
+                    filepath = os.path.join(self._log_to_file, filename)
+                    self._log_filenames.append(filepath)
+                    writers.append(TranscriptWriter(open(filepath, "w")))
+                    self._report(f"Logging to: {filepath}")
                 elif isinstance(writer, NotationWriter):
                     filename = f"zertzlog{variant}_{self.session.get_seed()}_notation.txt"
-                    self._log_filenames.append(filename)
-                    writers.append(NotationWriter(open(filename, "w")))
-                    self._report(f"Logging notation to: {filename}")
+                    filepath = os.path.join(self._log_notation_to_file, filename)
+                    self._log_filenames.append(filepath)
+                    writers.append(NotationWriter(open(filepath, "w")))
+                    self._report(f"Logging notation to: {filepath}")
             self.logger.writers = writers
 
         # Reset renderer if present
