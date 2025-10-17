@@ -5,13 +5,14 @@ from panda3d.core import TextureAttrib, AmbientLight, BitMask32
 
 
 class _BaseModel(ABC):
-    def __init__(self, renderer, model_name, color=(1.0, 1.0, 1.0, 1.0)):
+    def __init__(self, renderer, model_name, color=(1.0, 1.0, 1.0, 1.0), parent=None):
         self.renderer = renderer
         self.model_name = model_name
         self.color = color
         self.pos_coords = None
         self.saved_coords = None
         self.model = None
+        self.parent = parent  # Optional parent NodePath for scene graph organization
         self.add()
 
     def _set_pos(self, coord):
@@ -45,7 +46,9 @@ class _BaseModel(ABC):
         self.model.setColor(self.color)
         # self.model.setScale(0.3)
         self.model.setScale(0.305)
-        self.model.reparentTo(self.renderer.render)
+        # Use custom parent if provided, otherwise default to renderer.render
+        parent_node = self.parent if self.parent is not None else self.renderer.render
+        self.model.reparentTo(parent_node)
         self._set_collide_mask(BitMask32.allOff())
 
     def show(self):
@@ -106,20 +109,20 @@ class SkyBox(_BaseModel):
         self.model.setLight(a_node)
 
 
-def make_marble(renderer, color):
+def make_marble(renderer, color, parent=None):
     if color == "w":
-        return WhiteBallModel(renderer, color)
+        return WhiteBallModel(renderer, color, parent)
     elif color == "b":
-        return BlackBallModel(renderer, color)
+        return BlackBallModel(renderer, color, parent)
     elif color == "g":
-        return GrayBallModel(renderer, color)
+        return GrayBallModel(renderer, color, parent)
     return None
 
 
 class _BallBase(_BaseModel):
-    def __init__(self, renderer, rgba_color, marble_color):
+    def __init__(self, renderer, rgba_color, marble_color, parent=None):
         model_name = "models/ball_lo.bam"
-        super().__init__(renderer, model_name, rgba_color)
+        super().__init__(renderer, model_name, rgba_color, parent)
         # self.model.flattenStrong()
         # Store marble color as readonly property (set once at creation)
         self.zertz_color = marble_color
@@ -199,21 +202,21 @@ class _BallBase(_BaseModel):
 
 
 class BlackBallModel(_BallBase):
-    def __init__(self, renderer, marble_color):
+    def __init__(self, renderer, marble_color, parent=None):
         rgba_color = (0.25, 0.25, 0.25, 1)
-        super().__init__(renderer, rgba_color, marble_color)
+        super().__init__(renderer, rgba_color, marble_color, parent)
 
 
 class GrayBallModel(_BallBase):
-    def __init__(self, renderer, marble_color):
+    def __init__(self, renderer, marble_color, parent=None):
         rgba_color = (1.25, 1.25, 1.25, 1)
-        super().__init__(renderer, rgba_color, marble_color)
+        super().__init__(renderer, rgba_color, marble_color, parent)
 
 
 class WhiteBallModel(_BallBase):
-    def __init__(self, renderer, marble_color):
+    def __init__(self, renderer, marble_color, parent=None):
         rgba_color = (1.5, 1.5, 1.2, 1)
-        super().__init__(renderer, rgba_color, marble_color)
+        super().__init__(renderer, rgba_color, marble_color, parent)
         for c in self.model.findAllMatches("**/+GeomNode"):
             gn = c.node()
             for i in range(gn.getNumGeoms()):
@@ -226,11 +229,11 @@ class WhiteBallModel(_BallBase):
 
 
 class BasePiece(_BaseModel):
-    def __init__(self, renderer):
+    def __init__(self, renderer, parent=None):
         color = (0.0, 0.0, 0.0, 1)
         model_name = "models/torus_lo.bam"
 
-        super().__init__(renderer, model_name, color)
+        super().__init__(renderer, model_name, color, parent)
         self.model.setP(self.model, 180)
         self._set_collide_mask(BitMask32.bit(1))
         # self.model.flattenStrong()

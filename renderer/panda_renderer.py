@@ -16,6 +16,7 @@ from panda3d.core import (
     WindowProperties,
     loadPrcFileData,
     TextNode,
+    NodePath,
 )
 from sympy import capture
 
@@ -89,6 +90,10 @@ class PandaRenderer(ShowBase):
         "hover_captured": HOVER_CAPTURED_MATERIAL_MOD,
     }
 
+    # Board positioning
+    BOARD_Y_OFFSET = -0.75  # Y-axis offset for board position (positive = away from camera)
+    SUPPLY_Y_OFFSET = 6.0  # Y-axis offset for supply pool (positive = away from camera)
+
     # Camera configuration per board size
     CAMERA_CONFIG = {
         37: {"center_pos": "D4", "cam_dist": 10, "cam_height": 8},
@@ -109,6 +114,7 @@ class PandaRenderer(ShowBase):
         move_duration=0.666,
         start_delay=0.0,
     ):
+        # self.rotation = 0.
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
@@ -139,6 +145,14 @@ class PandaRenderer(ShowBase):
         self.pos_array = None
         self.show_coords = show_coords
         self._action_context = None  # Tracks in-flight action for completion callbacks
+
+        # Track world→board animations that need dynamic destination updates
+        # Format: {marble_id: {'marble': marble, 'dst_local': (x,y,z), 'on_complete': callback}}
+        self._world_to_board_animations = {}
+
+        # Track board→world animations that need reparenting at animation start
+        # Format: {marble_id: {'marble': marble, 'reparented': bool}}
+        self._board_to_world_animations = {}
 
         self.x_base_size = self.BASE_SIZE_X
         self.y_base_size = self.BASE_SIZE_Y
@@ -198,9 +212,16 @@ class PandaRenderer(ShowBase):
         self.wb = None
         self._setup_water()
 
+        # Create board container node for rotation (will be positioned at geometric center after board is built)
+        self.board_node = NodePath("board_container")
+        self.board_node.reparentTo(self.render)
+
         # anim: vx, vy, scale, skip
 
         self._build_base(board_layout)
+
+        # Calculate geometric center and position board_node
+        self._position_board_node()
 
         self.marble_supply = None
         self.marbles_in_play = None
@@ -252,6 +273,16 @@ class PandaRenderer(ShowBase):
 
     def update(self, task):
         """Update all animations - delegating to manager classes."""
+        # self.rotation += 0.01
+        # if self.rotation > 2* math.pi:
+        #     self.rotation = 0.
+        # self.set_board_rotation(self.rotation)
+
+        # Handle board→world reparenting BEFORE animation updates
+        self._handle_board_to_world_reparenting(task)
+
+        # Update world→board animation destinations before animation update
+        self._update_world_to_board_destinations()
 
         # Update state machine if active
         if (
@@ -261,7 +292,10 @@ class PandaRenderer(ShowBase):
             self.action_visualization_sequencer.update(task)
 
         # Delegate move/freeze animation updates to animation_manager
-        self.animation_manager.update(task)
+        completed = self.animation_manager.update(task)
+
+        # Handle completed world→board animations
+        self._handle_completed_world_to_board_animations(completed)
 
         # Delegate highlight animation updates to highlighting_manager
         self.highlighting_manager.update(task)
@@ -311,7 +345,7 @@ class PandaRenderer(ShowBase):
         self.marble_supply = self._make_marble_dict()
         self.marbles_in_play = self._make_marble_dict()
 
-        x, y, z = 0, 5.25, 0
+        x, y, z = 0, self.SUPPLY_Y_OFFSET, 0
         self._build_color_supply("b", self.black_marbles, y)
         y -= self.y_base_size
         self._build_color_supply("g", self.grey_marbles, y)
@@ -322,19 +356,14 @@ class PandaRenderer(ShowBase):
         """Setup camera position and orientation based on board size."""
         # Get camera configuration for this board size
         config = self.CAMERA_CONFIG.get(self.rings, self.CAMERA_CONFIG[37])
-        center_pos = config["center_pos"]
         cam_dist = config["cam_dist"]
         cam_height = config["cam_height"]
 
-        # Get the actual 3D coordinates of the center position
-        if center_pos in self.pos_to_coords:
-            center_x, center_y, center_z = self.pos_to_coords[center_pos]
-        else:
-            # Fallback to origin if we can't find the center
-            center_x, center_y, center_z = 0, 0, 0
+        # After _position_board_node(), the board is centered at origin
+        # Camera looks at board_node position (0, 0, 0)
+        center_x, center_y, center_z = 0, 0, 0
 
-        # Position camera to look at the board center
-        # Camera is positioned behind (negative Y) and above (positive Z) the center point
+        # Position camera behind (negative Y) and above (positive Z) the board
         cam_x = center_x
         cam_y = center_y - cam_dist
         cam_z = center_z + cam_height
@@ -407,6 +436,14 @@ class PandaRenderer(ShowBase):
         tl_coord = self.pos_to_coords[top_left]
         tr_coord = self.pos_to_coords[top_right]
 
+        # Calculate vectors from board center to corners and normalize to unit vectors
+        tl_out = np.array(tl_coord) - self.geometric_center
+        tl_out = tl_out / np.linalg.norm(tl_out)
+        tr_out = np.array(tr_coord) - self.geometric_center
+        tr_out = tr_out / np.linalg.norm(tr_out)
+        # tl_coord += tl_out
+        # tr_coord += tr_out
+
         # Use adjacent positions if they exist, otherwise use same row one position down
         if second_from_top_left:
             tl_adj = self.pos_to_coords[second_from_top_left]
@@ -429,12 +466,12 @@ class PandaRenderer(ShowBase):
         capture_pool_member_offset = np.array(self.capture_pool_member_offset)
 
         d_ul = (tl_coord - tl_adj) * self.capture_pool_offset_scale
-        p_ul = tl_coord + d_ul
+        p_ul = tl_coord + tl_out + d_ul
 
         # For player 2 (right side), we want the pool closer and further from camera
         # Use a smaller offset and add extra Y offset to move away from camera
         d_ur = (tr_coord - tr_adj) * self.capture_pool_offset_scale
-        p_ur = tr_coord + d_ur
+        p_ur = tr_coord + tr_out + d_ur
 
         # Create 12 positions per player (6 + 6 with offset)
         for r in range(2):
@@ -485,7 +522,8 @@ class PandaRenderer(ShowBase):
                 pos = self.pos_array[i][pa]
 
                 if pos != "":  # Only create pieces for non-empty positions
-                    base_piece = BasePiece(self)
+                    # Pass board_node as parent so rings rotate with the board
+                    base_piece = BasePiece(self, parent=self.board_node)
                     x = x_center + (k * self.x_base_size) - x_row_offset
                     y = y_center - y_row_offset
                     coords = (x, y, 0)
@@ -495,12 +533,13 @@ class PandaRenderer(ShowBase):
                     self.pos_to_coords[pos] = coords
 
                     # Create coordinate label if show_coords is enabled
+                    # Labels are also parented to board_node so they rotate with rings
                     if self.show_coords:
                         text_node = TextNode(f"label_{pos}")
                         text_node.setText(pos)
                         text_node.setAlign(TextNode.ACenter)
                         text_node.setTextColor(1, 1, 1, 1)  # White text
-                        text_node_path = self.render.attachNewNode(text_node)
+                        text_node_path = self.board_node.attachNewNode(text_node)
                         # Position label above the ring
                         label_z = 0.4  # Height above ring
                         text_node_path.setPos(x, y, label_z)
@@ -510,6 +549,181 @@ class PandaRenderer(ShowBase):
                         self.pos_to_label[pos] = text_node_path
 
             logger.debug(f"Board row {i}: {self.pos_array[i]}")
+
+    def _position_board_node(self):
+        """Calculate geometric center and offset all ring positions to center the board at origin.
+
+        This ensures the board rotates around its geometric center while keeping board_node at origin.
+        """
+        if not self.pos_to_coords:
+            logger.warning("No rings found, board_node positioned at origin")
+            self.board_node.setPos(0, self.BOARD_Y_OFFSET, 0)
+            self.geometric_center = np.array([0.0, 0.0, 0.0])
+            return
+
+        # Collect all ring coordinates (x, y, z tuples)
+        all_coords = np.array([coords for coords in self.pos_to_coords.values()])
+
+        # Calculate geometric center (mean of all ring positions)
+        self.geometric_center = np.mean(all_coords, axis=0)
+
+        logger.debug(f"Board geometric center: ({self.geometric_center[0]:.3f}, {self.geometric_center[1]:.3f}, {self.geometric_center[2]:.3f})")
+
+        # Position board_node with configurable Y offset
+        # X and Z remain at origin for clean rotation around geometric center
+        self.board_node.setPos(0, self.BOARD_Y_OFFSET, 0)
+
+        # Offset all rings by -geometric_center so they're centered around origin
+        # This way, rotation around origin == rotation around geometric center
+        for pos_str, base_piece in self.pos_to_base.items():
+            world_coords = self.pos_to_coords[pos_str]
+            # Calculate local position relative to board_node (which is at origin)
+            local_coords = (
+                world_coords[0] - self.geometric_center[0],
+                world_coords[1] - self.geometric_center[1],
+                world_coords[2] - self.geometric_center[2]
+            )
+            base_piece.set_pos(local_coords)
+            # Update stored coordinates to be world coordinates (for camera, etc.)
+            # Actually, keep them as original world coords for backward compatibility
+
+        # Also offset coordinate labels if they exist
+        for pos_str, label in self.pos_to_label.items():
+            # Labels were already parented to board_node in _build_base
+            # Just need to offset their positions
+            world_coords = self.pos_to_coords[pos_str]
+            label_z = 0.4  # Height above ring (same as in _build_base)
+            local_coords = (
+                world_coords[0] - self.geometric_center[0],
+                world_coords[1] - self.geometric_center[1],
+                world_coords[2] - self.geometric_center[2] + label_z
+            )
+            label.setPos(local_coords)
+
+    def _world_to_board_local(self, world_coords):
+        """Convert world coordinates to board-local coordinates.
+
+        When board_node is rotated, marbles parented to it need positions in board-local space.
+        This converts from stored world coordinates to the local coordinate system of board_node.
+
+        Args:
+            world_coords: Tuple of (x, y, z) in world space
+
+        Returns:
+            Tuple of (x, y, z) in board-local space
+        """
+        return (
+            world_coords[0] - self.geometric_center[0],
+            world_coords[1] - self.geometric_center[1],
+            world_coords[2] - self.geometric_center[2]
+        )
+
+    def _board_local_to_world(self, local_coords):
+        """Convert board-local coordinates to world coordinates.
+
+        Takes board-local coordinates and returns the current world position,
+        accounting for board rotation.
+
+        Args:
+            local_coords: Tuple of (x, y, z) in board-local space
+
+        Returns:
+            Tuple of (x, y, z) in world space
+        """
+        from panda3d.core import Point3
+
+        local_point = Point3(local_coords[0], local_coords[1], local_coords[2])
+        world_point = self.render.getRelativePoint(self.board_node, local_point)
+        return (world_point.x, world_point.y, world_point.z)
+
+    def _update_world_to_board_destinations(self):
+        """Update animation destinations for world→board transitions as board rotates."""
+        for marble_id, info in list(self._world_to_board_animations.items()):
+            marble = info['marble']
+            # Find the animation by matching entity reference
+            for anim_item in self.animation_manager.current_animations:
+                if anim_item.get('entity') is marble:
+                    # Recalculate world position of destination
+                    dst_local = info['dst_local']
+                    dst_world = self._board_local_to_world(dst_local)
+                    # Update the animation's destination
+                    anim_item['dst'] = dst_world
+                    break
+
+    def _handle_completed_world_to_board_animations(self, completed_animations):
+        """Handle completion of world→board animations - reparent and cleanup.
+
+        Args:
+            completed_animations: List of completed animation items from animation_manager
+        """
+        if not completed_animations:
+            return
+
+        for anim_item in completed_animations:
+            entity = anim_item.get('entity')
+            if entity is None:
+                continue
+
+            # Find this entity in our tracking dict by matching entity reference
+            marble_id = id(entity)
+            if marble_id in self._world_to_board_animations:
+                info = self._world_to_board_animations.pop(marble_id)
+                marble = info['marble']
+                dst_local = info['dst_local']
+                on_complete = info.get('on_complete')
+
+                # Reparent to board_node and set final board-local position
+                marble.model.reparentTo(self.board_node)
+                marble.set_pos(dst_local)
+
+                # Call additional completion callback if provided
+                if on_complete:
+                    on_complete()
+
+    def _handle_board_to_world_reparenting(self, task):
+        """Handle reparenting of board→world animations when they start.
+
+        Marbles animating from board to capture pool stay parented to board_node during
+        their defer period (rotating with the board). When the animation actually starts,
+        we reparent them to render (world space) and update their source coordinates.
+
+        Args:
+            task: Current Panda3D task (for time information)
+        """
+        if not self._board_to_world_animations:
+            return
+
+        current_time = task.time
+
+        for marble_id, info in list(self._board_to_world_animations.items()):
+            if info['reparented']:
+                continue  # Already handled
+
+            marble = info['marble']
+
+            # Find the animation for this marble
+            for anim_item in self.animation_manager.current_animations:
+                if anim_item.get('entity') is marble:
+                    # Check if animation has started (passed its start_time)
+                    start_time = anim_item.get('start_time', 0)
+                    if current_time >= start_time:
+                        # Animation is starting - do the reparenting now
+                        # Get current board-local position
+                        src_coords_local = marble.get_pos()
+                        # Convert to world coordinates
+                        src_coords_world = self._board_local_to_world(src_coords_local)
+
+                        # Reparent to world space
+                        marble.model.reparentTo(self.render)
+                        # Set world position
+                        marble.set_pos(src_coords_world)
+
+                        # Update animation's source coordinates
+                        anim_item['src'] = src_coords_world
+
+                        # Mark as reparented
+                        info['reparented'] = True
+                    break
 
     def setup_lights(self):
         """Setup lighting with shadow-casting directional lights.
@@ -631,16 +845,27 @@ class PandaRenderer(ShowBase):
                 # Defer the capture animation so it starts after the flash
                 capture_animation_defer = action_duration + self.CAPTURE_FLASH_DURATION
 
-            # Queue animation which will interpolate scale from current to CAPTURED_MARBLE_SCALE
+            # Track this marble for reparenting when animation starts
+            # For now, get placeholder source coordinates (will be updated at animation start)
+            src_coords_local = captured_marble.get_pos()  # Current board-local position
+            src_coords_world_placeholder = self._board_local_to_world(src_coords_local)
+
+            # Queue animation - the src coordinates will be corrected when animation starts
             self.animation_manager.queue_animation(
                 anim_type="move",
                 entity=captured_marble,
-                src=src_coords,
+                src=src_coords_world_placeholder,
                 dst=capture_pool_coords,
                 scale=self.CAPTURED_MARBLE_SCALE,
                 duration=action_duration,
                 defer=capture_animation_defer,
             )
+
+            # Track this animation for reparenting at start time
+            self._board_to_world_animations[id(captured_marble)] = {
+                'marble': captured_marble,
+                'reparented': False,
+            }
 
     def show_isolated_removal(self, player, pos, marble_color, action_duration=0):
         """Animate removal of an isolated ring (with or without marble).
@@ -699,9 +924,9 @@ class PandaRenderer(ShowBase):
             return
         put_marble = supply.pop()
         mip = self.marbles_in_play[action_marble_color]
-        src_coords = put_marble.get_pos()
+        src_coords_world = put_marble.get_pos()  # Get world position (marble still in render)
         if put_marble not in [p for p, _ in mip]:
-            mip.append((put_marble, src_coords))
+            mip.append((put_marble, src_coords_world))
 
         # Store current scale before configure (marble is at SUPPLY_MARBLE_SCALE or player pool scale)
         current_scale = put_marble.model.getScale()[0]  # Get current scale (uniform)
@@ -709,25 +934,46 @@ class PandaRenderer(ShowBase):
         # Configure marble's metadata (tags, collision masks, etc.) and position tracking
         self.pos_to_marble[dst] = put_marble
         put_marble.configure_as_board_marble(dst, self.BOARD_MARBLE_SCALE, f"board:{dst}")
+
         self._update_capture_marble_colliders()
 
+        # Convert destination from world to board-local coordinates
+        dst_coords_local = self._world_to_board_local(dst_coords)
+
         if action_duration == 0:
-            put_marble.set_pos(dst_coords)
+            # Instant placement: reparent and position immediately
+            put_marble.model.reparentTo(self.board_node)
+            put_marble.set_pos(dst_coords_local)
             put_marble.set_scale(self.BOARD_MARBLE_SCALE)
         else:
+            # Animated placement: marble stays in world space, destination updates each frame
+            # Calculate initial world position of destination
+            dst_coords_world = self._board_local_to_world(dst_coords_local)
+
             # Restore original scale so animation can interpolate from current → target
             put_marble.set_scale(current_scale)
 
-            # Queue animation which will interpolate scale from current to BOARD_MARBLE_SCALE
+            # Queue animation using world coordinates
+            # The animation manager will return an ID that we can track
             self.animation_manager.queue_animation(
                 anim_type="move",
                 entity=put_marble,
-                src=src_coords,
-                dst=dst_coords,
+                src=src_coords_world,
+                dst=dst_coords_world,
                 scale=self.BOARD_MARBLE_SCALE,
                 duration=action_duration,
                 defer=delay,
             )
+
+            # Track this animation for dynamic destination updates
+            # We need to get the animation ID - let's read the queue to get the last queued item
+            # Actually, we need to modify this approach - we can't get the ID until it's dequeued
+            # Let me store a marker and match it when the animation starts
+            # Better: store the marble reference and match by entity
+            self._world_to_board_animations[id(put_marble)] = {
+                'marble': put_marble,
+                'dst_local': dst_coords_local,
+            }
 
     def show_ring_removal(self, action_dict, action_duration=0., delay=0.):
         """Remove a ring from the board (PUT action only).
@@ -799,14 +1045,19 @@ class PandaRenderer(ShowBase):
             captured_marble = self.pos_to_marble.pop(cap)
             self.pos_to_marble[dst] = action_marble
             action_marble.configure_as_board_marble(dst, self.BOARD_MARBLE_SCALE, f"board:{dst}")
+
+            # Convert world coordinates to board-local coordinates for marbles parented to board_node
+            src_coords_local = self._world_to_board_local(src_coords)
+            dst_coords_local = self._world_to_board_local(dst_coords)
+
             if action_duration == 0:
-                action_marble.set_pos(dst_coords)
+                action_marble.set_pos(dst_coords_local)
             else:
                 self.animation_manager.queue_animation(
                     anim_type="move",
                     entity=action_marble,
-                    src=src_coords,
-                    dst=dst_coords,
+                    src=src_coords_local,
+                    dst=dst_coords_local,
                     scale=self.BOARD_MARBLE_SCALE,
                     duration=action_duration,
                     defer=0,
@@ -1221,3 +1472,27 @@ class PandaRenderer(ShowBase):
     def report_status(self, message: str) -> None:
         """Handle textual status reports for compatibility with composite renderers."""
         logger.info(message)
+
+    def set_board_rotation(self, angle_radians: float) -> None:
+        """Set the rotation angle of the board around the Z-axis.
+
+        The board rotates around an axis perpendicular to the board plane (Z-axis),
+        passing through the geometric center. Only rings and marbles on rings rotate;
+        supply and capture pools remain static.
+
+        Args:
+            angle_radians: Rotation angle in radians. Positive values rotate counter-clockwise
+                          when viewed from above (looking down the Z-axis).
+
+        Note:
+            Board rotation is allowed during animations. Marbles parented to board_node
+            use board-local coordinates, so they automatically rotate with the board without
+            requiring position adjustment.
+        """
+        # Convert radians to degrees (Panda3D uses degrees for rotation)
+        angle_degrees = math.degrees(angle_radians)
+
+        # setH() sets the heading (rotation around Z-axis) in degrees
+        self.board_node.setH(angle_degrees)
+
+        logger.debug(f"Board rotation set to {angle_radians:.4f} radians ({angle_degrees:.2f} degrees)")
