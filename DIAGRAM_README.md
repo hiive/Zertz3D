@@ -8,7 +8,9 @@ A utility for rendering Zèrtz board states from notation files or strings to 2D
 - Execute move sequences and render resulting board states
 - Save as PNG, SVG, or display on screen
 - Show/hide coordinate labels (with smart color adaptation)
+- Edge coordinates mode (show only top/bottom edge labels per column)
 - Show/hide removed rings
+- Customizable background color with transparency support
 - Stop at specific move numbers
 - Pixel-based sizing with automatic scaling
 - Consistent image dimensions across different board states
@@ -45,8 +47,17 @@ python render_notation.py game.txt --output final.png --width 2400 --title "Fina
 # Export as SVG (vector format - infinitely scalable)
 python render_notation.py game.txt --output board.svg --coords
 
-# Show removed rings with transparency
+# Show removed rings (light gray)
 python render_notation.py game.txt --output board.png --show-removed --coords
+
+# Edge coordinates only (like official diagrams)
+python render_notation.py game.txt --output board.png --edge-coords
+
+# Custom background color (transparent for compositing)
+python render_notation.py game.txt --output board.png --coords --bg-color #00000000
+
+# Custom background (opaque white)
+python render_notation.py game.txt --output board.png --coords --bg-color #FFFFFF
 ```
 
 ### Sizing
@@ -103,6 +114,16 @@ render_board_from_notation(
     dpi=150,
 )
 
+# Edge coordinates with custom background
+render_board_from_notation(
+    "game.txt",
+    output_path="official_style.png",
+    edge_coords=True,    # Show only top/bottom edge labels
+    show_removed=True,
+    bg_color="#00000000", # Transparent background (RGBA)
+    title="Position Analysis",
+)
+
 # SVG output for vector graphics
 render_board_from_notation(
     "game.txt",
@@ -156,22 +177,21 @@ Wd4
 
 The renderer creates top-down 2D images showing:
 
-- **Rings**: Brown circles (wood-colored)
-  - Present rings: Full opacity
-  - Removed rings (if show_removed): Semi-transparent
-  - Hollow outline style
-- **Marbles**: Filled circles on rings (20% larger than standard)
-  - White: #FFFFFF
-  - Gray: #808080
-  - Black: #000000
+- **Rings**: Circular outlines (hollow)
+  - Present rings: Solid black, 2pt line width
+  - Removed rings (if show_removed): Light gray, 1pt line width
+  - Empty positions on present rings: Small inner circle in mid-gray
+  - No alpha transparency except on background
+- **Marbles**: Filled circles on rings, 20% larger than standard
+  - White, gray, and black marbles
   - Dark edge color for definition
-- **Coordinates** (if show_coords): Position labels (A1, B2, etc.)
-  - Black text on empty rings and white marbles
-  - White text on gray and black marbles (high contrast)
-  - Bold font for readability
+- **Coordinates** (if show_coords or edge_coords): Position labels like A1, B2, etc.
+  - Regular coords: Black text on empty rings and white marbles, white text on dark marbles, bold, centered on rings
+  - Edge coords: Black text only, non-bold, positioned above top edge rings and below bottom edge rings
+  - Edge coords shown even when rings are removed
   - Automatically scaled with image size
-- **Background**: Light beige (#F5E6D3)
-- **Title**: 1.5x the coordinate font size (scaled)
+- **Background**: Light beige by default, customizable via --bg-color flag (supports RGBA transparency)
+- **Title** (if specified): Always bold, 1.5x the coordinate font size, scaled proportionally
 
 ### Consistent Sizing
 
@@ -190,7 +210,7 @@ The renderer ensures all images from the same board size have identical dimensio
 
 ```bash
 # Create diagram for documentation (high DPI)
-python render_notation.py examples/example_game.txt \
+uv run render_notation.py examples/example_game.txt \
     --output docs/example_position.png \
     --coords \
     --title "Example Position" \
@@ -198,14 +218,14 @@ python render_notation.py examples/example_game.txt \
     --dpi 300
 
 # Generate SVG for web/print
-python render_notation.py game.txt \
+uv run render_notation.py game.txt \
     --output diagram.svg \
     --coords \
     --title "Board Position"
 
 # Generate sequence of images for animation
 for i in {1..50}; do
-    python render_notation.py game.txt \
+    uv run render_notation.py game.txt \
         --output "frames/frame_$(printf '%03d' $i).png" \
         --stop-at $i \
         --coords \
@@ -213,15 +233,29 @@ for i in {1..50}; do
 done
 
 # Quick preview of a position
-python render_notation.py game.txt --show --coords
+uv run render_notation.py game.txt --show --coords
 
 # High-resolution print version (6000px at 300 DPI = 20 inches)
-python render_notation.py game.txt \
+uv run render_notation.py game.txt \
     --output poster.png \
     --width 6000 \
     --dpi 300 \
     --coords \
     --title "Tournament Position"
+
+# Official diagram style (edge coords, transparent background)
+uv run render_notation.py game.txt \
+    --output official_diagram.png \
+    --edge-coords \
+    --show-removed \
+    --bg-color #00000000 \
+    --title "Position Analysis"
+
+# Minimal diagram (white background, edge coords only)
+uv run render_notation.py game.txt \
+    --output minimal.png \
+    --edge-coords \
+    --bg-color #FFFFFF
 ```
 
 ## Module Structure
@@ -243,8 +277,10 @@ from game.utils.diagram import DiagramRenderer, execute_notation_sequence
 
 class CustomRenderer(DiagramRenderer):
     # Override colors
-    RING_EDGE_COLOR = "#A0522D"  # Sienna
-    BACKGROUND_COLOR = "#FFFFFF"  # White
+    RING_EDGE_COLOR = "#A0522D"      # Sienna (present rings)
+    REMOVED_RING_COLOR = "#CCCCCC"   # Lighter gray (removed rings)
+    INNER_RING_COLOR = "#666666"     # Darker gray (empty position inner circles)
+    BACKGROUND_COLOR = "#FFFFFF"     # White
 
     # Override sizes (in hex grid units)
     MARBLE_RADIUS = 0.55 * DiagramRenderer.HEX_SIZE
