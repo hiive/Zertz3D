@@ -4,6 +4,8 @@ A 3D implementation of the abstract board game Zèrtz using Panda3D. This projec
 
 Full game rules: http://www.gipf.com/zertz/rules/rules.html
 
+**THIS IS A WORK-IN-PROGRESS!**
+
 ## Features
 
 - **Multiple Board Sizes**: Play on 37, 48, or 61 ring boards
