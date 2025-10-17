@@ -273,7 +273,7 @@ class PandaRenderer(ShowBase):
 
     def update(self, task):
         """Update all animations - delegating to manager classes."""
-        # self.rotation += 0.01
+        # self.rotation += 0.002
         # if self.rotation > 2* math.pi:
         #     self.rotation = 0.
         # self.set_board_rotation(self.rotation)
@@ -772,7 +772,7 @@ class PandaRenderer(ShowBase):
         # Ambient light (no shadows, provides base illumination)
         # Higher ambient light makes shadows more subtle/softer
         a_light = AmbientLight("a_light")
-        a_light.setColor((0.06, 0.08, 0.10, 1.00))
+        a_light.setColor((0.12, 0.16, 0.16, 1.00))
         a_node = self.render.attachNewNode(a_light)
         a_node.hide(BitMask32(1))
         self.render.setLight(a_node)
@@ -1005,14 +1005,13 @@ class PandaRenderer(ShowBase):
 
                 self.removed_bases.append((base_piece, base_pos))
 
-    def show_action(self, player, render_data, action_duration=0.0, action_result=None):
+    def show_action(self, player, render_data, action_duration=0.0):
         """Visualize an action without highlights.
 
         Args:
             player: Player making the move
             render_data: RenderData value object containing action_dict
             action_duration: Animation duration
-            action_result: ActionResult containing frozen positions (optional)
         """
         # Extract data from value objects
         action_dict = render_data.action_dict
@@ -1161,7 +1160,7 @@ class PandaRenderer(ShowBase):
             )
         else:
             # Direct visualization without highlights
-            self.show_action(player, render_data, task_delay_time, action_result)
+            self.show_action(player, render_data, task_delay_time)
 
         # If no animations or highlights were queued, complete immediately
         self._complete_action_if_ready()

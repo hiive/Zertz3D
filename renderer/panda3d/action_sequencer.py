@@ -273,8 +273,7 @@ class ActionVisualizationSequencer:
         self.renderer.show_action(
             player,
             render_data,
-            self.task_delay_time,
-            self.renderer.current_action_result,
+            self.task_delay_time
         )
 
         # Wait for final move animations to complete

@@ -140,11 +140,25 @@ class AnimationManager:
         jump = True
         if dst is None:
             # Disappearing animation (ring removal)
+            # Calculate direction vector from board center (origin) to ring position
             dx, dy, dz = src
-            adx = -1 if dx < 0 else 1
-            ady = -1 if dy < 0 else 1
-            dx = max(10, abs(dx) * 10) * adx
-            dy = max(4, abs(dy) * 4) * ady
+            distance_from_center = math.sqrt(dx * dx + dy * dy)
+
+            if distance_from_center > 0:
+                # Normalize to get unit direction vector
+                ux = dx / distance_from_center
+                uy = dy / distance_from_center
+
+                # Calculate magnitude (same logic as before: 10x distance, minimum 10)
+                magnitude = max(10., distance_from_center * 10)
+
+                # Apply magnitude along the direction vector
+                dx = magnitude * ux
+                dy = magnitude * uy
+            else:
+                # Ring at center (shouldn't happen, but handle gracefully)
+                dx, dy = 10, 4
+
             fz = 1.5
             dst = (dx, dy, dz * fz)
             jump = False
