@@ -51,9 +51,11 @@ class DiagramRenderer:
     MARBLE_RADIUS = 0.6 * HEX_SIZE  # Marble radius (20% bigger: 0.5 * 1.2)
 
     # Colors
-    RING_COLOR = "#8B7355"  # Brown/wood color for rings
-    RING_EDGE_COLOR = "#5C4033"  # Darker brown for ring edges
-    EMPTY_RING_ALPHA = 0.3  # Transparency for removed rings
+    RING_COLOR = "#000000"  # Brown/wood color for rings
+    RING_EDGE_COLOR = "#000000"  # Black for present ring edges
+    REMOVED_RING_COLOR = "#AAAAAA"  # Light gray for removed rings
+    INNER_RING_COLOR = "#888888"  # Mid-to-dark gray for inner rings on empty positions
+    INNER_RING_RATIO = 0.4  # Inner ring radius as ratio of outer ring (1/3 marble radius)
 
     MARBLE_COLORS = {
         "w": "#FFFFFF",  # White
@@ -69,12 +71,14 @@ class DiagramRenderer:
 
     BACKGROUND_COLOR = "#F5E6D3"  # Light beige background
 
-    def __init__(self, show_coords: bool = False, show_removed: bool = False):
+    def __init__(self, show_coords: bool = False, edge_coords: bool = False, show_removed: bool = False, bg_color: Optional[str] = None):
         """Initialize board renderer.
 
         Args:
-            show_coords: If True, display coordinate labels on rings
+            show_coords: If True, display coordinate labels on all rings
+            edge_coords: If True, display coordinate labels on top/bottom edge rings only
             show_removed: If True, show removed rings with transparency
+            bg_color: Background color in #RRGGBB or #RRGGBBAA format (default: #F5E6D3)
         """
         if not MATPLOTLIB_AVAILABLE:
             raise ImportError(
@@ -83,7 +87,9 @@ class DiagramRenderer:
             )
 
         self.show_coords = show_coords
+        self.edge_coords = edge_coords
         self.show_removed = show_removed
+        self.bg_color = bg_color if bg_color is not None else self.BACKGROUND_COLOR
 
     def _yx_to_axial(self, y: int, x: int, width: int) -> tuple[float, float]:
         """Convert board (y,x) indices to axial coordinates (q,r).
@@ -169,8 +175,8 @@ class DiagramRenderer:
         """
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_aspect('equal')
-        ax.set_facecolor(self.BACKGROUND_COLOR)
-        fig.patch.set_facecolor(self.BACKGROUND_COLOR)
+        ax.set_facecolor(self.bg_color)
+        fig.patch.set_facecolor(self.bg_color)
 
         # Get board dimensions
         width = board.width
@@ -183,7 +189,30 @@ class DiagramRenderer:
         # Collect patches for rings and marbles, and text labels
         ring_patches = []
         marble_patches = []
-        text_labels = []  # Store (px, py, pos_str, text_color) tuples
+        text_labels = []  # Store (px, py, pos_str, text_color, va, weight) tuples
+
+        # If edge_coords is enabled, find the top and bottom edge of each column
+        edge_ring_positions = {}  # Maps (y, x) -> 'top' or 'bottom'
+        if self.edge_coords:
+            # First pass: find all valid ring positions grouped by column (x)
+            columns = {}  # Maps x -> list of y values
+            for y in range(width):
+                for x in range(width):
+                    try:
+                        if board.letter_layout is not None and board.letter_layout[y][x]:
+                            if x not in columns:
+                                columns[x] = []
+                            columns[x].append(y)
+                    except IndexError:
+                        continue
+
+            # For each column, find min and max y and mark as top/bottom edges
+            for x, y_values in columns.items():
+                if y_values:
+                    min_y = min(y_values)
+                    max_y = max(y_values)
+                    edge_ring_positions[(min_y, x)] = 'top'
+                    edge_ring_positions[(max_y, x)] = 'bottom'
 
         # Iterate through board positions
         for y in range(width):
@@ -207,14 +236,19 @@ class DiagramRenderer:
 
                 # Draw ring as circle (if exists or show_removed is True)
                 if ring_exists or self.show_removed:
+                    # Use solid black for present rings, light gray for removed rings (no alpha)
+                    ring_color = self.RING_EDGE_COLOR if ring_exists else self.REMOVED_RING_COLOR
+                    # Present rings get higher zorder so they draw on top of removed rings
+                    ring_zorder = 1 if ring_exists else 0.5
+                    # Removed rings get thinner lines
+                    ring_linewidth = (2 * scale_factor) if ring_exists else (1 * scale_factor)
                     ring = patches.Circle(
                         (px, py),
                         radius=self.RING_RADIUS,
                         fill=False,  # Rings are hollow (just the outline)
-                        edgecolor=self.RING_EDGE_COLOR,
-                        linewidth=2 * scale_factor,
-                        alpha=1.0 if ring_exists else self.EMPTY_RING_ALPHA,
-                        zorder=1,
+                        edgecolor=ring_color,
+                        linewidth=ring_linewidth,
+                        zorder=ring_zorder,
                     )
                     ring_patches.append(ring)
 
@@ -237,12 +271,49 @@ class DiagramRenderer:
                             zorder=3,
                         )
                         marble_patches.append(marble)
+                    else:
+                        # Empty ring - add inner ring with thinner line in mid-to-dark gray
+                        inner_ring = patches.Circle(
+                            (px, py),
+                            radius=self.RING_RADIUS * self.INNER_RING_RATIO,
+                            fill=False,
+                            edgecolor=self.INNER_RING_COLOR,
+                            linewidth=1 * scale_factor,  # Thinner than outer ring
+                            zorder=2,
+                        )
+                        ring_patches.append(inner_ring)
 
                 # Store text label info for rendering AFTER marbles
                 # Use white text on gray/black marbles, black text otherwise
+
+                # Check if we should show this coordinate
+                show_this_coord = False
+                edge_position = None
+
                 if self.show_coords and ring_exists:
-                    text_color = self.COORD_COLOR_ON_DARK if marble_type in ['g', 'b'] else self.COORD_COLOR
-                    text_labels.append((px, py, pos_str, text_color))
+                    # Show all coords, centered on ring
+                    show_this_coord = True
+                    va = 'center'
+                elif self.edge_coords and (y, x) in edge_ring_positions:
+                    # Show edge coords even if ring is removed
+                    show_this_coord = True
+                    edge_position = edge_ring_positions[(y, x)]
+                    if edge_position == 'top':
+                        va = 'bottom'  # Position label above ring (text bottom aligns to point above ring)
+                        label_py = py + self.RING_RADIUS * 1.3  # Position above ring
+                    else:  # 'bottom'
+                        va = 'top'  # Position label below ring (text top aligns to point below ring)
+                        label_py = py - self.RING_RADIUS * 1.3  # Position below ring
+
+                if show_this_coord:
+                    if edge_position:
+                        # Edge coords always black, non-bold
+                        text_color = self.COORD_COLOR
+                        text_labels.append((px, label_py, pos_str, text_color, va, 'normal'))
+                    else:
+                        # Regular coords: white on dark marbles, black otherwise, bold
+                        text_color = self.COORD_COLOR_ON_DARK if (ring_exists and marble_type in ['g', 'b']) else self.COORD_COLOR
+                        text_labels.append((px, py, pos_str, text_color, 'center', 'bold'))
 
         # Add all patches to axis (rings, then marbles, then text on top)
         for patch in ring_patches:
@@ -251,15 +322,15 @@ class DiagramRenderer:
             ax.add_patch(patch)
 
         # Render text labels on top of everything
-        for px, py, pos_str, text_color in text_labels:
+        for px, py, pos_str, text_color, va, weight in text_labels:
             ax.text(
                 px, py,
                 pos_str,
-                ha='center', va='center',
+                ha='center', va=va,
                 fontsize=self.COORD_FONT_SIZE * scale_factor,
                 color=text_color,
                 zorder=4,  # Above marbles (zorder=3)
-                weight='bold',  # Make text bold for better visibility
+                weight=weight,
             )
 
         # Set axis limits based on ALL possible ring positions (not just existing ones)
@@ -280,14 +351,22 @@ class DiagramRenderer:
             # Border = full ring radius + 1/4 hex width trim
             # This shows complete rings at edges with minimal whitespace
             border = self.RING_RADIUS + 0.25
-            ax.set_xlim(min(all_x_coords) - border, max(all_x_coords) + border)
-            ax.set_ylim(min(all_y_coords) - border, max(all_y_coords) + border)
+
+            # When edge_coords is enabled, add extra space at bottom and top for labels
+            if self.edge_coords:
+                border_top = border + self.RING_RADIUS * 0.6  # Extra space for top labels
+                border_bottom = border + self.RING_RADIUS * 0.6  # Extra space for bottom labels
+                ax.set_xlim(min(all_x_coords) - border, max(all_x_coords) + border)
+                ax.set_ylim(min(all_y_coords) - border_bottom, max(all_y_coords) + border_top)
+            else:
+                ax.set_xlim(min(all_x_coords) - border, max(all_x_coords) + border)
+                ax.set_ylim(min(all_y_coords) - border, max(all_y_coords) + border)
 
         ax.axis('off')
 
-        # Add title if provided (1.5x the coordinate font size, scaled)
+        # Add title if provided (1.5x the coordinate font size, scaled, always bold)
         if title:
-            ax.set_title(title, fontsize=int(self.COORD_FONT_SIZE * 1.5 * scale_factor), pad=20)
+            ax.set_title(title, fontsize=int(self.COORD_FONT_SIZE * 1.5 * scale_factor), pad=20, weight='bold')
 
         plt.tight_layout()
         return fig
@@ -491,12 +570,14 @@ def render_board_from_notation(
     output_path: Optional[Union[str, Path]] = None,
     show: bool = False,
     show_coords: bool = True,
+    edge_coords: bool = False,
     show_removed: bool = False,
     title: Optional[str] = None,
     width: Optional[int] = None,
     height: Optional[int] = None,
     dpi: int = 150,
     stop_at_move: Optional[int] = None,
+    bg_color: Optional[str] = None,
 ) -> None:
     """Render a board state from notation sequence.
 
@@ -507,13 +588,15 @@ def render_board_from_notation(
         notation_input: Either a file path or a notation string
         output_path: Optional path to save the image (PNG recommended)
         show: If True, display the image on screen
-        show_coords: If True, display coordinate labels on rings
+        show_coords: If True, display coordinate labels on all rings
+        edge_coords: If True, display coordinate labels on top/bottom edge rings only
         show_removed: If True, show removed rings with transparency
         title: Optional title for the figure
         width: Output width in pixels (if None, defaults to 1500)
         height: Output height in pixels (if None, defaults to 1500)
         dpi: Resolution for saved image (default: 150)
         stop_at_move: Optional move number to stop at (0-indexed)
+        bg_color: Background color in #RRGGBB or #RRGGBBAA format (default: #F5E6D3)
 
     Width/Height behavior:
         - Both None: Use default (1500x1500 pixels at 150 DPI = 10x10 inches)
@@ -564,7 +647,7 @@ def render_board_from_notation(
     board = execute_notation_sequence(notation_input, stop_at_move=stop_at_move)
 
     # Create renderer
-    renderer = DiagramRenderer(show_coords=show_coords, show_removed=show_removed)
+    renderer = DiagramRenderer(show_coords=show_coords, edge_coords=edge_coords, show_removed=show_removed, bg_color=bg_color)
 
     # Save or show
     if output_path:

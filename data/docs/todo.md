@@ -429,6 +429,25 @@ policy = PolicyHead(combined)
   - Low technical debt, minimal duplication, well-tested
 - **Recommendations Identified**: See "Architecture Recommendations" section below
 
+## README Missing or Incomplete Sections:
+
+  1. Python Version Requirements - Installation section doesn't specify required Python version
+  2. Programmatic/API Usage - README only shows command-line usage, but doesn't show how to use the game as a library (creating games, accessing state, implementing custom players)
+  3. ML Integration Examples - While state representation is documented, there's no example code showing how to actually use it for ML training
+  4. Captured Marble Rules - Game Mechanics doesn't explain that players MUST use their captured marble pool when the general supply is empty (important game rule)
+  5. Action Space Details - The action system mentions formats but doesn't clearly document the numpy array shapes for placement (3 × width² × (width²+1)) and capture (6 × width × width) actions
+  6. Loop Detection Mechanics - Win Conditions mentions "loop detection" but doesn't explain the k=2 move-pairs mechanism
+  7. Immobilization/Auto-Pass - Doesn't explain that players automatically pass when they have no valid moves
+  8. License - Currently a placeholder "[Add license information]"
+  9. Contributing Guidelines - Currently a placeholder "[Add contribution guidelines]"
+  10. Troubleshooting/FAQ - No section for common issues
+
+  Would you like me to add any of these sections? The most valuable additions would likely be:
+  - Programmatic Usage section with code examples
+  - ML Integration Examples
+  - Python version requirements
+  - Complete game mechanics details (captured marbles, loop detection, immobilization)
+
 ## Andrew's notes (DO NOT DELETE)
 - Add unit tests for tagging system.
 - Allow board to be rotated around its geometric center round an axis perpendicular to the board.
@@ -439,3 +458,4 @@ policy = PolicyHead(combined)
 - ✅ Extract highlight state machine into its own module - COMPLETED: ActionVisualizationSequencer class in renderer/panda3d/action_sequencer.py handles all multi-phase highlighting sequences (tests still TODO)
 - Extract out game configurator (e.g. number of rings/marbles, win conditions, etc.)
 - Look for examples of technical debt.
+- Edge ring stuff - simpler to add all rings to collection and just check that rather that just add edge rings and if switch.

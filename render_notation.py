@@ -46,7 +46,13 @@ def main():
     parser.add_argument(
         "--coords",
         action="store_true",
-        help="Show coordinate labels on rings"
+        help="Show coordinate labels on all rings"
+    )
+
+    parser.add_argument(
+        "--edge-coords",
+        action="store_true",
+        help="Show coordinate labels on top/bottom edge rings only"
     )
 
     parser.add_argument(
@@ -85,6 +91,11 @@ def main():
         help="Stop at this move number (0-indexed)"
     )
 
+    parser.add_argument(
+        "--bg-color",
+        help="Background color in #RRGGBB or #RRGGBBAA format (default: #F5E6D3)"
+    )
+
     args = parser.parse_args()
 
     # Convert notation to Path if it's a file
@@ -102,12 +113,14 @@ def main():
             output_path=args.output,
             show=args.show,
             show_coords=args.coords,
+            edge_coords=args.edge_coords,
             show_removed=args.show_removed,
             title=args.title,
             width=args.width,
             height=args.height,
             dpi=args.dpi,
             stop_at_move=args.stop_at,
+            bg_color=args.bg_color,
         )
 
         if args.output:

@@ -173,7 +173,7 @@ class ZertzPositionCollection:
 
     def get_by_label(self, label: str) -> ZertzPosition | None:
         self.ensure()
-        return self._by_label.get(label)
+        return self._by_label.get(label.upper())
 
     def get_by_axial(self, axial: Tuple[int, int]) -> ZertzPosition | None:
         self.ensure()
