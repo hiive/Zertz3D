@@ -104,7 +104,7 @@ Zertz3D/
 │   ├── render_data.py             # Data transfer objects
 │   ├── constants.py               # Global constants
 │   └── materials_modifiers.py     # Material definitions
-├── tests/                          # Test suite (551 tests)
+├── tests/                          # Test suite
 │   ├── test_notation.py           # Notation system tests
 │   ├── test_win_conditions.py     # Win detection tests
 │   ├── test_pass_and_loops.py     # Pass/loop mechanics
@@ -255,7 +255,7 @@ Board size is automatically detected from coordinates in the replay file.
 
 ### Testing
 
-The project includes a comprehensive test suite with **551 tests** covering game logic, notation systems, and board mechanics across all supported board sizes.
+The project includes a comprehensive test suite covering game logic, notation systems, and board mechanics across all supported board sizes.
 
 Run tests with pytest:
 
@@ -309,16 +309,11 @@ uv run pytest --cov=game --cov=controller --cov=shared --cov-report=html tests/
 
 ## Dependencies
 
-Key dependencies:
-- Panda3D 1.10.15 - 3D rendering engine
-- NumPy 2.3.3 - Game state arrays and calculations
-- PyTorch 2.8.0 - For ML/AI integration
-
 See `pyproject.toml` for complete dependency list.
 
 ## License
 
-GNU Affero General Public License v3.0	[AGPL-3.0]
+[GNU Affero General Public License v3.0](LICENSE)
 
 ## Contributing
 
