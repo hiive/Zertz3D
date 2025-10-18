@@ -90,6 +90,11 @@ def main() -> None:
         default=0.0,
         help="Delay before first move in seconds (Panda renderer only, default: 0)",
     )
+    parser.add_argument(
+        "--stats",
+        action="store_true",
+        help="Track and report statistics for each game",
+    )
     args = parser.parse_args()
 
     factory = ZertzFactory()
@@ -110,9 +115,15 @@ def main() -> None:
         move_duration=args.move_duration,
         human_players=(1,) if args.human else None,
         start_delay=args.start_delay,
+        track_statistics=args.stats,
     )
     controller.run()
+
+    # Print timing statistics if enabled
+    if args.stats:
+        controller.print_statistics()
 
 
 if __name__ == "__main__":
     main()
+

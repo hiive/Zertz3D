@@ -55,7 +55,7 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
     canonical_counts = defaultdict(int)  # canonical_key -> count
     canonical_first_seen = {}  # canonical_key -> move_num
     canonical_to_id = {}  # canonical_key -> sequential ID
-    move_info = []  # List of (move_num, original_state, canonical_state, transform, original_board)
+    move_info = []  # List of (move_num, original_state, canonical_state, transform, inverse, original_board)
 
     # Prepare output directory if saving images
     if save_images:
@@ -78,7 +78,7 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
 
         # Get states
         original_state = board.state.copy()
-        canonical_state, transform, _ = board.canonicalize_state()
+        canonical_state, transform, inverse = board.canonicalize_state()
 
         # Track canonical state
         canonical_key = state_to_key(canonical_state)
@@ -89,7 +89,7 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
             canonical_to_id[canonical_key] = len(canonical_to_id) + 1
 
         # Store for later display
-        move_info.append((move_num, original_state, canonical_state, transform, board))
+        move_info.append((move_num, original_state, canonical_state, transform, inverse, board))
 
     print(f"Total states analyzed: {len(move_info)}")
     print(f"Unique canonical states: {len(canonical_counts)}")
@@ -106,7 +106,7 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
         seed_dir.mkdir(exist_ok=True)
         print(f"Saving visualizations to {seed_dir}/")
 
-    for move_num, original_state, canonical_state, transform, board in move_info:
+    for move_num, original_state, canonical_state, transform, inverse, board in move_info:
         is_canonical = np.array_equal(original_state, canonical_state)
         canonical_key = state_to_key(canonical_state)
         canonical_id = canonical_to_id[canonical_key]
@@ -122,7 +122,13 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
             images_to_concat = []
             temp_files = []
 
-            # 1. Canonical state (left-most)
+            # 1. Original state (left-most)
+            tmp_orig = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            temp_files.append(tmp_orig.name)
+            renderer.save_board(board, tmp_orig.name, title=f"Original ({inverse})", width=512)
+            images_to_concat.append(Image.open(tmp_orig.name))
+
+            # 2. Canonical state
             tmp_canon = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
             temp_files.append(tmp_canon.name)
             canonical_board = ZertzBoard(loader.detected_rings)
@@ -130,21 +136,15 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
             renderer.save_board(canonical_board, tmp_canon.name, title=f"Canonical (R0)", width=512)
             images_to_concat.append(Image.open(tmp_canon.name))
 
-            # 2. Original state
-            tmp_orig = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            temp_files.append(tmp_orig.name)
-            renderer.save_board(board, tmp_orig.name, title=f"Original ({transform})", width=512)
-            images_to_concat.append(Image.open(tmp_orig.name))
-
             # 3. Optionally add all other unique transformations
             if show_all_transforms:
-                # Get all unique transformations of the original state
+                # Get all unique transformations of the canonical state
                 all_transforms = board.canonicalizer.get_all_transformations(
-                    state=original_state,
+                    state=canonical_state,
                     include_translation=False
                 )
 
-                # Filter out canonical and original (which is identity if already canonical)
+                # Filter out canonical and original
                 original_key = state_to_key(original_state)
                 canonical_key = state_to_key(canonical_state)
 
@@ -220,7 +220,7 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
         # Get the board for this canonical state to count permutations
         # Find a move that has this canonical state
         num_permutations = 0
-        for move_num, original_state, canonical_state, transform, board in move_info:
+        for move_num, original_state, canonical_state, transform, inverse, board in move_info:
             if state_to_key(canonical_state) == canonical_key:
                 # Count all valid transformations of this canonical state
                 all_transforms = board.canonicalizer.get_all_transformations(
