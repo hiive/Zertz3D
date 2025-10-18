@@ -459,3 +459,4 @@ policy = PolicyHead(combined)
 - Extract out game configurator (e.g. number of rings/marbles, win conditions, etc.)
 - Look for examples of technical debt.
 - Edge ring stuff - simpler to add all rings to collection and just check that rather that just add edge rings and if switch.
+- Check if get_all_permutations also includes all possible translations? (Even if they are eliminated via grouping.) 

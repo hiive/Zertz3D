@@ -2,6 +2,7 @@ from collections import deque
 import numpy as np
 
 from game.zertz_position import ZertzPosition, ZertzPositionCollection
+from game.utils.canonicalization import TransformFlags, CanonicalizationManager
 
 
 class ZertzBoard:
@@ -247,6 +248,9 @@ class ZertzBoard:
 
         # Position cache manager (built lazily)
         self.positions = ZertzPositionCollection(self)
+
+        # Canonicalization manager for state transformations
+        self.canonicalizer = CanonicalizationManager(self)
 
         if clone is not None:
             self.rings = clone.rings
@@ -1248,24 +1252,179 @@ class ZertzBoard:
         masked = (state[self.BOARD_LAYERS] * self.board_layout).astype(np.uint8)
         return masked.tobytes()
 
-    def canonicalize_state(self):
+    # ======================  TRANSLATION CANONICALIZATION  ==================
+
+    def _get_bounding_box(self, state=None):
+        """Find bounding box of all remaining rings.
+
+        Returns:
+            tuple: (min_y, max_y, min_x, max_x) or None if no rings exist
+        """
+        if state is None:
+            state = self.state
+
+        # Find all positions with rings
+        ring_positions = np.where(state[self.RING_LAYER] == 1)
+
+        if len(ring_positions[0]) == 0:
+            return None  # No rings remaining
+
+        min_y, max_y = ring_positions[0].min(), ring_positions[0].max()
+        min_x, max_x = ring_positions[1].min(), ring_positions[1].max()
+
+        return (min_y, max_y, min_x, max_x)
+
+    def _translate_state(self, state, dy, dx):
+        """Translate state by (dy, dx) offset.
+
+        Only translates ring and marble data (BOARD_LAYERS), preserving layout validity.
+        Returns translated state if valid, None otherwise.
+        """
+        out = np.zeros_like(state)
+
+        # Translate each position
+        for y in range(self.width):
+            for x in range(self.width):
+                # Check if source position has a ring
+                if state[self.RING_LAYER, y, x] == 0:
+                    continue
+
+                # Calculate destination
+                new_y, new_x = y + dy, x + dx
+
+                # Check if destination is valid on the board layout
+                if not (0 <= new_y < self.width and 0 <= new_x < self.width):
+                    return None  # Translation would move rings off-board
+
+                if self.board_layout is not None and not self.board_layout[new_y, new_x]:
+                    return None  # Destination not valid in board layout
+
+                # Copy all board layers (ring + marbles)
+                out[self.BOARD_LAYERS, new_y, new_x] = state[self.BOARD_LAYERS, y, x]
+
+        # Copy history and capture layers unchanged
+        # BOARD_LAYERS is slice(0, 4), so it covers 4 layers
+        num_board_layers = self.BOARD_LAYERS.stop
+        if state.shape[0] > num_board_layers:
+            out[num_board_layers:] = state[num_board_layers:]
+
+        return out
+
+    def _get_all_translations(self, state=None):
+        """Generate all valid translation offsets for current board state.
+
+        Returns:
+            list: List of (name, dy, dx) tuples for valid translations
+        """
+        if state is None:
+            state = self.state
+
+        bbox = self._get_bounding_box(state)
+        if bbox is None:
+            return [("T0,0", 0, 0)]  # No rings, identity only
+
+        min_y, max_y, min_x, max_x = bbox
+
+        translations = []
+
+        # Try all possible translations that might keep rings on board
+        # Limit search to reasonable bounds
+        for dy in range(-min_y, self.width - max_y):
+            for dx in range(-min_x, self.width - max_x):
+                # Test if this translation is valid
+                translated = self._translate_state(state, dy, dx)
+                if translated is not None:
+                    translations.append((f"T{dy},{dx}", dy, dx))
+
+        return translations
+
+    def canonicalize_state(self, transforms=TransformFlags.ALL):
         """
         Return (canonical_state, transform_name, inverse_name).
-        - transform_name is the symmetry that was applied to reach canonical.
-        - inverse_name is what to apply to map policy logits back to original.
+
+        Finds the lexicographically smallest representation among all enabled symmetry
+        transformations. Transformations are applied in order: translation, then rotation/mirror.
+
+        Args:
+            transforms: TransformFlags specifying which transforms to use (default: ALL)
+
+        Returns:
+            tuple: (canonical_state, transform_name, inverse_name)
+                - canonical_state: The transformed state with minimum lexicographic key
+                - transform_name: Name of transform applied (e.g., "T2,1_MR120", "R60", "T1,-1")
+                - inverse_name: Inverse transform to map back to original orientation
         """
         best_name = "R0"
         best_state = np.copy(self.state)
         best_key = self._canonical_key(best_state)
 
-        for name, fn in self._get_all_symmetry_transforms():
-            s2 = fn(self.state)
-            key = self._canonical_key(s2)
-            if key < best_key:
-                best_key, best_state, best_name = key, s2, name
+        # Build list of transform combinations based on flags
+        transform_ops = []
+
+        # Get rotation/mirror transforms if enabled
+        if transforms & (TransformFlags.ROTATION | TransformFlags.MIRROR):
+            rot_mirror_ops = []
+            for name, fn in self._get_all_symmetry_transforms():
+                # Filter based on flags
+                if name.startswith("R") and not name.startswith("MR"):
+                    # Pure rotation or mirror-then-rotate (R{k} or R{k}M)
+                    if transforms & TransformFlags.ROTATION:
+                        if "M" in name:
+                            # R{k}M requires both rotation and mirror
+                            if transforms & TransformFlags.MIRROR:
+                                rot_mirror_ops.append((name, fn))
+                        else:
+                            # Pure rotation
+                            rot_mirror_ops.append((name, fn))
+                elif name.startswith("MR"):
+                    # Rotate-then-mirror (MR{k})
+                    if (transforms & TransformFlags.ROTATION) and (transforms & TransformFlags.MIRROR):
+                        rot_mirror_ops.append((name, fn))
+        else:
+            # No rotation/mirror, just identity
+            rot_mirror_ops = [("R0", lambda s: s)]
+
+        # Get translation transforms if enabled
+        if transforms & TransformFlags.TRANSLATION:
+            translation_ops = self._get_all_translations(self.state)
+        else:
+            # No translation, just identity
+            translation_ops = [("T0,0", 0, 0)]
+
+        # Combine: translate FIRST, then rotate/mirror
+        for trans_name, dy, dx in translation_ops:
+            # Apply translation
+            if dy == 0 and dx == 0:
+                translated = self.state
+            else:
+                translated = self._translate_state(self.state, dy, dx)
+                if translated is None:
+                    continue  # Invalid translation
+
+            # Then apply each rotation/mirror to the translated state
+            for rot_mirror_name, rot_mirror_fn in rot_mirror_ops:
+                transformed = rot_mirror_fn(translated)
+
+                # Compute canonical key
+                key = self._canonical_key(transformed)
+
+                # Update best if this is lexicographically smaller
+                if key < best_key:
+                    # Combine transform names
+                    if trans_name == "T0,0" and rot_mirror_name == "R0":
+                        combined_name = "R0"  # Identity
+                    elif trans_name == "T0,0":
+                        combined_name = rot_mirror_name
+                    elif rot_mirror_name == "R0":
+                        combined_name = trans_name
+                    else:
+                        combined_name = f"{trans_name}_{rot_mirror_name}"
+
+                    best_key = key
+                    best_state = transformed
+                    best_name = combined_name
 
         inv = self._get_inverse_transform(best_name)
-
         return best_state, best_name, inv
 
     # ======================  ACTION / MASK TRANSFORMERS  ===================
@@ -1273,21 +1432,58 @@ class ZertzBoard:
         """
         Get the inverse of a symmetry transform.
 
-        For hex boards with D6 symmetry (37, 61 rings): 18 total (6 rot + 6 MR + 6 RM)
-        For boards with D3 symmetry (48 rings): 9 total (3 rot + 3 MR + 3 RM)
+        Supports combined transforms with translation:
+        - "T{dy},{dx}_{rot_mirror}" → "{inv_rot_mirror}_T{-dy},{-dx}"
+        - "T{dy},{dx}" → "T{-dy},{-dx}"
+        - Pure rotation/mirror uses existing inversion rules
 
-        Inverse relationships:
+        Inverse relationships (rotation/mirror only):
         - R(k)⁻¹ = R(-k mod 360°)
         - MR(k)⁻¹ = R(-k mod 360°)M  (rotate-then-mirror inverts to mirror-then-rotate)
         - R(k)M⁻¹ = MR(-k mod 360°)  (mirror-then-rotate inverts to rotate-then-mirror)
 
+        Inverse relationships (combined):
+        - (T ∘ R)⁻¹ = R⁻¹ ∘ T⁻¹  (apply inverses in reverse order)
+
         Args:
-            transform_name: String like "R60", "MR120", "R240M", etc.
+            transform_name: String like "R60", "MR120", "R240M", "T2,1", "T1,-1_MR120"
 
         Returns:
             String naming the inverse transform
         """
-        if transform_name.endswith("M") and not transform_name.startswith("MR"):
+        # Check for combined transform (translation + rotation/mirror)
+        if "_" in transform_name:
+            # Combined transform: "T{dy},{dx}_{rot_mirror}"
+            parts = transform_name.split("_")
+            if len(parts) != 2:
+                raise ValueError(f"Invalid combined transform format: {transform_name}")
+
+            trans_part, rot_mirror_part = parts
+
+            # Invert translation: T{dy},{dx} → T{-dy},{-dx}
+            if not trans_part.startswith("T"):
+                raise ValueError(f"Expected translation in combined transform: {transform_name}")
+
+            # Extract dy, dx from "T{dy},{dx}"
+            coords = trans_part[1:]  # Remove "T"
+            dy, dx = map(int, coords.split(","))
+            inv_trans = f"T{-dy},{-dx}"
+
+            # Invert rotation/mirror part
+            inv_rot_mirror = self._get_inverse_transform(rot_mirror_part)
+
+            # Combine in reverse order: rot_mirror_inv _ trans_inv
+            return f"{inv_rot_mirror}_{inv_trans}"
+
+        # Translation-only transform
+        elif transform_name.startswith("T"):
+            # Extract dy, dx from "T{dy},{dx}"
+            coords = transform_name[1:]  # Remove "T"
+            dy, dx = map(int, coords.split(","))
+            return f"T{-dy},{-dx}"
+
+        # Rotation/mirror-only transforms (existing logic)
+        elif transform_name.endswith("M") and not transform_name.startswith("MR"):
             # R{k}M (mirror-then-rotate): inverse is MR{-k} (rotate-then-mirror)
             # Extract angle from name (e.g., "R120M" -> 120)
             angle = int(transform_name[1:-1])  # Strip "R" and "M"

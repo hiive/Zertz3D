@@ -18,8 +18,10 @@ Example usage:
     render_board_from_notation(
         "game.txt",
         output_path="board.png",
-        show_coords=True,
-        size=(1200, 1200),
+        internal_coords=True,
+        edge_coords=True,
+        width=1200,
+        height=1200,
         title="Final Position"
     )
 """
@@ -71,14 +73,19 @@ class DiagramRenderer:
 
     BACKGROUND_COLOR = "#F5E6D3"  # Light beige background
 
-    def __init__(self, show_coords: bool = False, edge_coords: bool = False, show_removed: bool = False, bg_color: Optional[str] = None):
+    def __init__(self, internal_coords: bool = False, edge_coords: bool = False, show_removed: bool = False, bg_color: Optional[str] = None):
         """Initialize board renderer.
 
         Args:
-            show_coords: If True, display coordinate labels on all rings
-            edge_coords: If True, display coordinate labels on top/bottom edge rings only
+            internal_coords: If True, display coordinate labels centered on rings
+            edge_coords: If True, display coordinate labels at top/bottom edges of columns
             show_removed: If True, show removed rings with transparency
             bg_color: Background color in #RRGGBB or #RRGGBBAA format (default: #F5E6D3)
+
+        Note:
+            internal_coords and edge_coords can both be enabled simultaneously.
+            When both are enabled, edge positions show edge coords (outside the ring),
+            while non-edge positions show internal coords (centered on ring).
         """
         if not MATPLOTLIB_AVAILABLE:
             raise ImportError(
@@ -86,7 +93,7 @@ class DiagramRenderer:
                 "Install it with: pip install matplotlib"
             )
 
-        self.show_coords = show_coords
+        self.internal_coords = internal_coords
         self.edge_coords = edge_coords
         self.show_removed = show_removed
         self.bg_color = bg_color if bg_color is not None else self.BACKGROUND_COLOR
@@ -161,30 +168,36 @@ class DiagramRenderer:
         self,
         board: ZertzBoard,
         title: Optional[str] = None,
-        figsize: tuple[int, int] = (10, 10),
+        width: int = 1024,
+        height: int = 1024,
     ) -> plt.Figure:
         """Render a board state as a matplotlib figure.
 
         Args:
             board: ZertzBoard instance to render
             title: Optional title for the figure
-            figsize: Figure size in inches (width, height)
+            width: Figure width in pixels (default: 1024)
+            height: Figure height in pixels (default: 1024)
 
         Returns:
             matplotlib Figure object
         """
+        # Convert pixels to inches for matplotlib (using DPI=100)
+        DPI = 100
+        figsize = (width / DPI, height / DPI)
+
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_aspect('equal')
         ax.set_facecolor(self.bg_color)
         fig.patch.set_facecolor(self.bg_color)
 
         # Get board dimensions
-        width = board.width
+        board_width = board.width
 
         # Calculate scale factor for line widths based on figure size
-        # Default is 10x10 inches, scale linewidths proportionally
-        default_size = 10.0
-        scale_factor = figsize[0] / default_size
+        # Default is 1024 pixels, scale linewidths proportionally
+        default_size = 1024.0
+        scale_factor = width / default_size
 
         # Collect patches for rings and marbles, and text labels
         ring_patches = []
@@ -196,8 +209,8 @@ class DiagramRenderer:
         if self.edge_coords:
             # First pass: find all valid ring positions grouped by column (x)
             columns = {}  # Maps x -> list of y values
-            for y in range(width):
-                for x in range(width):
+            for y in range(board_width):
+                for x in range(board_width):
                     try:
                         if board.letter_layout is not None and board.letter_layout[y][x]:
                             if x not in columns:
@@ -215,8 +228,8 @@ class DiagramRenderer:
                     edge_ring_positions[(max_y, x)] = 'bottom'
 
         # Iterate through board positions
-        for y in range(width):
-            for x in range(width):
+        for y in range(board_width):
+            for x in range(board_width):
                 # Get position string (empty if not a valid board position)
                 pos_str = ""
                 try:
@@ -232,7 +245,7 @@ class DiagramRenderer:
                     continue
 
                 # Get hexagonal position
-                px, py = self._get_hex_position(y, x, width)
+                px, py = self._get_hex_position(y, x, board_width)
 
                 # Draw ring as circle (if exists or show_removed is True)
                 if ring_exists or self.show_removed:
@@ -287,15 +300,12 @@ class DiagramRenderer:
                 # Use white text on gray/black marbles, black text otherwise
 
                 # Check if we should show this coordinate
+                # Edge coords take precedence over internal coords at edge positions
                 show_this_coord = False
                 edge_position = None
 
-                if self.show_coords and ring_exists:
-                    # Show all coords, centered on ring
-                    show_this_coord = True
-                    va = 'center'
-                elif self.edge_coords and (y, x) in edge_ring_positions:
-                    # Show edge coords even if ring is removed
+                if self.edge_coords and (y, x) in edge_ring_positions:
+                    # Show edge coords at top/bottom of columns
                     show_this_coord = True
                     edge_position = edge_ring_positions[(y, x)]
                     if edge_position == 'top':
@@ -304,6 +314,10 @@ class DiagramRenderer:
                     else:  # 'bottom'
                         va = 'top'  # Position label below ring (text top aligns to point below ring)
                         label_py = py - self.RING_RADIUS * 1.3  # Position below ring
+                elif self.internal_coords and ring_exists:
+                    # Show internal coords, centered on ring
+                    show_this_coord = True
+                    va = 'center'
 
                 if show_this_coord:
                     if edge_position:
@@ -337,11 +351,11 @@ class DiagramRenderer:
         # This ensures consistent image sizes across different board states
         all_x_coords = []
         all_y_coords = []
-        for y in range(width):
-            for x in range(width):
+        for y in range(board_width):
+            for x in range(board_width):
                 try:
                     if board.letter_layout is not None and board.letter_layout[y][x]:
-                        px, py = self._get_hex_position(y, x, width)
+                        px, py = self._get_hex_position(y, x, board_width)
                         all_x_coords.append(px)
                         all_y_coords.append(py)
                 except IndexError:
@@ -376,8 +390,8 @@ class DiagramRenderer:
         board: ZertzBoard,
         output_path: Union[str, Path],
         title: Optional[str] = None,
-        figsize: tuple[int, int] = (10, 10),
-        dpi: int = 150,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
     ) -> None:
         """Render and save a board state to a file.
 
@@ -385,19 +399,35 @@ class DiagramRenderer:
             board: ZertzBoard instance to render
             output_path: Path to save the image (PNG/SVG supported)
             title: Optional title for the figure
-            figsize: Figure size in inches (width, height)
-            dpi: Resolution in dots per inch (for raster formats like PNG)
+            width: Figure width in pixels (if None, defaults to 1024 or matches height)
+            height: Figure height in pixels (if None, defaults to 1024 or matches width)
         """
-        fig = self.render_board(board, title=title, figsize=figsize)
+        # Handle optional width/height - default to 1024, or match the provided dimension
+        default_pixels = 1024
+        if width is None and height is None:
+            output_width = default_pixels
+            output_height = default_pixels
+        elif width is not None and height is None:
+            output_width = width
+            output_height = width
+        elif width is None and height is not None:
+            output_width = height
+            output_height = height
+        else:
+            output_width = width
+            output_height = height
+
+        fig = self.render_board(board, title=title, width=output_width, height=output_height)
 
         # Detect format from extension - matplotlib handles SVG natively
+        # Use fixed DPI=100 internally for saving
         output_path = Path(output_path)
         if output_path.suffix.lower() == '.svg':
-            # SVG is vector format - no DPI needed, but include for text sizing
+            # SVG is vector format - no DPI needed
             fig.savefig(output_path, format='svg', bbox_inches='tight', facecolor=fig.get_facecolor())
         else:
             # Raster formats (PNG, JPG, etc.) use DPI
-            fig.savefig(output_path, dpi=dpi, bbox_inches='tight', facecolor=fig.get_facecolor())
+            fig.savefig(output_path, dpi=100, bbox_inches='tight', facecolor=fig.get_facecolor())
 
         plt.close(fig)
 
@@ -405,16 +435,33 @@ class DiagramRenderer:
         self,
         board: ZertzBoard,
         title: Optional[str] = None,
-        figsize: tuple[int, int] = (10, 10),
+        width: Optional[int] = None,
+        height: Optional[int] = None,
     ) -> None:
         """Render and display a board state on screen.
 
         Args:
             board: ZertzBoard instance to render
             title: Optional title for the figure
-            figsize: Figure size in inches (width, height)
+            width: Figure width in pixels (if None, defaults to 1024 or matches height)
+            height: Figure height in pixels (if None, defaults to 1024 or matches width)
         """
-        fig = self.render_board(board, title=title, figsize=figsize)
+        # Handle optional width/height - default to 1024, or match the provided dimension
+        default_pixels = 1024
+        if width is None and height is None:
+            output_width = default_pixels
+            output_height = default_pixels
+        elif width is not None and height is None:
+            output_width = width
+            output_height = width
+        elif width is None and height is not None:
+            output_width = height
+            output_height = height
+        else:
+            output_width = width
+            output_height = height
+
+        fig = self.render_board(board, title=title, width=output_width, height=output_height)
         plt.show()
 
 
@@ -569,7 +616,7 @@ def render_board_from_notation(
     notation_input: Union[str, Path],
     output_path: Optional[Union[str, Path]] = None,
     show: bool = False,
-    show_coords: bool = True,
+    internal_coords: bool = True,
     edge_coords: bool = False,
     show_removed: bool = False,
     title: Optional[str] = None,
@@ -588,27 +635,27 @@ def render_board_from_notation(
         notation_input: Either a file path or a notation string
         output_path: Optional path to save the image (PNG recommended)
         show: If True, display the image on screen
-        show_coords: If True, display coordinate labels on all rings
-        edge_coords: If True, display coordinate labels on top/bottom edge rings only
+        internal_coords: If True, display coordinate labels centered on rings
+        edge_coords: If True, display coordinate labels at top/bottom edges of columns
         show_removed: If True, show removed rings with transparency
         title: Optional title for the figure
-        width: Output width in pixels (if None, defaults to 1500)
-        height: Output height in pixels (if None, defaults to 1500)
-        dpi: Resolution for saved image (default: 150)
+        width: Output width in pixels (if None, defaults to 1024)
+        height: Output height in pixels (if None, defaults to 1024)
+        dpi: DEPRECATED - kept for backward compatibility but ignored (fixed at 100 internally)
         stop_at_move: Optional move number to stop at (0-indexed)
         bg_color: Background color in #RRGGBB or #RRGGBBAA format (default: #F5E6D3)
 
     Width/Height behavior:
-        - Both None: Use default (1500x1500 pixels at 150 DPI = 10x10 inches)
-        - Width only: Calculate height to maintain aspect ratio
-        - Height only: Calculate width to maintain aspect ratio
-        - Both specified: Use both (may distort aspect ratio)
+        - Both None: Use default (1024x1024 pixels)
+        - Width only: Height set to match width (square image)
+        - Height only: Width set to match height (square image)
+        - Both specified: Use both (may distort aspect ratio if not equal)
 
     Example:
-        # From file, save to PNG with default size (1500x1500 pixels)
+        # From file, save to PNG with default size (1024x1024 pixels)
         render_board_from_notation("game.txt", output_path="board.png")
 
-        # Custom width in pixels (height auto-calculated)
+        # Custom width in pixels (height auto-set to match)
         render_board_from_notation("game.txt", output_path="board.png", width=1200)
 
         # Custom dimensions in pixels
@@ -621,41 +668,39 @@ def render_board_from_notation(
         # Stop at specific move
         render_board_from_notation("game.txt", output_path="move_10.png", stop_at_move=10)
     """
-    # Calculate figsize based on width/height parameters (convert pixels to inches)
-    default_pixels = 1500  # Default: 10 inches * 150 DPI
+    # Convert to pixel dimensions (DPI parameter is deprecated but kept for compatibility)
+    default_pixels = 1024
 
     if width is None and height is None:
         # Both omitted: use defaults
-        width_inches = default_pixels / dpi
-        height_inches = default_pixels / dpi
-        figsize = (width_inches, height_inches)
+        output_width = default_pixels
+        output_height = default_pixels
     elif width is not None and height is None:
         # Width only: maintain aspect ratio (board is square)
-        width_inches = width / dpi
-        figsize = (width_inches, width_inches)
+        output_width = width
+        output_height = width
     elif width is None and height is not None:
         # Height only: maintain aspect ratio (board is square)
-        height_inches = height / dpi
-        figsize = (height_inches, height_inches)
+        output_width = height
+        output_height = height
     else:
         # Both specified: use as-is
-        width_inches = width / dpi
-        height_inches = height / dpi
-        figsize = (width_inches, height_inches)
+        output_width = width
+        output_height = height
 
     # Execute notation to get board state
     board = execute_notation_sequence(notation_input, stop_at_move=stop_at_move)
 
     # Create renderer
-    renderer = DiagramRenderer(show_coords=show_coords, edge_coords=edge_coords, show_removed=show_removed, bg_color=bg_color)
+    renderer = DiagramRenderer(internal_coords=internal_coords, edge_coords=edge_coords, show_removed=show_removed, bg_color=bg_color)
 
     # Save or show
     if output_path:
-        renderer.save_board(board, output_path, title=title, figsize=figsize, dpi=dpi)
+        renderer.save_board(board, output_path, title=title, width=output_width, height=output_height)
 
     if show:
-        renderer.show_board(board, title=title, figsize=figsize)
+        renderer.show_board(board, title=title, width=output_width, height=output_height)
 
     if not output_path and not show:
         # Default to showing if no output specified
-        renderer.show_board(board, title=title, figsize=figsize)
+        renderer.show_board(board, title=title, width=output_width, height=output_height)

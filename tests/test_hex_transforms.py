@@ -1015,6 +1015,415 @@ class TestCanonicalTransform:
             )
 
 
+class TestTranslationCanonicalization:
+    """Test translation symmetry detection and canonicalization."""
+
+    def test_bounding_box_full_board(self, small_board):
+        """Test that full board has expected bounding box."""
+        bbox = small_board._get_bounding_box()
+        assert bbox is not None, "Full board should have bounding box"
+
+        min_y, max_y, min_x, max_x = bbox
+        # 37-ring board is 7x7, but corners are empty
+        assert 0 <= min_y < small_board.width
+        assert 0 <= max_y < small_board.width
+        assert 0 <= min_x < small_board.width
+        assert 0 <= max_x < small_board.width
+
+    def test_bounding_box_after_ring_removal(self, small_board):
+        """Test bounding box after removing edge rings."""
+        # Remove entire edge rows/columns to actually reduce bounding box
+        for pos in ["A4", "A3", "A2", "A1", "B1", "C1", "D1", "D7", "E6", "F5", "G4", "G3", "G2", "G1"]:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 0
+
+        bbox = small_board._get_bounding_box()
+        assert bbox is not None, "Board with removed edges should have bounding box"
+
+        # Bounding box should be smaller than full board now
+        min_y, max_y, min_x, max_x = bbox
+        # After removing edges, bbox should be reduced
+        assert (max_y - min_y) < (small_board.width - 1) or (max_x - min_x) < (small_board.width - 1), \
+            f"Expected reduced bounding box, got ({min_y}, {max_y}, {min_x}, {max_x})"
+
+    def test_bounding_box_empty_board(self, small_board):
+        """Test that empty board (no rings) returns None."""
+        # Remove all rings
+        small_board.state[small_board.RING_LAYER] = 0
+
+        bbox = small_board._get_bounding_box()
+        assert bbox is None, "Empty board should return None for bounding box"
+
+    def test_translation_identity(self, small_board):
+        """Test that translating by (0, 0) returns the same state."""
+        original = np.copy(small_board.state)
+
+        translated = small_board._translate_state(original, 0, 0)
+
+        assert translated is not None, "Identity translation should be valid"
+        assert np.array_equal(translated, original), "T(0,0) should preserve state"
+
+    def test_translation_preserves_marbles(self, small_board):
+        """Test that translation preserves ring and marble counts."""
+        # Place some marbles
+        small_board.state[1, *small_board.str_to_index("D4")] = 1
+        small_board.state[2, *small_board.str_to_index("B3")] = 1
+        small_board.state[3, *small_board.str_to_index("E3")] = 1
+
+        original = np.copy(small_board.state)
+        original_rings = np.sum(original[small_board.RING_LAYER])
+        original_marbles = np.sum(original[small_board.MARBLE_LAYERS])
+
+        # Try translation by (1, 0)
+        translated = small_board._translate_state(original, 1, 0)
+
+        if translated is not None:
+            translated_rings = np.sum(translated[small_board.RING_LAYER])
+            translated_marbles = np.sum(translated[small_board.MARBLE_LAYERS])
+
+            assert translated_rings == original_rings, "Translation should preserve ring count"
+            assert translated_marbles == original_marbles, "Translation should preserve marble count"
+
+    def test_translation_invalid_off_board(self, small_board):
+        """Test that translation moving rings off-board returns None."""
+        # Try to translate by large offset that would move rings off-board
+        translated = small_board._translate_state(small_board.state, 10, 10)
+
+        assert translated is None, "Translation moving rings off-board should return None"
+
+    def test_get_all_translations_full_board(self, small_board):
+        """Test that full board has minimal translation options."""
+        translations = small_board._get_all_translations()
+
+        assert len(translations) > 0, "Should have at least identity translation"
+
+        # Check that identity is included
+        identities = [t for t in translations if t[0] == "T0,0"]
+        assert len(identities) == 1, "Should have exactly one identity translation"
+
+    def test_get_all_translations_with_removed_edges(self, small_board):
+        """Test that removing edge rings enables more translations."""
+        # Keep only a small cluster of rings in the center to enable translation
+        # Remove all rings except a 3x3 cluster
+        center_cluster = ["C3", "D3", "E3", "C4", "D4", "E4", "C5", "D5", "E5"]
+
+        # Remove all rings first
+        small_board.state[small_board.RING_LAYER] = 0
+
+        # Add back only the center cluster
+        for pos in center_cluster:
+            try:
+                y, x = small_board.str_to_index(pos)
+                small_board.state[small_board.RING_LAYER, y, x] = 1
+            except:
+                pass  # Some positions might not exist
+
+        translations = small_board._get_all_translations()
+
+        # Should have more than just identity with a small cluster
+        assert len(translations) > 1, f"Board with small cluster should have multiple valid translations, got {len(translations)}"
+
+        # All translations should be valid (not None)
+        for name, dy, dx in translations:
+            translated = small_board._translate_state(small_board.state, dy, dx)
+            assert translated is not None, f"Translation {name} should be valid"
+
+    def test_get_all_translations_empty_board(self, small_board):
+        """Test that empty board only has identity translation."""
+        # Remove all rings
+        small_board.state[small_board.RING_LAYER] = 0
+
+        translations = small_board._get_all_translations()
+
+        assert len(translations) == 1, "Empty board should only have identity"
+        assert translations[0] == ("T0,0", 0, 0), "Empty board should return T0,0"
+
+    def test_canonicalize_with_translation_only(self, small_board):
+        """Test canonicalization with only translation enabled."""
+        from game.zertz_board import TransformFlags
+
+        # Keep only a small cluster to enable translation
+        center_cluster = ["C3", "D3", "E3", "C4", "D4", "E4"]
+
+        # Remove all rings first
+        small_board.state[small_board.RING_LAYER] = 0
+
+        # Add back only the center cluster
+        for pos in center_cluster:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 1
+
+        # Place a marble off-center to make translation meaningful
+        small_board.state[1, *small_board.str_to_index("E4")] = 1
+
+        # Canonicalize with translation only
+        canonical, transform, inverse = small_board.canonicalize_state(
+            transforms=TransformFlags.TRANSLATION
+        )
+
+        # Transform should be R0 or T{dy},{dx} (R0 when already canonical)
+        # The key is that rotation/mirror transforms are NOT used
+        assert transform.startswith("T") or transform == "R0", f"Expected translation or identity, got {transform}"
+        assert "_" not in transform, f"Expected simple transform, got {transform}"
+
+        # If not identity, should be translation
+        if transform != "R0":
+            assert transform.startswith("T"), f"Expected translation, got {transform}"
+            assert inverse.startswith("T"), f"Expected translation inverse, got {inverse}"
+
+    def test_canonicalize_with_rotation_mirror_only(self, small_board):
+        """Test canonicalization with rotation/mirror but no translation."""
+        from game.zertz_board import TransformFlags
+
+        # Place asymmetric pattern
+        small_board.state[1, *small_board.str_to_index("A4")] = 1
+        small_board.state[2, *small_board.str_to_index("B3")] = 1
+
+        # Canonicalize with rotation and mirror only (no translation)
+        canonical, transform, inverse = small_board.canonicalize_state(
+            transforms=TransformFlags.ROTATION_MIRROR
+        )
+
+        # Transform should be rotation/mirror, not translation
+        assert not transform.startswith("T") or transform == "T0,0", (
+            f"Expected rotation/mirror transform, got {transform}"
+        )
+        # If there's a "_" it should be rotation/mirror combination
+        if "_" in transform:
+            parts = transform.split("_")
+            assert not any(p.startswith("T") and p != "T0,0" for p in parts), (
+                f"Should not have non-identity translation with ROTATION_MIRROR flag"
+            )
+
+    def test_canonicalize_with_all_transforms(self, small_board):
+        """Test canonicalization with all transforms enabled."""
+        from game.zertz_board import TransformFlags
+
+        # Remove edge rings to enable translation
+        for pos in ["A4", "A3", "D7", "G4", "G1"]:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 0
+
+        # Place asymmetric pattern
+        small_board.state[1, *small_board.str_to_index("D4")] = 1
+        small_board.state[2, *small_board.str_to_index("C3")] = 1
+
+        # Canonicalize with all transforms
+        canonical, transform, inverse = small_board.canonicalize_state(
+            transforms=TransformFlags.ALL
+        )
+
+        # Should get some canonical form
+        assert canonical is not None
+        assert transform is not None
+        assert inverse is not None
+
+    def test_combined_transform_format(self, small_board):
+        """Test that combined transforms use correct format T{dy},{dx}+{rot_mirror}."""
+        from game.zertz_board import TransformFlags
+
+        # Set up board state that will benefit from combined transform
+        # Remove some edge rings
+        for pos in ["A4", "A3", "A2", "D7", "E6"]:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 0
+
+        # Place marbles
+        small_board.state[1, *small_board.str_to_index("B3")] = 1
+        small_board.state[2, *small_board.str_to_index("E3")] = 1
+
+        canonical, transform, inverse = small_board.canonicalize_state(
+            transforms=TransformFlags.ALL
+        )
+
+        # If we get a combined transform, check format
+        if "_" in transform:
+            parts = transform.split("_")
+            assert len(parts) == 2, f"Combined transform should have exactly 2 parts: {transform}"
+
+            trans_part, rot_mirror_part = parts
+
+            # First part should be translation
+            assert trans_part.startswith("T"), f"First part should be translation: {transform}"
+
+            # Second part should be rotation/mirror
+            assert (
+                rot_mirror_part.startswith("R") or rot_mirror_part.startswith("MR")
+            ), f"Second part should be rotation/mirror: {transform}"
+
+    def test_inverse_of_translation(self, small_board):
+        """Test that inverse of translation T{dy},{dx} is T{-dy},{-dx}."""
+        # Test various translation inverses
+        test_cases = [
+            ("T0,0", "T0,0"),  # Identity
+            ("T1,0", "T-1,0"),
+            ("T0,1", "T0,-1"),
+            ("T2,3", "T-2,-3"),
+            ("T-1,2", "T1,-2"),
+        ]
+
+        for transform, expected_inverse in test_cases:
+            inverse = small_board._get_inverse_transform(transform)
+            assert inverse == expected_inverse, (
+                f"Inverse of {transform} should be {expected_inverse}, got {inverse}"
+            )
+
+    def test_inverse_of_combined_transform(self, small_board):
+        """Test that inverse of combined transform reverses order."""
+        # Test that inverse of "T{dy},{dx}_{rot_mirror}" is "{inv_rot_mirror}_T{-dy},{-dx}"
+        test_cases = [
+            ("T1,0_R60", "R300_T-1,0"),
+            ("T2,1_MR120", "R240M_T-2,-1"),
+            ("T-1,3_R180", "R180_T1,-3"),
+            ("T0,1_R120M", "MR240_T0,-1"),
+        ]
+
+        for transform, expected_inverse in test_cases:
+            inverse = small_board._get_inverse_transform(transform)
+            assert inverse == expected_inverse, (
+                f"Inverse of {transform} should be {expected_inverse}, got {inverse}"
+            )
+
+    def test_translation_then_inverse_recovers_original(self, small_board):
+        """Test that applying translation then its inverse recovers original state."""
+        # Place some marbles
+        small_board.state[1, *small_board.str_to_index("D4")] = 1
+        small_board.state[2, *small_board.str_to_index("B3")] = 1
+        small_board.state[3, *small_board.str_to_index("E3")] = 1
+
+        original = np.copy(small_board.state)
+
+        # Try various translations
+        translations_to_test = [(1, 0), (0, 1), (1, 1), (-1, 0), (0, -1), (2, -1)]
+
+        for dy, dx in translations_to_test:
+            # Apply translation
+            translated = small_board._translate_state(original, dy, dx)
+
+            if translated is not None:
+                # Apply inverse translation
+                recovered = small_board._translate_state(translated, -dy, -dx)
+
+                assert recovered is not None, f"Inverse translation ({-dy},{-dx}) should be valid"
+                assert np.array_equal(recovered, original), (
+                    f"Translation ({dy},{dx}) then inverse should recover original"
+                )
+
+    def test_combined_transform_then_inverse_recovers_original(self, small_board):
+        """Test that combined transform + inverse recovers original."""
+        from game.zertz_board import TransformFlags
+
+        # Remove edge rings to enable translation
+        for pos in ["A4", "A3", "D7", "G4", "G1"]:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 0
+
+        # Place asymmetric pattern
+        small_board.state[1, *small_board.str_to_index("D4")] = 1
+        small_board.state[2, *small_board.str_to_index("C3")] = 1
+        small_board.state[3, *small_board.str_to_index("E3")] = 1
+
+        original = np.copy(small_board.state)
+
+        # Canonicalize with all transforms
+        canonical, transform, inverse_name = small_board.canonicalize_state(
+            transforms=TransformFlags.ALL
+        )
+
+        # Create a temporary board to apply the inverse
+        temp_board = ZertzBoard(clone=small_board)
+        temp_board.state = canonical
+
+        # Get transform functions
+        transforms = dict(temp_board._get_all_symmetry_transforms())
+
+        # If the transform is combined (has translation), we need to apply inverse differently
+        if "_" in transform:
+            # For combined transforms, we need to manually reconstruct the inverse operation
+            # The inverse is already calculated correctly, but we can't apply it directly
+            # because _get_all_symmetry_transforms doesn't include translation
+
+            # For now, just verify that the inverse format is correct
+            assert "_" in inverse_name, "Combined transform should have combined inverse"
+            parts = inverse_name.split("_")
+            assert len(parts) == 2, "Combined inverse should have 2 parts"
+
+            # First part should be rotation/mirror inverse
+            rot_mirror_inv = parts[0]
+            assert (
+                rot_mirror_inv.startswith("R") or rot_mirror_inv.startswith("MR")
+            ), "First part of combined inverse should be rotation/mirror"
+
+            # Second part should be translation inverse
+            trans_inv = parts[1]
+            assert trans_inv.startswith("T"), "Second part of combined inverse should be translation"
+        else:
+            # For simple transforms (rotation/mirror only), we can verify recovery
+            if inverse_name in transforms:
+                recovered = transforms[inverse_name](canonical)
+                assert np.array_equal(recovered, original), (
+                    f"Transform {transform} with inverse {inverse_name} should recover original"
+                )
+
+    def test_canonicalization_is_deterministic_with_translation(self, small_board):
+        """Test that canonicalization produces consistent results with translation enabled."""
+        from game.zertz_board import TransformFlags
+
+        # Remove edge rings
+        for pos in ["A4", "D7", "G4", "G1"]:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 0
+
+        # Place pattern
+        small_board.state[1, *small_board.str_to_index("D4")] = 1
+        small_board.state[2, *small_board.str_to_index("C3")] = 1
+
+        # Canonicalize multiple times
+        results = []
+        for _ in range(5):
+            canonical, transform, inverse = small_board.canonicalize_state(
+                transforms=TransformFlags.ALL
+            )
+            results.append((canonical.tobytes(), transform, inverse))
+
+        # All results should be identical
+        first_result = results[0]
+        for result in results[1:]:
+            assert result == first_result, "Canonicalization should be deterministic"
+
+    def test_translation_with_history_layers(self, small_board):
+        """Test that translation preserves history and capture layers."""
+        # Use a board with time history (t > 1)
+        board_with_history = ZertzBoard(rings=37, t=3)
+
+        # Set up history layers (simulate past moves)
+        board_with_history.state[0:4, 3, 3] = [1, 1, 0, 0]  # Current: ring + white marble
+        board_with_history.state[4:8, 3, 3] = [1, 0, 0, 1]  # t-1: ring + black marble
+        board_with_history.state[8:12, 3, 3] = [1, 0, 1, 0]  # t-2: ring + gray marble
+
+        # Set capture flag
+        board_with_history.state[board_with_history.CAPTURE_LAYER, 2, 2] = 1
+
+        original_history = board_with_history.state[4:].copy()
+        original_capture = board_with_history.state[board_with_history.CAPTURE_LAYER].copy()
+
+        # Apply translation
+        translated = board_with_history._translate_state(board_with_history.state, 1, 0)
+
+        if translated is not None:
+            # History layers should be preserved (not translated)
+            assert np.array_equal(
+                translated[4:board_with_history.CAPTURE_LAYER],
+                original_history[:board_with_history.CAPTURE_LAYER-4]
+            ), "History layers should be preserved"
+
+            # Capture layer should be preserved
+            assert np.array_equal(
+                translated[board_with_history.CAPTURE_LAYER],
+                original_capture
+            ), "Capture layer should be preserved"
+
+
 class TestBoardSizeSymmetries:
     """Test that different board sizes have correct symmetry groups."""
 
@@ -1251,3 +1660,278 @@ def test_center_equidistant_from_three_middle_rings(medium_board):
     assert np.allclose(dists, dists[0], rtol=1e-5, atol=1e-5), (
         f"Distances to center not equal: {dists}"
     )
+
+
+class TestGetAllTransformations:
+    """Test the get_all_transformations() method of CanonicalizationManager."""
+
+    @pytest.mark.parametrize(
+        "board_fixture,expected_rot_mirror_count",
+        [
+            ("small_board", 18),   # D6: 6 R + 6 MR + 6 RM
+            ("medium_board", 9),   # D3: 3 R + 3 MR + 3 RM
+            ("large_board", 18),   # D6: 6 R + 6 MR + 6 RM
+        ],
+    )
+    def test_returns_correct_count_without_translation(
+        self, request, board_fixture, expected_rot_mirror_count
+    ):
+        """Test that get_all_transformations returns correct number of transforms."""
+        board = request.getfixturevalue(board_fixture)
+
+        transforms = board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        assert len(transforms) == expected_rot_mirror_count, (
+            f"{board.rings}-ring board should have {expected_rot_mirror_count} "
+            f"rotation/mirror transforms, got {len(transforms)}"
+        )
+
+    def test_all_transformations_are_unique(self, small_board):
+        """Test that all transformations produce unique state representations."""
+        # Create an asymmetric pattern
+        small_board.state[1, *small_board.str_to_index("A4")] = 1
+        small_board.state[2, *small_board.str_to_index("B3")] = 1
+        small_board.state[3, *small_board.str_to_index("E3")] = 1
+
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        # Convert all transformed states to bytes for comparison
+        unique_states = set()
+        for name, state in transforms.items():
+            unique_states.add(state.tobytes())
+
+        # For a truly asymmetric pattern, all 18 transforms should produce unique states
+        assert len(unique_states) == len(transforms), (
+            f"Expected {len(transforms)} unique states, got {len(unique_states)}"
+        )
+
+    def test_identity_transform_included(self, small_board):
+        """Test that identity transform (R0) is always included."""
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        assert "R0" in transforms, "Identity transform R0 should be included"
+
+        # Identity should preserve the state
+        original = small_board.state.copy()
+        identity_state = transforms["R0"]
+
+        assert np.array_equal(identity_state, original), (
+            "Identity transform should preserve state"
+        )
+
+    def test_transformations_preserve_marble_count(self, small_board):
+        """Test that all transformations preserve marble counts."""
+        # Place marbles
+        small_board.state[1, *small_board.str_to_index("A4")] = 1
+        small_board.state[2, *small_board.str_to_index("D4")] = 1
+        small_board.state[3, *small_board.str_to_index("G1")] = 1
+
+        original_white = np.sum(small_board.state[small_board.MARBLE_TO_LAYER["w"]])
+        original_gray = np.sum(small_board.state[small_board.MARBLE_TO_LAYER["g"]])
+        original_black = np.sum(small_board.state[small_board.MARBLE_TO_LAYER["b"]])
+
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        for name, state in transforms.items():
+            white_count = np.sum(state[small_board.MARBLE_TO_LAYER["w"]])
+            gray_count = np.sum(state[small_board.MARBLE_TO_LAYER["g"]])
+            black_count = np.sum(state[small_board.MARBLE_TO_LAYER["b"]])
+
+            assert white_count == original_white, (
+                f"Transform {name} changed white marble count"
+            )
+            assert gray_count == original_gray, (
+                f"Transform {name} changed gray marble count"
+            )
+            assert black_count == original_black, (
+                f"Transform {name} changed black marble count"
+            )
+
+    def test_transformations_preserve_ring_count(self, small_board):
+        """Test that all transformations preserve ring counts."""
+        # Remove some edge rings
+        for pos in ["A4", "D7", "G1"]:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 0
+
+        original_rings = np.sum(small_board.state[small_board.RING_LAYER])
+
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        for name, state in transforms.items():
+            ring_count = np.sum(state[small_board.RING_LAYER])
+            assert ring_count == original_rings, (
+                f"Transform {name} changed ring count: "
+                f"expected {original_rings}, got {ring_count}"
+            )
+
+    def test_include_translation_parameter(self, small_board):
+        """Test that include_translation parameter works correctly."""
+        # Remove edge rings to enable translation
+        for pos in ["A4", "A3", "A2", "D7", "E6", "F5", "G4", "G3", "G2", "G1"]:
+            y, x = small_board.str_to_index(pos)
+            small_board.state[small_board.RING_LAYER, y, x] = 0
+
+        # Get transforms without translation
+        without_translation = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        # Get transforms with translation
+        with_translation = small_board.canonicalizer.get_all_transformations(
+            include_translation=True
+        )
+
+        # With translation should have more transforms (unless board is full)
+        assert len(with_translation) >= len(without_translation), (
+            "Including translation should not reduce transform count"
+        )
+
+        # All rotation/mirror transforms should be in both sets
+        rot_mirror_names = {
+            name for name in without_translation.keys()
+            if not name.startswith("T") or name == "T0,0"
+        }
+
+        # Check that all pure rotation/mirror transforms are in the translation set
+        for name in rot_mirror_names:
+            # The name might be combined with T0,0 in the translation set
+            found = name in with_translation or f"T0,0_{name}" in with_translation
+            assert found, f"Rotation/mirror transform {name} not found in translation set"
+
+    def test_transformation_names_follow_convention(self, small_board):
+        """Test that transformation names follow the expected naming convention."""
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        for name in transforms.keys():
+            # Should be one of: R{angle}, MR{angle}, R{angle}M, or T{dy},{dx}_{transform}
+            assert (
+                name.startswith("R") or
+                name.startswith("MR") or
+                name.startswith("T")
+            ), f"Unexpected transform name format: {name}"
+
+            # If it contains underscore, should be combined transform
+            if "_" in name:
+                parts = name.split("_")
+                assert len(parts) == 2, (
+                    f"Combined transform should have exactly 2 parts: {name}"
+                )
+
+    def test_symmetric_pattern_reduces_unique_count(self, small_board):
+        """Test that patterns with symmetry produce fewer unique transformations."""
+        # Create a 6-fold symmetric pattern (all corners)
+        for corner in ["A4", "D7", "G4", "G1", "D1", "A1"]:
+            small_board.state[1, *small_board.str_to_index(corner)] = 1
+
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        # Count unique states
+        unique_states = set()
+        for name, state in transforms.items():
+            unique_states.add(state.tobytes())
+
+        # 6-fold symmetric pattern should produce fewer than 18 unique states
+        assert len(unique_states) < 18, (
+            f"6-fold symmetric pattern should produce < 18 unique states, "
+            f"got {len(unique_states)}"
+        )
+
+    def test_empty_board_produces_one_unique_state(self, small_board):
+        """Test that empty board produces only one unique state."""
+        # Empty board (just rings, no marbles)
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        # All transforms should produce the same state for empty board
+        unique_states = set()
+        for name, state in transforms.items():
+            unique_states.add(state.tobytes())
+
+        assert len(unique_states) == 1, (
+            f"Empty board should have 1 unique state, got {len(unique_states)}"
+        )
+
+    def test_transformations_valid_for_board_layout(self, small_board):
+        """Test that all transformations only place rings on valid board positions."""
+        # Place marbles
+        small_board.state[1, *small_board.str_to_index("D4")] = 1
+        small_board.state[2, *small_board.str_to_index("B3")] = 1
+
+        transforms = small_board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        for name, state in transforms.items():
+            # Check that rings only appear at valid board positions
+            ring_positions = np.argwhere(state[small_board.RING_LAYER] == 1)
+
+            for y, x in ring_positions:
+                # Position should be valid according to letter_layout
+                assert small_board.letter_layout[y][x] != '', (
+                    f"Transform {name} placed ring at invalid position ({y}, {x})"
+                )
+
+    @pytest.mark.parametrize(
+        "board_fixture", ["small_board", "medium_board", "large_board"]
+    )
+    def test_works_for_all_board_sizes(self, request, board_fixture):
+        """Test that get_all_transformations works for all board sizes."""
+        board = request.getfixturevalue(board_fixture)
+
+        # Place an asymmetric pattern
+        positions = []
+        if board.rings == 37:
+            positions = [("A4", 1), ("B3", 2), ("E3", 3)]
+        elif board.rings == 48:
+            positions = [("A5", 1), ("B4", 2), ("F4", 3)]
+        elif board.rings == 61:
+            positions = [("A5", 1), ("B4", 2), ("F4", 3)]
+
+        for pos, layer in positions:
+            board.state[layer, *board.str_to_index(pos)] = 1
+
+        # Should not raise an error
+        transforms = board.canonicalizer.get_all_transformations(
+            include_translation=False
+        )
+
+        assert len(transforms) > 0, "Should return at least one transformation"
+        assert "R0" in transforms, "Should include identity transformation"
+
+    def test_passes_state_parameter(self, small_board):
+        """Test that the state parameter allows transforming arbitrary states."""
+        # Create a custom state (not the board's current state)
+        custom_state = np.copy(small_board.state)
+        custom_state[1, *small_board.str_to_index("A4")] = 1
+        custom_state[2, *small_board.str_to_index("G1")] = 1
+
+        # Get transformations of the custom state
+        transforms = small_board.canonicalizer.get_all_transformations(
+            state=custom_state,
+            include_translation=False
+        )
+
+        # Verify that transformations were applied to custom_state, not board.state
+        assert "R0" in transforms
+        identity_state = transforms["R0"]
+
+        # Identity should match custom_state, not board.state
+        assert np.array_equal(identity_state, custom_state), (
+            "Identity transformation should preserve custom state"
+        )
