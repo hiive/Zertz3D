@@ -13,7 +13,7 @@ class MCTSZertzPlayer(ZertzPlayer):
     def __init__(self, game, n, iterations=1000, exploration_constant=1.41,
                  max_simulation_depth=None, use_transposition_table=True,
                  use_transposition_lookups=True, time_limit=None, verbose=False,
-                 clear_table_each_move=True, parallel=True, num_threads=16):
+                 clear_table_each_move=True, parallel='multiprocess', num_workers=16):
         """Initialize MCTS player.
 
         Args:
@@ -22,13 +22,13 @@ class MCTSZertzPlayer(ZertzPlayer):
             iterations: MCTS iterations per move (default: 1000)
             exploration_constant: UCB1 exploration (default: √2 ≈ 1.41)
             max_simulation_depth: Max rollout depth (None = play to end)
-            use_transposition_table: Enable symmetry caching (recommended: True)
-            use_transposition_lookups: Use cached stats to initialize nodes (default: True)
+            use_transposition_table: Enable symmetry caching (serial mode only)
+            use_transposition_lookups: Use cached stats to initialize nodes (serial mode only)
             time_limit: Max search time per move in seconds (None = no limit)
             verbose: Print search statistics after each move
-            clear_table_each_move: Clear transposition table between moves
-            parallel: Enable parallel MCTS search (default: True)
-            num_threads: Number of threads for parallel search (default: 16)
+            clear_table_each_move: Clear transposition table between moves (serial mode only)
+            parallel: Parallelization mode: False (serial), 'thread' (threaded), 'multiprocess' (default)
+            num_workers: Number of threads/processes for parallel search (default: 16)
         """
         super().__init__(game, n)
 
@@ -40,10 +40,10 @@ class MCTSZertzPlayer(ZertzPlayer):
         self.verbose = verbose
         self.clear_table_each_move = clear_table_each_move
         self.parallel = parallel
-        self.num_threads = num_threads
+        self.num_workers = num_workers
         self.mcts = MCTSTree()
 
-        # Initialize transposition table
+        # Initialize transposition table (only used in serial mode)
         if use_transposition_table:
             self.transposition_table = TranspositionTable()
         else:
@@ -81,8 +81,20 @@ class MCTSZertzPlayer(ZertzPlayer):
         if self.clear_table_each_move and self.transposition_table:
             self.transposition_table.clear()
 
-        # Run MCTS search (parallel or serial)
-        if self.parallel:
+        # Run MCTS search (multiprocess, threaded, or serial)
+        if self.parallel == 'multiprocess':
+            action = self.mcts.search_multiprocess(
+                self.game,
+                iterations=self.iterations,
+                exploration_constant=self.exploration_constant,
+                max_simulation_depth=self.max_simulation_depth,
+                transposition_table=None,  # Not used in multiprocess mode
+                use_transposition_lookups=False,
+                time_limit=self.time_limit,
+                verbose=self.verbose,
+                num_processes=self.num_workers
+            )
+        elif self.parallel == 'thread':
             action = self.mcts.search_parallel(
                 self.game,
                 iterations=self.iterations,
@@ -92,9 +104,9 @@ class MCTSZertzPlayer(ZertzPlayer):
                 use_transposition_lookups=self.use_transposition_lookups,
                 time_limit=self.time_limit,
                 verbose=self.verbose,
-                num_threads=self.num_threads
+                num_threads=self.num_workers
             )
-        else:
+        else:  # Serial mode
             action = self.mcts.search(
                 self.game,
                 iterations=self.iterations,

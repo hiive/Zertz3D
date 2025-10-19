@@ -557,3 +557,159 @@ class MCTSTree:
                       f"value {avg_value:.3f}")
 
         return best_action
+    def search_multiprocess(self, game, iterations, exploration_constant=1.41,
+                           max_simulation_depth=None, transposition_table=None,
+                           use_transposition_lookups=True, time_limit=None, verbose=False,
+                           num_processes=16):
+        """Run parallel MCTS search using multiprocessing (bypasses GIL).
+
+        Uses root parallelization: Each process runs independent MCTS search,
+        then results are merged. This bypasses Python's GIL for true parallel speedup.
+
+        Args:
+            game: ZertzGame instance to search from
+            iterations: Total number of MCTS iterations to run
+            exploration_constant: UCB1 exploration parameter (default: √2)
+            max_simulation_depth: Max simulation depth (None = play to end)
+            transposition_table: TranspositionTable for caching (not used in multiprocess mode)
+            use_transposition_lookups: Not used in multiprocess mode
+            time_limit: Maximum search time in seconds (None = no limit)
+            verbose: Print search statistics
+            num_processes: Number of worker processes (default: 16)
+
+        Returns:
+            Best action found, or None if no legal actions
+        """
+        start_time = time.time()
+
+        # Serialize game state for workers
+        board_state = game.board.state.copy()
+        global_state = game.board.global_state.copy()
+        rings = game.board.rings  # Board size for reconstruction
+
+        # Distribute iterations across processes
+        iters_per_process = iterations // num_processes
+        remainder = iterations % num_processes
+
+        # Build work assignments
+        work_assignments = []
+        for i in range(num_processes):
+            # Distribute remainder iterations to first few processes
+            process_iters = iters_per_process + (1 if i < remainder else 0)
+            work_assignments.append((
+                board_state,
+                global_state,
+                rings,
+                process_iters,
+                exploration_constant,
+                max_simulation_depth,
+                i  # process_id for seeding RNG
+            ))
+
+        # Run MCTS in parallel processes
+        with ProcessPoolExecutor(max_workers=num_processes) as executor:
+            results = list(executor.map(_mcts_worker, work_assignments))
+
+        # Merge results from all processes
+        action_stats = {}
+        for result in results:
+            for action, (visits, value) in result.items():
+                if action not in action_stats:
+                    action_stats[action] = [0, 0.0]  # [visits, value]
+                action_stats[action][0] += visits
+                action_stats[action][1] += value
+
+        # Store root statistics for external analysis
+        total_visits = sum(visits for visits, _ in action_stats.values())
+        total_value = sum(value for _, value in action_stats.values())
+        self._last_root_children = len(action_stats)
+        self._last_root_visits = total_visits
+        self._last_root_value = total_value
+
+        # Select best action (highest visit count)
+        if not action_stats:
+            return ("PASS", None)
+
+        best_action = max(action_stats.items(), key=lambda item: item[1][0])[0]
+
+        if verbose:
+            elapsed = time.time() - start_time
+            print(f"\nMultiprocess MCTS Search Statistics ({num_processes} processes):")
+            print(f"  Iterations: {total_visits}")
+            print(f"  Time: {elapsed:.2f}s")
+            print(f"  Iterations/sec: {total_visits / elapsed:.1f}")
+            print(f"  Root visits: {total_visits}")
+            print(f"  Root value: {total_value:.2f}")
+            print(f"  Children explored: {len(action_stats)}")
+
+            # Show top 3 moves
+            sorted_actions = sorted(action_stats.items(),
+                                   key=lambda item: item[1][0],
+                                   reverse=True)
+            print(f"\n  Top moves:")
+            for i, (action, (visits, value)) in enumerate(sorted_actions[:3], 1):
+                avg_value = value / visits if visits > 0 else 0
+                print(f"    {i}. {action[0]}: {visits} visits, "
+                      f"value {avg_value:.3f}")
+
+        return best_action
+
+
+# Worker function for multiprocessing (must be at module level)
+def _mcts_worker(args):
+    """Worker function that runs MCTS in a separate process.
+
+    Args:
+        args: Tuple of (board_state, global_state, rings, iterations,
+                       exploration_constant, max_simulation_depth, process_id)
+
+    Returns:
+        Dict mapping actions to (visits, value) tuples
+    """
+    board_state, global_state, rings, iterations, exploration_constant, max_simulation_depth, process_id = args
+
+    # Seed RNG uniquely for this process
+    import random
+    np.random.seed(process_id * 10000 + int(time.time() * 1000) % 10000)
+    random.seed(process_id * 10000 + int(time.time() * 1000) % 10000)
+
+    # Recreate game from serialized state
+    from game.zertz_game import ZertzGame
+    game = ZertzGame(rings=rings)
+    game.board.state = board_state.copy()
+    game.board.global_state = global_state.copy()
+
+    # Run MCTS locally
+    mcts = MCTSTree()
+    config = game.board._get_config()
+
+    # Create root node
+    root = MCTSNode(
+        game.board.state,
+        game.board.global_state,
+        config,
+        game.board.canonicalizer,
+        transposition_table=None  # No transposition table in multiprocess mode
+    )
+
+    # Run iterations
+    for _ in range(iterations):
+        # Selection
+        node = mcts.select(root, exploration_constant)
+
+        # Expansion
+        if not node.is_terminal():
+            node = mcts.expand(node, transposition_table=None)
+
+        # Simulation
+        result = mcts.simulate(node, max_simulation_depth)
+
+        # Backpropagation
+        mcts.backpropagate(node, result, transposition_table=None)
+
+    # Return action statistics
+    action_stats = {}
+    for action, child in root.children.items():
+        action_stats[action] = (child.visits, child.value)
+
+    return action_stats
