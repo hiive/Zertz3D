@@ -49,17 +49,19 @@ class MCTSNode:
             self.visits = 0
             self.value = 0.0
 
-    def is_fully_expanded(self, progressive_widening=True, widening_constant=2.0):
+    def is_fully_expanded(self, progressive_widening=True, widening_constant=10.0):
         """Check if node should be expanded further.
 
         With progressive widening enabled, limits children based on parent visits:
         max_children = widening_constant * sqrt(parent_visits)
 
         This focuses search on promising moves instead of trying every legal move.
+        With large branching factors (Zertz has 100+ moves early game), this is
+        essential to get enough visits per move to distinguish good from bad.
 
         Args:
             progressive_widening: Enable progressive widening (default: True)
-            widening_constant: Controls branching factor (default: 2.0)
+            widening_constant: Controls branching factor (default: 10.0, moderate setting)
 
         Returns:
             True if no more children should be added

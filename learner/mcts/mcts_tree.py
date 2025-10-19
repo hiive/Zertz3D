@@ -1,5 +1,8 @@
 import math
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from threading import Lock
 
 import numpy as np
 
@@ -134,9 +137,17 @@ class MCTSTree:
         Returns:
             Result from node's current player's perspective: +1 (win), -1 (loss), 0 (draw)
         """
-        # Evaluate from the leaf node's current player perspective
-        # This is the standard MCTS approach: evaluate from current position,
-        # then flip values during backpropagation as we go up the tree
+        # CRITICAL: Capture the player to move at THIS node (before simulation starts).
+        # This is the perspective from which we'll evaluate the outcome.
+        #
+        # MCTS evaluation logic:
+        # 1. Each node represents a game state with a player to move
+        # 2. We simulate from that state and evaluate from that player's perspective
+        # 3. During backpropagation, values flip at each level (zero-sum game)
+        # 4. Terminal states: After a winning move, current_player has switched to the opponent
+        #    - If Player A makes a winning move, the resulting state has Player B as current_player
+        #    - When evaluating from Player B's perspective, Player A winning = -1 for Player B
+        #    - This -1 gets flipped to +1 when backpropagating to Player A's node
         leaf_player = int(node.global_state[node.config.cur_player])
 
         if node.is_terminal():
@@ -377,6 +388,11 @@ class MCTSTree:
             # Backpropagation (always update table if provided, regardless of lookup setting)
             self.backpropagate(node, result, transposition_table)
 
+        # Store root statistics for external analysis
+        self._last_root_children = len(root.children)
+        self._last_root_visits = root.visits
+        self._last_root_value = root.value
+
         # Select best move (highest visit count)
         if len(root.children) == 0:
             return ("PASS", None)
@@ -388,6 +404,137 @@ class MCTSTree:
             elapsed = time.time() - start_time
             actual_iterations = root.visits
             print(f"\nMCTS Search Statistics:")
+            print(f"  Iterations: {actual_iterations}")
+            print(f"  Time: {elapsed:.2f}s")
+            print(f"  Iterations/sec: {actual_iterations / elapsed:.1f}")
+            print(f"  Root visits: {root.visits}")
+            print(f"  Root value: {root.value:.2f}")
+            print(f"  Children explored: {len(root.children)}")
+
+            if transposition_table:
+                hit_rate = transposition_table.get_hit_rate()
+                print(f"  Transposition hit rate: {hit_rate:.1%}")
+
+            # Show top 3 moves
+            sorted_children = sorted(root.children.items(),
+                                     key=lambda item: item[1].visits,
+                                     reverse=True)
+            print(f"\n  Top moves:")
+            for i, (action, child) in enumerate(sorted_children[:3], 1):
+                avg_value = child.value / child.visits if child.visits > 0 else 0
+                print(f"    {i}. {action[0]}: {child.visits} visits, "
+                      f"value {avg_value:.3f}")
+
+        return best_action
+
+    def search_parallel(self, game, iterations, exploration_constant=1.41,
+                       max_simulation_depth=None, transposition_table=None,
+                       use_transposition_lookups=True, time_limit=None, verbose=False,
+                       num_threads=16):
+        """Run parallel MCTS search from current game state using multiple threads.
+
+        Uses a thread pool to run simulations in parallel. Selection, expansion,
+        and backpropagation are synchronized with locks to ensure thread safety.
+
+        Args:
+            game: ZertzGame instance to search from
+            iterations: Number of MCTS iterations to run
+            exploration_constant: UCB1 exploration parameter (default: √2)
+            max_simulation_depth: Max simulation depth (None = play to end)
+            transposition_table: TranspositionTable for caching (optional but recommended)
+            use_transposition_lookups: Use cached statistics to initialize nodes (default: True)
+            time_limit: Maximum search time in seconds (None = no limit)
+            verbose: Print search statistics
+            num_threads: Number of worker threads (default: 16)
+
+        Returns:
+            Best action found, or None if no legal actions
+        """
+        # Import stateless logic
+        from game import stateless_logic
+
+        # Get config from game
+        config = game.board._get_config()
+
+        # Only use lookups if both table exists and lookups enabled
+        lookup_table = transposition_table if use_transposition_lookups else None
+
+        # Create root node from game state
+        root = MCTSNode(
+            game.board.state,
+            game.board.global_state,
+            config,
+            game.board.canonicalizer,
+            transposition_table=lookup_table
+        )
+
+        # Check if any actions available
+        if root.is_terminal():
+            return "PASS", None
+
+        # Create lock for synchronizing tree operations
+        tree_lock = Lock()
+
+        # Counter for completed iterations
+        completed_iterations = [0]  # Use list so it's mutable in closures
+        start_time = time.time()
+
+        def run_iteration():
+            """Run a single MCTS iteration (select, expand, simulate, backpropagate)."""
+            # Selection and expansion require tree lock
+            with tree_lock:
+                # Check if we've hit iteration or time limit
+                if completed_iterations[0] >= iterations:
+                    return False
+                if time_limit is not None and time.time() - start_time > time_limit:
+                    return False
+
+                # Selection
+                node = self.select(root, exploration_constant)
+
+                # Expansion
+                if not node.is_terminal():
+                    node = self.expand(node, transposition_table=lookup_table)
+
+            # Simulation (no lock needed - operates on copies)
+            result = self.simulate(node, max_simulation_depth)
+
+            # Backpropagation requires tree lock
+            with tree_lock:
+                self.backpropagate(node, result, transposition_table)
+                completed_iterations[0] += 1
+
+            return True
+
+        # Run iterations in parallel using thread pool
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            # Submit all iterations to thread pool
+            futures = [executor.submit(run_iteration) for _ in range(iterations)]
+
+            # Wait for all iterations to complete
+            for future in futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    if verbose:
+                        print(f"Error in MCTS iteration: {e}")
+
+        # Store root statistics for external analysis
+        self._last_root_children = len(root.children)
+        self._last_root_visits = root.visits
+        self._last_root_value = root.value
+
+        # Select best move (highest visit count)
+        if len(root.children) == 0:
+            return ("PASS", None)
+
+        best_action = max(root.children.items(),
+                          key=lambda item: item[1].visits)[0]
+
+        if verbose:
+            elapsed = time.time() - start_time
+            actual_iterations = root.visits
+            print(f"\nParallel MCTS Search Statistics ({num_threads} threads):")
             print(f"  Iterations: {actual_iterations}")
             print(f"  Time: {elapsed:.2f}s")
             print(f"  Iterations/sec: {actual_iterations / elapsed:.1f}")

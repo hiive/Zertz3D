@@ -13,7 +13,7 @@ class MCTSZertzPlayer(ZertzPlayer):
     def __init__(self, game, n, iterations=1000, exploration_constant=1.41,
                  max_simulation_depth=None, use_transposition_table=True,
                  use_transposition_lookups=True, time_limit=None, verbose=False,
-                 clear_table_each_move=True):
+                 clear_table_each_move=True, parallel=True, num_threads=16):
         """Initialize MCTS player.
 
         Args:
@@ -27,6 +27,8 @@ class MCTSZertzPlayer(ZertzPlayer):
             time_limit: Max search time per move in seconds (None = no limit)
             verbose: Print search statistics after each move
             clear_table_each_move: Clear transposition table between moves
+            parallel: Enable parallel MCTS search (default: True)
+            num_threads: Number of threads for parallel search (default: 16)
         """
         super().__init__(game, n)
 
@@ -37,6 +39,8 @@ class MCTSZertzPlayer(ZertzPlayer):
         self.time_limit = time_limit
         self.verbose = verbose
         self.clear_table_each_move = clear_table_each_move
+        self.parallel = parallel
+        self.num_threads = num_threads
         self.mcts = MCTSTree()
 
         # Initialize transposition table
@@ -77,16 +81,29 @@ class MCTSZertzPlayer(ZertzPlayer):
         if self.clear_table_each_move and self.transposition_table:
             self.transposition_table.clear()
 
-        # Run MCTS search
-        action = self.mcts.search(
-            self.game,
-            iterations=self.iterations,
-            exploration_constant=self.exploration_constant,
-            max_simulation_depth=self.max_simulation_depth,
-            transposition_table=self.transposition_table,
-            use_transposition_lookups=self.use_transposition_lookups,
-            time_limit=self.time_limit,
-            verbose=self.verbose
-        )
+        # Run MCTS search (parallel or serial)
+        if self.parallel:
+            action = self.mcts.search_parallel(
+                self.game,
+                iterations=self.iterations,
+                exploration_constant=self.exploration_constant,
+                max_simulation_depth=self.max_simulation_depth,
+                transposition_table=self.transposition_table,
+                use_transposition_lookups=self.use_transposition_lookups,
+                time_limit=self.time_limit,
+                verbose=self.verbose,
+                num_threads=self.num_threads
+            )
+        else:
+            action = self.mcts.search(
+                self.game,
+                iterations=self.iterations,
+                exploration_constant=self.exploration_constant,
+                max_simulation_depth=self.max_simulation_depth,
+                transposition_table=self.transposition_table,
+                use_transposition_lookups=self.use_transposition_lookups,
+                time_limit=self.time_limit,
+                verbose=self.verbose
+            )
 
         return action
