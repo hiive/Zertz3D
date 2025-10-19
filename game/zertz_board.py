@@ -3,6 +3,7 @@ import numpy as np
 
 from game.zertz_position import ZertzPosition, ZertzPositionCollection
 from game.utils.canonicalization import TransformFlags, CanonicalizationManager
+from game import stateless_logic
 
 
 class ZertzBoard:
@@ -359,6 +360,43 @@ class ZertzBoard:
 
         # Coordinate maps are built lazily via PositionCollection
 
+    def _get_config(self):
+        """Create BoardConfig from current board state.
+
+        This allows delegation to pure stateless functions.
+        BoardConfig should be cached if performance becomes an issue.
+        """
+        return stateless_logic.BoardConfig(
+            width=self.width,
+            rings=self.rings,
+            t=self.t,
+            directions=tuple(self.DIRECTIONS),
+            ring_layer=self.RING_LAYER,
+            marble_layers=self.MARBLE_LAYERS,
+            board_layers=self.BOARD_LAYERS,
+            capture_layer=self.CAPTURE_LAYER,
+            layers_per_timestep=self.LAYERS_PER_TIMESTEP,
+            supply_w=self.SUPPLY_W,
+            supply_g=self.SUPPLY_G,
+            supply_b=self.SUPPLY_B,
+            p1_cap_w=self.P1_CAP_W,
+            p1_cap_g=self.P1_CAP_G,
+            p1_cap_b=self.P1_CAP_B,
+            p2_cap_w=self.P2_CAP_W,
+            p2_cap_g=self.P2_CAP_G,
+            p2_cap_b=self.P2_CAP_B,
+            cur_player=self.CUR_PLAYER,
+            supply_slice=self.SUPPLY_SLICE,
+            p1_cap_slice=self.P1_CAP_SLICE,
+            p2_cap_slice=self.P2_CAP_SLICE,
+            player_1=self.PLAYER_1,
+            player_2=self.PLAYER_2,
+            num_players=self.NUM_PLAYERS,
+            marble_to_layer=self.MARBLE_TO_LAYER,
+            layer_to_marble=self.LAYER_TO_MARBLE,
+            board_layout=self.board_layout,
+        )
+
     @staticmethod
     def get_middle_ring(src, dst):
         # Return the (y, x) index of the ring between src and dst
@@ -395,30 +433,12 @@ class ZertzBoard:
         return 0 <= y < self.width and 0 <= x < self.width
 
     def _get_regions(self):
-        # Return a list of continuous regions on the board. A region consists of a list of indices.
-        # If any index can be reached from any other index then this will return a list of length 1.
-        regions = []
-        not_visited = set(zip(*np.where(self.state[self.RING_LAYER] == 1)))
-        while not_visited:
-            # While there are indices that have not been added to a region start a new empty region
-            region = []
-            queue = deque()
-            queue.appendleft(not_visited.pop())
-            # Add all indices to the region that can be reached from the starting index
-            while queue:
-                index = queue.pop()
-                region.append(index)
-                # Add all neighbors to the queue and mark visited to add them to the same region
-                for neighbor in self.get_neighbors(index):
-                    if (
-                        neighbor in not_visited
-                        and self._is_inbounds(neighbor)
-                        and self.state[self.RING_LAYER][neighbor] != 0
-                    ):
-                        not_visited.remove(neighbor)
-                        queue.appendleft(neighbor)
-            regions.append(region)
-        return regions
+        """Return list of connected regions on the board.
+
+        Delegates to stateless_logic.get_regions() for zero code duplication.
+        """
+        config = self._get_config()
+        return stateless_logic.get_regions(self.state, config)
 
     def get_cur_player(self):
         return int(self.global_state[self.CUR_PLAYER])
@@ -624,15 +644,12 @@ class ZertzBoard:
         return captured_type
 
     def get_valid_moves(self):
-        # Return two matrices that can be used to filter the placement and capture action policy
-        # distribution for actions that are valid with the current game state.
-        capture = self.get_capture_moves()
-        if np.any(capture):
-            # no placement move is allowed if there is a valid capture move
-            placement = np.zeros((3, self.width**2, self.width**2 + 1), dtype=bool)
-        else:
-            placement = self.get_placement_moves()
-        return placement, capture
+        """Return valid placement and capture moves.
+
+        Delegates to stateless_logic.get_valid_actions() for zero code duplication.
+        """
+        config = self._get_config()
+        return stateless_logic.get_valid_actions(self.state, self.global_state, config)
 
     def get_placement_shape(self):
         # get shape of placement moves as a tuple
@@ -643,131 +660,44 @@ class ZertzBoard:
         return 6, self.width, self.width
 
     def get_placement_moves(self):
-        # Return a boolean matrix of size (3 x w^2 x w^2 + 1) with the value True at
-        # every index that corresponds to a valid placement action.
-        # Marble types correspond to the following indices {'w':0, 'g':1, 'b':2}
-        # A ring removal value of w^2 indicates no ring is removed
-        moves = np.zeros((3, self.width**2, self.width**2 + 1), dtype=bool)
+        """Return valid placement moves.
 
-        # Build list of open and removable rings for marble placement and ring removal
-        open_rings = list(self._get_open_rings())
-        removable_rings = list(self._get_removable_rings())
-
-        # Get list of marble types that can be placed. If supply is empty then
-        # the player must use a captured marble.
-        supply_counts = self.global_state[self.SUPPLY_SLICE]
-        if np.all(supply_counts == 0):
-            # Use current player's captured marbles
-            if self.get_cur_player() == self.PLAYER_1:
-                marble_counts = self.global_state[self.P1_CAP_SLICE]
-            else:
-                marble_counts = self.global_state[self.P2_CAP_SLICE]
-        else:
-            marble_counts = supply_counts
-
-        # Assign 1 to all indices that are valid actions
-        for m, marble_count in enumerate(marble_counts):
-            if marble_count == 0:
-                continue
-            for put_index in open_rings:
-                put = put_index[0] * self.width + put_index[1]
-                for rem_index in removable_rings:
-                    rem = rem_index[0] * self.width + rem_index[1]
-                    if put != rem:
-                        moves[m, put, rem] = True
-                # If there are no removable rings then you are not required to remove one
-                if not removable_rings or (
-                    len(removable_rings) == 1 and removable_rings[0] == put_index
-                ):
-                    rem = self.width**2
-                    moves[m, put, rem] = True
-        return moves
+        Delegates to stateless_logic.get_placement_moves() for zero code duplication.
+        """
+        config = self._get_config()
+        return stateless_logic.get_placement_moves(self.state, self.global_state, config)
 
     def get_capture_moves(self):
-        # Return a boolean matrix of size (6 x w x w) with the value True at
-        # every index that corresponds to a valid capture action.
-        # The six directions are given by self.DIRECTIONS
-        moves = np.zeros((6, self.width, self.width), dtype=bool)
+        """Return valid capture moves.
 
-        # Create list of the indices of marbles that can be used to capture
-        if np.sum(self.state[self.CAPTURE_LAYER]) == 1:
-            occupied_rings = zip(*np.where(self.state[self.CAPTURE_LAYER] == 1))
-        else:
-            occupied_rings = zip(
-                *np.where(np.sum(self.state[self.MARBLE_LAYERS], axis=0) == 1)
-            )
-
-        # Update matrix with all possible capture directions from each capturing marble
-        for src_index in occupied_rings:
-            src_y, src_x = src_index
-            neighbors = self.get_neighbors(src_index)
-            for direction, neighbor in enumerate(neighbors):
-                # Check each neighbor to see if it has a marble and the jump destination is empty
-                y, x = neighbor
-                if (
-                    self._is_inbounds(neighbor)
-                    and np.sum(self.state[self.MARBLE_LAYERS, y, x]) == 1
-                ):
-                    dst_index = self.get_jump_destination(src_index, neighbor)
-                    y, x = dst_index
-                    if (
-                        self._is_inbounds(dst_index)
-                        and np.sum(self.state[self.BOARD_LAYERS, y, x]) == 1
-                    ):
-                        # Set this move as a valid action in the filter matrix
-                        moves[direction, src_y, src_x] = True
-        return moves
+        Delegates to stateless_logic.get_capture_moves() for zero code duplication.
+        """
+        config = self._get_config()
+        return stateless_logic.get_capture_moves(self.state, self.global_state, config)
 
     def _get_open_rings(self):
-        # Return a list of indices for all of the open rings in the main (connected) region
-        # Frozen isolated regions are excluded per official rules
+        """Return empty ring indices in the main connected region.
 
-        # Get all vacant rings
-        all_open = list(
-            zip(*np.where(np.sum(self.state[self.BOARD_LAYERS], axis=0) == 1))
-        )
-
-        # Check if there are multiple regions (some might be frozen/isolated)
-        regions = self._get_regions()
-        if len(regions) <= 1:
-            # Single connected region - all open rings are valid
-            return all_open
-
-        # Multiple regions exist - only return rings from the largest (main) region
-        main_region = max(regions, key=len)
-        open_rings = [ring for ring in all_open if ring in main_region]
-        return open_rings
+        Delegates to stateless_logic.get_open_rings() for zero code duplication.
+        """
+        config = self._get_config()
+        return stateless_logic.get_open_rings(self.state, config)
 
     def _is_removable(self, index):
-        # Check if the ring at index is removable. A ring is removable if two of its neighbors
-        # in a row are missing and the ring itself is empty.
-        y, x = index
-        if np.sum(self.state[self.BOARD_LAYERS, y, x]) != 1:
-            return False
-        neighbors = self.get_neighbors(index)
-        # Add the first neighbor index to the end so that if the first and last are both empty then it still passes
-        neighbors.append(neighbors[0])
-        # Track the number of consecutive empty neighboring rings
-        adjacent_empty = 0
-        for neighbor in neighbors:
-            if (
-                self._is_inbounds(neighbor)
-                and self.state[self.RING_LAYER][neighbor] == 1
-            ):
-                # If the neighbor index is in bounds and not removed then reset the empty counter
-                adjacent_empty = 0
-            else:
-                adjacent_empty += 1
-                if adjacent_empty >= 2:
-                    return True
-        return False
+        """Check if ring at index can be removed.
+
+        Delegates to stateless_logic.is_removable() for zero code duplication.
+        """
+        config = self._get_config()
+        return stateless_logic.is_removable(index, self.state, config)
 
     def _get_removable_rings(self):
-        # Return a list of indices to rings that can be removed
-        removable = [
-            index for index in self._get_open_rings() if self._is_removable(index)
-        ]
-        return removable
+        """Return list of removable ring indices.
+
+        Delegates to stateless_logic.get_removable_rings() for zero code duplication.
+        """
+        config = self._get_config()
+        return stateless_logic.get_removable_rings(self.state, config)
 
     # =========================  GEOMETRIC RING REMOVAL  =========================
 
@@ -1167,180 +1097,11 @@ class ZertzBoard:
         # In cube coords (x=q, z=r, y=-q-r), mirror over q-axis => (x, z, y)
         return q, -q - r
 
-    def _transform_state_hex(self, state, rot60_k=0, mirror=False, mirror_first=False):
-        """Apply rotation and/or mirror to the whole SPATIAL state.
-
-        Args:
-            state: Board state to transform
-            rot60_k: Number of 60° rotations (0-5 for D6, 0,2,4 for D3)
-            mirror: Whether to apply mirror transformation
-            mirror_first: If True, mirror then rotate. If False, rotate then mirror.
-        """
-        self._build_axial_maps()
-        out = np.zeros_like(state)
-        for (y, x), (q, r) in self._yx_to_ax.items():
-            if mirror_first:
-                # Mirror first, then rotate (for R{k}M transforms)
-                if mirror:
-                    q2, r2 = self._ax_mirror_q_axis(q, r)
-                else:
-                    q2, r2 = q, r
-                q2, r2 = self._ax_rot60(q2, r2, rot60_k)
-            else:
-                # Rotate first, then mirror (for MR{k} transforms)
-                q2, r2 = self._ax_rot60(q, r, rot60_k)
-                if mirror:
-                    q2, r2 = self._ax_mirror_q_axis(q2, r2)
-            dst = self._ax_to_yx.get((q2, r2))
-            if dst is not None:
-                y2, x2 = dst
-                out[:, y2, x2] = state[:, y, x]
-        return out
-
-    # ======================  D6 / D3 SYMMETRY ENUMERATION  =================
-
-    def _get_all_symmetry_transforms(self):
-        """Return (name, fn) pairs for all valid symmetries of this board.
-
-        Returns all 12 (D6) or 6 (D3) transformations:
-        - R{k}: Pure rotations
-        - MR{k}: Rotate then mirror
-        - R{k}M: Mirror then rotate
-        """
-        if self.rings in (self.SMALL_BOARD_37, self.LARGE_BOARD_61):
-            # full hex (D6): 6 rotations + 12 mirror combinations
-            rot_steps = [0, 1, 2, 3, 4, 5]  # multiples of 60°
-        else:
-            # alternating 4/5 sides (48): D3 subset
-            rot_steps = [0, 2, 4]  # 0°, 120°, 240°
-
-        ops = []
-        # Pure rotations
-        for k in rot_steps:
-            ops.append(
-                (
-                    f"R{60 * k}",
-                    lambda s, kk=k: self._transform_state_hex(
-                        s, rot60_k=kk, mirror=False
-                    ),
-                )
-            )
-        # Rotate then mirror (MR{k})
-        for k in rot_steps:
-            ops.append(
-                (
-                    f"MR{60 * k}",
-                    lambda s, kk=k: self._transform_state_hex(
-                        s, rot60_k=kk, mirror=True, mirror_first=False
-                    ),
-                )
-            )
-        # Mirror then rotate (R{k}M)
-        for k in rot_steps:
-            ops.append(
-                (
-                    f"R{60 * k}M",
-                    lambda s, kk=k: self._transform_state_hex(
-                        s, rot60_k=kk, mirror=True, mirror_first=True
-                    ),
-                )
-            )
-        return ops
-
-    def _canonical_key(self, state):
-        """Lexicographic key over valid cells only (rings+marbles now)."""
-        masked = (state[self.BOARD_LAYERS] * self.board_layout).astype(np.uint8)
-        return masked.tobytes()
-
-    # ======================  TRANSLATION CANONICALIZATION  ==================
-
-    def _get_bounding_box(self, state=None):
-        """Find bounding box of all remaining rings.
-
-        Returns:
-            tuple: (min_y, max_y, min_x, max_x) or None if no rings exist
-        """
-        if state is None:
-            state = self.state
-
-        # Find all positions with rings
-        ring_positions = np.where(state[self.RING_LAYER] == 1)
-
-        if len(ring_positions[0]) == 0:
-            return None  # No rings remaining
-
-        min_y, max_y = ring_positions[0].min(), ring_positions[0].max()
-        min_x, max_x = ring_positions[1].min(), ring_positions[1].max()
-
-        return (min_y, max_y, min_x, max_x)
-
-    def _translate_state(self, state, dy, dx):
-        """Translate state by (dy, dx) offset.
-
-        Only translates ring and marble data (BOARD_LAYERS), preserving layout validity.
-        Returns translated state if valid, None otherwise.
-        """
-        out = np.zeros_like(state)
-
-        # Translate each position
-        for y in range(self.width):
-            for x in range(self.width):
-                # Check if source position has a ring
-                if state[self.RING_LAYER, y, x] == 0:
-                    continue
-
-                # Calculate destination
-                new_y, new_x = y + dy, x + dx
-
-                # Check if destination is valid on the board layout
-                if not (0 <= new_y < self.width and 0 <= new_x < self.width):
-                    return None  # Translation would move rings off-board
-
-                if self.board_layout is not None and not self.board_layout[new_y, new_x]:
-                    return None  # Destination not valid in board layout
-
-                # Copy all board layers (ring + marbles)
-                out[self.BOARD_LAYERS, new_y, new_x] = state[self.BOARD_LAYERS, y, x]
-
-        # Copy history and capture layers unchanged
-        # BOARD_LAYERS is slice(0, 4), so it covers 4 layers
-        num_board_layers = self.BOARD_LAYERS.stop
-        if state.shape[0] > num_board_layers:
-            out[num_board_layers:] = state[num_board_layers:]
-
-        return out
-
-    def _get_all_translations(self, state=None):
-        """Generate all valid translation offsets for current board state.
-
-        Returns:
-            list: List of (name, dy, dx) tuples for valid translations
-        """
-        if state is None:
-            state = self.state
-
-        bbox = self._get_bounding_box(state)
-        if bbox is None:
-            return [("T0,0", 0, 0)]  # No rings, identity only
-
-        min_y, max_y, min_x, max_x = bbox
-
-        translations = []
-
-        # Try all possible translations that might keep rings on board
-        # Limit search to reasonable bounds
-        for dy in range(-min_y, self.width - max_y):
-            for dx in range(-min_x, self.width - max_x):
-                # Test if this translation is valid
-                translated = self._translate_state(state, dy, dx)
-                if translated is not None:
-                    translations.append((f"T{dy},{dx}", dy, dx))
-
-        return translations
-
     def canonicalize_state(self, transforms=TransformFlags.ALL):
         """
         Return (canonical_state, transform_name, inverse_name).
+
+        Delegates to CanonicalizationManager.
 
         Finds the lexicographically smallest representation among all enabled symmetry
         transformations. Transformations are applied in order: translation, then rotation/mirror.
@@ -1354,241 +1115,187 @@ class ZertzBoard:
                 - transform_name: Name of transform applied (e.g., "T2,1_MR120", "R60", "T1,-1")
                 - inverse_name: Inverse transform to map back to original orientation
         """
-        best_name = "R0"
-        best_state = np.copy(self.state)
-        best_key = self._canonical_key(best_state)
+        return self.canonicalizer.canonicalize_state(state=None, transforms=transforms)
 
-        # Build list of transform combinations based on flags
-        transform_ops = []
 
-        # Get rotation/mirror transforms if enabled
-        if transforms & (TransformFlags.ROTATION | TransformFlags.MIRROR):
-            rot_mirror_ops = []
-            for name, fn in self._get_all_symmetry_transforms():
-                # Filter based on flags
-                if name.startswith("R") and not name.startswith("MR"):
-                    # Pure rotation or mirror-then-rotate (R{k} or R{k}M)
-                    if transforms & TransformFlags.ROTATION:
-                        if "M" in name:
-                            # R{k}M requires both rotation and mirror
-                            if transforms & TransformFlags.MIRROR:
-                                rot_mirror_ops.append((name, fn))
-                        else:
-                            # Pure rotation
-                            rot_mirror_ops.append((name, fn))
-                elif name.startswith("MR"):
-                    # Rotate-then-mirror (MR{k})
-                    if (transforms & TransformFlags.ROTATION) and (transforms & TransformFlags.MIRROR):
-                        rot_mirror_ops.append((name, fn))
-        else:
-            # No rotation/mirror, just identity
-            rot_mirror_ops = [("R0", lambda s: s)]
+    # =========================  GEOMETRIC RING REMOVAL  =========================
 
-        # Get translation transforms if enabled
-        if transforms & TransformFlags.TRANSLATION:
-            translation_ops = self._get_all_translations(self.state)
-        else:
-            # No translation, just identity
-            translation_ops = [("T0,0", 0, 0)]
+    def yx_to_cartesian(self, y, x):
+        """Convert board indices (y, x) to Cartesian coordinates.
 
-        # Combine: translate FIRST, then rotate/mirror
-        for trans_name, dy, dx in translation_ops:
-            # Apply translation
-            if dy == 0 and dx == 0:
-                translated = self.state
-            else:
-                translated = self._translate_state(self.state, dy, dx)
-                if translated is None:
-                    continue  # Invalid translation
-
-            # Then apply each rotation/mirror to the translated state
-            for rot_mirror_name, rot_mirror_fn in rot_mirror_ops:
-                transformed = rot_mirror_fn(translated)
-
-                # Compute canonical key
-                key = self._canonical_key(transformed)
-
-                # Update best if this is lexicographically smaller
-                if key < best_key:
-                    # Combine transform names
-                    if trans_name == "T0,0" and rot_mirror_name == "R0":
-                        combined_name = "R0"  # Identity
-                    elif trans_name == "T0,0":
-                        combined_name = rot_mirror_name
-                    elif rot_mirror_name == "R0":
-                        combined_name = trans_name
-                    else:
-                        combined_name = f"{trans_name}_{rot_mirror_name}"
-
-                    best_key = key
-                    best_state = transformed
-                    best_name = combined_name
-
-        inv = self._get_inverse_transform(best_name)
-        return best_state, best_name, inv
-
-    # ======================  ACTION / MASK TRANSFORMERS  ===================
-    def _get_inverse_transform(self, transform_name):
-        """
-        Get the inverse of a symmetry transform.
-
-        Supports combined transforms with translation:
-        - "T{dy},{dx}_{rot_mirror}" → "{inv_rot_mirror}_T{-dy},{-dx}"
-        - "T{dy},{dx}" → "T{-dy},{-dx}"
-        - Pure rotation/mirror uses existing inversion rules
-
-        Inverse relationships (rotation/mirror only):
-        - R(k)⁻¹ = R(-k mod 360°)
-        - MR(k)⁻¹ = R(-k mod 360°)M  (rotate-then-mirror inverts to mirror-then-rotate)
-        - R(k)M⁻¹ = MR(-k mod 360°)  (mirror-then-rotate inverts to rotate-then-mirror)
-
-        Inverse relationships (combined):
-        - (T ∘ R)⁻¹ = R⁻¹ ∘ T⁻¹  (apply inverses in reverse order)
-
-        Args:
-            transform_name: String like "R60", "MR120", "R240M", "T2,1", "T1,-1_MR120"
+        Uses standard pointy-top hexagonal grid conversion:
+        - q = x - center
+        - r = y - x
+        - xc = sqrt(3) * (q + r/2)
+        - yc = 1.5 * r
 
         Returns:
-            String naming the inverse transform
+            tuple: (xc, yc) Cartesian coordinates
         """
-        # Check for combined transform (translation + rotation/mirror)
-        if "_" in transform_name:
-            # Combined transform: "T{dy},{dx}_{rot_mirror}"
-            parts = transform_name.split("_")
-            if len(parts) != 2:
-                raise ValueError(f"Invalid combined transform format: {transform_name}")
+        c = self.width // 2
+        q = x - c
+        r = y - x
+        sqrt3 = np.sqrt(3)
+        xc = sqrt3 * (q + r / 2.0)
+        yc = 1.5 * r
+        return xc, yc
 
-            trans_part, rot_mirror_part = parts
+    def is_removable_geometric(self, index, ring_radius=None):
+        """Check if a ring can be removed using geometric collision detection.
 
-            # Invert translation: T{dy},{dx} → T{-dy},{-dx}
-            if not trans_part.startswith("T"):
-                raise ValueError(f"Expected translation in combined transform: {transform_name}")
+        Uses actual Cartesian coordinates and perpendicular distance calculations
+        to verify that the ring can be slid out in some direction without colliding
+        with any other rings.
 
-            # Extract dy, dx from "T{dy},{dx}"
-            coords = trans_part[1:]  # Remove "T"
-            dy, dx = map(int, coords.split(","))
-            inv_trans = f"T{-dy},{-dx}"
+        This method validates that the simple adjacency-based heuristic (_is_removable)
+        is geometrically correct.
 
-            # Invert rotation/mirror part
-            inv_rot_mirror = self._get_inverse_transform(rot_mirror_part)
+        Args:
+            index: (y, x) position of the ring to check
+            ring_radius: Radius of a ring (default √3/2 ≈ 0.866 for unit grid)
 
-            # Combine in reverse order: rot_mirror_inv _ trans_inv
-            return f"{inv_rot_mirror}_{inv_trans}"
-
-        # Translation-only transform
-        elif transform_name.startswith("T"):
-            # Extract dy, dx from "T{dy},{dx}"
-            coords = transform_name[1:]  # Remove "T"
-            dy, dx = map(int, coords.split(","))
-            return f"T{-dy},{-dx}"
-
-        # Rotation/mirror-only transforms (existing logic)
-        elif transform_name.endswith("M") and not transform_name.startswith("MR"):
-            # R{k}M (mirror-then-rotate): inverse is MR{-k} (rotate-then-mirror)
-            # Extract angle from name (e.g., "R120M" -> 120)
-            angle = int(transform_name[1:-1])  # Strip "R" and "M"
-            # Inverse angle in full circle
-            inv_angle = (360 - angle) % 360
-            return f"MR{inv_angle}"
-
-        elif transform_name.startswith("MR"):
-            # MR{k} (rotate-then-mirror): inverse is R{-k}M (mirror-then-rotate)
-            # Extract angle from name (e.g., "MR120" -> 120)
-            angle = int(transform_name[2:])
-            # Inverse angle in full circle
-            inv_angle = (360 - angle) % 360
-            return f"R{inv_angle}M"
-
-        elif transform_name.startswith("R"):
-            # Pure rotation: inverse is opposite rotation
-            angle = int(transform_name[1:])
-            # Inverse angle in full circle
-            inv_angle = (360 - angle) % 360
-            return f"R{inv_angle}"
-
-        else:
-            raise ValueError(f"Unknown transform name format: {transform_name}")
-
-    def _dir_index_map(self, rot60_k=0, mirror=False):
+        Returns:
+            bool: True if the ring can be removed
         """
-        Map capture direction indices (0..5) under the same symmetry used for state.
-        We transform a direction vector v=(dy,dx) via axial:
-           (dq,dr) = (dx, dy-dx)
-           rotate/mirror in axial
-           back to (dy',dx') with: dx' = dq, dy' = dr + dq
+        if ring_radius is None:
+            ring_radius = (
+                np.sqrt(3) / 2.0
+            )  # Correct radius for touching rings in unit hex grid
+
+        y, x = index
+
+        # Ring must be empty (no marble on it)
+        if np.sum(self.state[self.BOARD_LAYERS, y, x]) != 1:
+            return False
+
+        # Get Cartesian position of this ring
+        ring_x, ring_y = self.yx_to_cartesian(y, x)
+
+        # Get all neighbor positions
+        neighbors = self.get_neighbors(index)
+
+        # Check each pair of consecutive empty neighbors - each creates a potential slide direction
+        for i in range(len(neighbors)):
+            curr = neighbors[i]
+            next_neighbor = neighbors[(i + 1) % len(neighbors)]
+
+            curr_empty = (
+                not self._is_inbounds(curr) or self.state[self.RING_LAYER][curr] == 0
+            )
+            next_empty = (
+                not self._is_inbounds(next_neighbor)
+                or self.state[self.RING_LAYER][next_neighbor] == 0
+            )
+
+            if curr_empty and next_empty:
+                # Found a gap. Calculate the slide direction (angle bisector of the gap)
+                # The gap is between directions i and i+1
+                dy1, dx1 = self.DIRECTIONS[i]
+                dy2, dx2 = self.DIRECTIONS[(i + 1) % len(self.DIRECTIONS)]
+
+                # Convert direction offsets to actual neighbor positions, then to Cartesian vectors
+                neighbor1_pos = (y + dy1, x + dx1)
+                neighbor2_pos = (y + dy2, x + dx2)
+
+                # Get Cartesian positions of where these neighbors would be
+                n1_x, n1_y = self.yx_to_cartesian(*neighbor1_pos)
+                n2_x, n2_y = self.yx_to_cartesian(*neighbor2_pos)
+
+                # Direction vectors from ring to neighbor positions
+                dir1_x, dir1_y = n1_x - ring_x, n1_y - ring_y
+                dir2_x, dir2_y = n2_x - ring_x, n2_y - ring_y
+
+                # Normalize
+                norm1 = np.sqrt(dir1_x**2 + dir1_y**2)
+                norm2 = np.sqrt(dir2_x**2 + dir2_y**2)
+                if norm1 > 0:
+                    dir1_x, dir1_y = dir1_x / norm1, dir1_y / norm1
+                if norm2 > 0:
+                    dir2_x, dir2_y = dir2_x / norm2, dir2_y / norm2
+
+                # Angle bisector (slide direction)
+                slide_dx = dir1_x + dir2_x
+                slide_dy = dir1_y + dir2_y
+                slide_norm = np.sqrt(slide_dx**2 + slide_dy**2)
+
+                if slide_norm > 0:
+                    slide_dx /= slide_norm
+                    slide_dy /= slide_norm
+
+                    # Check if we can slide out in this direction without hitting other rings
+                    if self._can_slide_ring_out(
+                        ring_x, ring_y, slide_dx, slide_dy, index, ring_radius
+                    ):
+                        return True
+
+        return False
+
+    def _can_slide_ring_out(
+        self, ring_x, ring_y, slide_dx, slide_dy, ring_index, ring_radius
+    ):
+        """Check if a ring can be slid out in a given direction.
+
+        A ring is removable if it can slide at least one hex spacing (√3) in some
+        direction without colliding with other rings. This represents sliding the
+        ring one full hex-position away, which effectively removes it from play.
+
+        Physics of ring collision:
+        - In unit hex grid (size=1.0), adjacent centers are √3 apart
+        - For touching rings: ring_radius = √3/2 ≈ 0.866
+        - Ring diameter = 2 * ring_radius = √3
+        - Minimum slide distance = √3 (one hex spacing)
+        - Two rings collide if their centers are < √3 apart
+        - For slide path: rings collide if perpendicular distance < diameter (2 * ring_radius)
+
+        Args:
+            ring_x, ring_y: Cartesian position of the ring to slide
+            slide_dx, slide_dy: Normalized direction vector to slide
+            ring_index: (y, x) index of the ring being slid (to exclude from checks)
+            ring_radius: Radius of rings (should be √3/2 for unit grid)
+
+        Returns:
+            bool: True if ring can slide at least √3 distance without collision
         """
-        # Original direction vectors in your order:
-        dirs = self.DIRECTIONS
+        # Minimum slide distance: one hex spacing
+        sqrt3 = np.sqrt(3)
+        min_slide_distance = sqrt3
 
-        def xform_vec(dy, dx):
-            dq, dr = dx, (dy - dx)
-            dq, dr = self._ax_rot60(dq, dr, rot60_k)
-            if mirror:
-                dq, dr = self._ax_mirror_q_axis(dq, dr)
-            dx2 = dq
-            dy2 = dr + dq
-            return (dy2, dx2)
+        # For a ring to be slideable, no other ring should be within 2*radius
+        # (diameter) of the slide path AND within the first √3 of travel
 
-        idx_map = {}
-        for i, v in enumerate(dirs):
-            vv = xform_vec(*v)
-            j = next(k for k, u in enumerate(dirs) if u == vv)
-            idx_map[i] = j
-        return idx_map
+        for y in range(self.width):
+            for x in range(self.width):
+                if (y, x) == ring_index:
+                    continue  # Don't check against ourselves
 
-    def transform_capture_mask(self, cap_mask, rot60_k=0, mirror=False):
-        """
-        cap_mask shape: (6, H, W). Returns transformed mask matching state xform.
-        """
-        self._build_axial_maps()
-        out = np.zeros_like(cap_mask)
-        dmap = self._dir_index_map(rot60_k, mirror)
+                if self._is_inbounds((y, x)) and self.state[self.RING_LAYER, y, x] == 1:
+                    # This ring exists, check if it would block the slide
+                    other_x, other_y = self.yx_to_cartesian(y, x)
 
-        for (y, x), (q, r) in self._yx_to_ax.items():
-            q2, r2 = self._ax_rot60(q, r, rot60_k)
-            if mirror:
-                q2, r2 = self._ax_mirror_q_axis(q2, r2)
-            dst = self._ax_to_yx.get((q2, r2))
-            if dst is None:
-                continue
-            y2, x2 = dst
-            for d in range(6):
-                out[dmap[d], y2, x2] = cap_mask[d, y, x]
-        return out
+                    # Vector from our ring to the other ring
+                    to_other_x = other_x - ring_x
+                    to_other_y = other_y - ring_y
+                    dist_sq = to_other_x**2 + to_other_y**2
 
-    def transform_put_mask(self, put_mask, rot60_k=0, mirror=False):
-        """
-        put_mask shape: (3, W*W, W*W+1). Applies same symmetry to (put, rem) indices.
-        """
-        self._build_axial_maps()
-        out = np.zeros_like(put_mask)
+                    # Project onto slide direction
+                    projection = to_other_x * slide_dx + to_other_y * slide_dy
 
-        # Build flat-index permutation for valid cells
-        flat_map = {}  # src_flat -> dst_flat
-        for (y, x), (q, r) in self._yx_to_ax.items():
-            q2, r2 = self._ax_rot60(q, r, rot60_k)
-            if mirror:
-                q2, r2 = self._ax_mirror_q_axis(q2, r2)
-            dst = self._ax_to_yx.get((q2, r2))
-            if dst is None:
-                continue
-            y2, x2 = dst
-            flat_map[y * self.width + x] = y2 * self.width + x2
+                    # Only check rings in front of us AND within one hex spacing
+                    # Rings behind us or beyond the minimum slide distance don't matter
+                    if projection < 0 or projection > min_slide_distance:
+                        continue
 
-        M, P, R = put_mask.shape
-        last = R - 1  # "no ring removed" slot stays put
+                    # Calculate perpendicular distance from the slide path
+                    # perp_dist² = |v|² - proj²
+                    perp_dist_sq = dist_sq - projection**2
 
-        for m in range(M):
-            for p in range(P):
-                p2 = flat_map.get(p)
-                if p2 is None:
-                    continue
-                # all concrete removals
-                for r in range(R - 1):
-                    r2 = flat_map.get(r)
-                    if r2 is not None:
-                        out[m, p2, r2] = put_mask[m, p, r]
-                # "no remove" column
-                out[m, p2, last] = put_mask[m, p, last]
+                    # If perpendicular distance < 2*radius, rings would collide during slide
+                    # Need at least 2*radius separation (ring diameters)
+                    # Use small tolerance for floating point comparison
+                    tolerance = 1e-6
+                    min_clearance_sq = (2 * ring_radius) ** 2
+                    if perp_dist_sq < min_clearance_sq - tolerance:
+                        # Would collide during the first √3 of slide
+                        return False
 
-        return out
+        return True

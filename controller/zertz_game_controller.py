@@ -68,6 +68,7 @@ class ZertzGameController:
         renderer_or_factory: IRenderer | IRendererFactory | None = None,
         human_players: tuple[int, ...] | None = None,
         track_statistics=False,
+        mcts_player2_iterations: int | None = None,
     ):
         self.show_coords = show_coords
         self.max_games = max_games  # None means play indefinitely
@@ -78,6 +79,7 @@ class ZertzGameController:
         # Statistics tracking
         self.track_statistics = track_statistics
         self.game_stats = []  # List of game durations in seconds
+        self.win_loss_stats = {PLAYER_1_WIN: 0, PLAYER_2_WIN: 0, 0: 0}  # Win/loss/tie counts
         self.current_game_start_time = None
         self.total_start_time = None
 
@@ -117,6 +119,7 @@ class ZertzGameController:
             t=5,
             status_reporter=print,
             human_players=human_players,
+            mcts_player2_iterations=mcts_player2_iterations,
         )
 
         # Create logger with all configuration - it manages all writers internally
@@ -319,7 +322,7 @@ class ZertzGameController:
         action_result = self.session.game.take_action(ax, ay)
 
         # TEMPORARY: Call canonicalize_state for profiling - REMOVE AFTER PROFILING
-        # self.session.game.board.canonicalize_state()
+        self.session.game.board.canonicalize_state()
         # END TEMPORARY
 
         # Generate complete notation WITH action_result (includes isolation in one pass)
@@ -420,10 +423,12 @@ class ZertzGameController:
         self._report(f"Player 1 captures: {self.session.player1.captured}")
         self._report(f"Player 2 captures: {self.session.player2.captured}")
 
-        # Record game time if timing is enabled
+        # Record game time and outcome if statistics tracking is enabled
         if self.track_statistics and self.current_game_start_time is not None:
             game_duration = time.time() - self.current_game_start_time
             self.game_stats.append(game_duration)
+            # Record win/loss/tie
+            self.win_loss_stats[game_over] += 1
 
         # Increment games played counter
         self.session.increment_games_played()
@@ -464,10 +469,10 @@ class ZertzGameController:
         self.logger.log_comment(text)
 
     def print_statistics(self) -> None:
-        """Print timing statistics for all games played.
+        """Print timing and win/loss statistics for all games played.
 
         Outputs mean, min, max, standard deviation for individual games,
-        plus total execution time.
+        plus total execution time and win/loss/tie breakdown.
         """
         if not self.track_statistics or not self.game_stats:
             return
@@ -477,20 +482,38 @@ class ZertzGameController:
         # Calculate total execution time
         total_time = time.time() - self.total_start_time if self.total_start_time else 0
 
-        # Calculate statistics
+        # Calculate timing statistics
         mean_time = statistics.mean(self.game_stats)
         min_time = min(self.game_stats)
         max_time = max(self.game_stats)
         std_time = statistics.stdev(self.game_stats) if len(self.game_stats) > 1 else 0.0
 
+        # Get win/loss stats
+        total_games = len(self.game_stats)
+        player1_wins = self.win_loss_stats[PLAYER_1_WIN]
+        player2_wins = self.win_loss_stats[PLAYER_2_WIN]
+        ties = self.win_loss_stats[0]
+
+        # Calculate percentages
+        p1_pct = (player1_wins / total_games * 100) if total_games > 0 else 0
+        p2_pct = (player2_wins / total_games * 100) if total_games > 0 else 0
+        tie_pct = (ties / total_games * 100) if total_games > 0 else 0
+
         # Print statistics
         print("\n" + "=" * 60)
         print("STATISTICS")
         print("=" * 60)
-        print(f"Games played: {len(self.game_stats)}")
-        print(f"Mean time per game: {mean_time:.3f}s")
-        print(f"Min time: {min_time:.3f}s")
-        print(f"Max time: {max_time:.3f}s")
-        print(f"Std deviation: {std_time:.3f}s")
-        print(f"Total execution time: {total_time:.3f}s")
+        print(f"Games played: {total_games}")
+        print()
+        print("Win/Loss/Tie:")
+        print(f"  Player 1 wins: {player1_wins} ({p1_pct:.1f}%)")
+        print(f"  Player 2 wins: {player2_wins} ({p2_pct:.1f}%)")
+        print(f"  Ties: {ties} ({tie_pct:.1f}%)")
+        print()
+        print("Timing:")
+        print(f"  Mean time per game: {mean_time:.3f}s")
+        print(f"  Min time: {min_time:.3f}s")
+        print(f"  Max time: {max_time:.3f}s")
+        print(f"  Std deviation: {std_time:.3f}s")
+        print(f"  Total execution time: {total_time:.3f}s")
         print("=" * 60)

@@ -459,4 +459,9 @@ policy = PolicyHead(combined)
 - Extract out game configurator (e.g. number of rings/marbles, win conditions, etc.)
 - Look for examples of technical debt.
 - Edge ring stuff - simpler to add all rings to collection and just check that rather that just add edge rings and if switch.
-- Check if get_all_permutations also includes all possible translations? (Even if they are eliminated via grouping.) 
+- Check if get_all_permutations also includes all possible translations? (Even if they are eliminated via grouping.)
+- investigate seed 1760840136
+- Player classes should use the PLAYER_x constants in their __init__
+- ✅ for MCTS player, optimization is when single capture move is only option do it without checking tree.
+- unit test to verify MCTS is actually being the right player at each level.
+- Tree visualizer.

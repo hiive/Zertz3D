@@ -44,188 +44,6 @@ class CanonicalizationManager:
         """
         self.board = board
 
-    # =========================  GEOMETRIC RING REMOVAL  =========================
-
-    def yx_to_cartesian(self, y, x):
-        """Convert board indices (y, x) to Cartesian coordinates.
-
-        Uses standard pointy-top hexagonal grid conversion:
-        - q = x - center
-        - r = y - x
-        - xc = sqrt(3) * (q + r/2)
-        - yc = 1.5 * r
-
-        Returns:
-            tuple: (xc, yc) Cartesian coordinates
-        """
-        c = self.board.width // 2
-        q = x - c
-        r = y - x
-        sqrt3 = np.sqrt(3)
-        xc = sqrt3 * (q + r / 2.0)
-        yc = 1.5 * r
-        return xc, yc
-
-    def is_removable_geometric(self, index, ring_radius=None):
-        """Check if a ring can be removed using geometric collision detection.
-
-        Uses actual Cartesian coordinates and perpendicular distance calculations
-        to verify that the ring can be slid out in some direction without colliding
-        with any other rings.
-
-        This method validates that the simple adjacency-based heuristic (_is_removable)
-        is geometrically correct.
-
-        Args:
-            index: (y, x) position of the ring to check
-            ring_radius: Radius of a ring (default √3/2 ≈ 0.866 for unit grid)
-
-        Returns:
-            bool: True if the ring can be removed
-        """
-        if ring_radius is None:
-            ring_radius = (
-                np.sqrt(3) / 2.0
-            )  # Correct radius for touching rings in unit hex grid
-
-        y, x = index
-
-        # Ring must be empty (no marble on it)
-        if np.sum(self.board.state[self.board.BOARD_LAYERS, y, x]) != 1:
-            return False
-
-        # Get Cartesian position of this ring
-        ring_x, ring_y = self.yx_to_cartesian(y, x)
-
-        # Get all neighbor positions
-        neighbors = self.board.get_neighbors(index)
-
-        # Check each pair of consecutive empty neighbors - each creates a potential slide direction
-        for i in range(len(neighbors)):
-            curr = neighbors[i]
-            next_neighbor = neighbors[(i + 1) % len(neighbors)]
-
-            curr_empty = (
-                not self.board._is_inbounds(curr) or self.board.state[self.board.RING_LAYER][curr] == 0
-            )
-            next_empty = (
-                not self.board._is_inbounds(next_neighbor)
-                or self.board.state[self.board.RING_LAYER][next_neighbor] == 0
-            )
-
-            if curr_empty and next_empty:
-                # Found a gap. Calculate the slide direction (angle bisector of the gap)
-                # The gap is between directions i and i+1
-                dy1, dx1 = self.board.DIRECTIONS[i]
-                dy2, dx2 = self.board.DIRECTIONS[(i + 1) % len(self.board.DIRECTIONS)]
-
-                # Convert direction offsets to actual neighbor positions, then to Cartesian vectors
-                neighbor1_pos = (y + dy1, x + dx1)
-                neighbor2_pos = (y + dy2, x + dx2)
-
-                # Get Cartesian positions of where these neighbors would be
-                n1_x, n1_y = self.yx_to_cartesian(*neighbor1_pos)
-                n2_x, n2_y = self.yx_to_cartesian(*neighbor2_pos)
-
-                # Direction vectors from ring to neighbor positions
-                dir1_x, dir1_y = n1_x - ring_x, n1_y - ring_y
-                dir2_x, dir2_y = n2_x - ring_x, n2_y - ring_y
-
-                # Normalize
-                norm1 = np.sqrt(dir1_x**2 + dir1_y**2)
-                norm2 = np.sqrt(dir2_x**2 + dir2_y**2)
-                if norm1 > 0:
-                    dir1_x, dir1_y = dir1_x / norm1, dir1_y / norm1
-                if norm2 > 0:
-                    dir2_x, dir2_y = dir2_x / norm2, dir2_y / norm2
-
-                # Angle bisector (slide direction)
-                slide_dx = dir1_x + dir2_x
-                slide_dy = dir1_y + dir2_y
-                slide_norm = np.sqrt(slide_dx**2 + slide_dy**2)
-
-                if slide_norm > 0:
-                    slide_dx /= slide_norm
-                    slide_dy /= slide_norm
-
-                    # Check if we can slide out in this direction without hitting other rings
-                    if self._can_slide_ring_out(
-                        ring_x, ring_y, slide_dx, slide_dy, index, ring_radius
-                    ):
-                        return True
-
-        return False
-
-    def _can_slide_ring_out(
-        self, ring_x, ring_y, slide_dx, slide_dy, ring_index, ring_radius
-    ):
-        """Check if a ring can be slid out in a given direction.
-
-        A ring is removable if it can slide at least one hex spacing (√3) in some
-        direction without colliding with other rings. This represents sliding the
-        ring one full hex-position away, which effectively removes it from play.
-
-        Physics of ring collision:
-        - In unit hex grid (size=1.0), adjacent centers are √3 apart
-        - For touching rings: ring_radius = √3/2 ≈ 0.866
-        - Ring diameter = 2 * ring_radius = √3
-        - Minimum slide distance = √3 (one hex spacing)
-        - Two rings collide if their centers are < √3 apart
-        - For slide path: rings collide if perpendicular distance < diameter (2 * ring_radius)
-
-        Args:
-            ring_x, ring_y: Cartesian position of the ring to slide
-            slide_dx, slide_dy: Normalized direction vector to slide
-            ring_index: (y, x) index of the ring being slid (to exclude from checks)
-            ring_radius: Radius of rings (should be √3/2 for unit grid)
-
-        Returns:
-            bool: True if ring can slide at least √3 distance without collision
-        """
-        # Minimum slide distance: one hex spacing
-        sqrt3 = np.sqrt(3)
-        min_slide_distance = sqrt3
-
-        # For a ring to be slideable, no other ring should be within 2*radius
-        # (diameter) of the slide path AND within the first √3 of travel
-
-        for y in range(self.board.width):
-            for x in range(self.board.width):
-                if (y, x) == ring_index:
-                    continue  # Don't check against ourselves
-
-                if self.board._is_inbounds((y, x)) and self.board.state[self.board.RING_LAYER, y, x] == 1:
-                    # This ring exists, check if it would block the slide
-                    other_x, other_y = self.yx_to_cartesian(y, x)
-
-                    # Vector from our ring to the other ring
-                    to_other_x = other_x - ring_x
-                    to_other_y = other_y - ring_y
-                    dist_sq = to_other_x**2 + to_other_y**2
-
-                    # Project onto slide direction
-                    projection = to_other_x * slide_dx + to_other_y * slide_dy
-
-                    # Only check rings in front of us AND within one hex spacing
-                    # Rings behind us or beyond the minimum slide distance don't matter
-                    if projection < 0 or projection > min_slide_distance:
-                        continue
-
-                    # Calculate perpendicular distance from the slide path
-                    # perp_dist² = |v|² - proj²
-                    perp_dist_sq = dist_sq - projection**2
-
-                    # If perpendicular distance < 2*radius, rings would collide during slide
-                    # Need at least 2*radius separation (ring diameters)
-                    # Use small tolerance for floating point comparison
-                    tolerance = 1e-6
-                    min_clearance_sq = (2 * ring_radius) ** 2
-                    if perp_dist_sq < min_clearance_sq - tolerance:
-                        # Would collide during the first √3 of slide
-                        return False
-
-        return True
-
     # =========================  SIMPLE SYMMETRY OPERATIONS  =========================
 
     def get_rotational_symmetries(self, state=None):
@@ -641,21 +459,22 @@ class CanonicalizationManager:
         # (category, translation_dist, rotation_angle, name_length)
         return (category, translation_dist, rotation_angle, len(name))
 
-    def get_all_transformations(self, state=None, include_translation=True):
+    def get_all_transformations(self, state=None, include_translation=True, deduplicate=True):
         """Get all valid transformation permutations of a state.
 
         Returns all transformations of the given state under the board's symmetry group.
-        Eliminates duplicate states, keeping only the simplest transform name for each.
+        By default, eliminates duplicate states, keeping only the simplest transform name for each.
 
-        For D6 boards (37/61 rings): Up to 18 rotation/mirror transforms (optionally × translations)
-        For D3 boards (48 rings): Up to 9 rotation/mirror transforms (optionally × translations)
+        For D6 boards (37/61 rings): 18 rotation/mirror transforms (optionally × translations)
+        For D3 boards (48 rings): 9 rotation/mirror transforms (optionally × translations)
 
         Args:
             state: Board state to transform (if None, uses current board state)
             include_translation: If True, includes all valid translations (default: True)
+            deduplicate: If True, eliminates duplicate states keeping simplest transform (default: True)
 
         Returns:
-            dict: Mapping of transform names to transformed states (duplicates removed)
+            dict: Mapping of transform names to transformed states
 
         Example:
             >>> manager = board.canonicalizer
@@ -704,7 +523,11 @@ class CanonicalizationManager:
 
                 all_transforms[combined_name] = transformed
 
-        # Now eliminate duplicates, keeping only the simplest transform for each unique state
+        # If deduplication is disabled, return all transforms
+        if not deduplicate:
+            return all_transforms
+
+        # Eliminate duplicates, keeping only the simplest transform for each unique state
         state_to_simplest = {}  # Maps state_key -> (transform_name, transformed_state)
 
         for name, transformed in all_transforms.items():
@@ -724,7 +547,7 @@ class CanonicalizationManager:
 
     # ======================  MAIN CANONICALIZATION  ==================
 
-    def canonicalize_state(self, transforms=TransformFlags.ALL):
+    def canonicalize_state(self, state=None, transforms=TransformFlags.ALL):
         """
         Return (canonical_state, transform_name, inverse_name).
 
@@ -732,6 +555,7 @@ class CanonicalizationManager:
         transformations. Transformations are applied in order: translation, then rotation/mirror.
 
         Args:
+            state: Board state to canonicalize (default: self.board.state)
             transforms: TransformFlags specifying which transforms to use (default: ALL)
 
         Returns:
@@ -740,8 +564,11 @@ class CanonicalizationManager:
                 - transform_name: Name of transform applied (e.g., "T2,1_MR120", "R60", "T1,-1")
                 - inverse_name: Inverse transform to map back to original orientation
         """
+        if state is None:
+            state = self.board.state
+
         best_name = "R0"
-        best_state = np.copy(self.board.state)
+        best_state = np.copy(state)
         best_key = self.canonical_key(best_state)
 
         # Build list of transform combinations based on flags
@@ -772,7 +599,7 @@ class CanonicalizationManager:
 
         # Get translation transforms if enabled
         if transforms & TransformFlags.TRANSLATION:
-            translation_ops = self.get_all_translations(self.board.state)
+            translation_ops = self.get_all_translations(state)
         else:
             # No translation, just identity
             translation_ops = [("T0,0", 0, 0)]
@@ -781,9 +608,9 @@ class CanonicalizationManager:
         for trans_name, dy, dx in translation_ops:
             # Apply translation
             if dy == 0 and dx == 0:
-                translated = self.board.state
+                translated = state
             else:
-                translated = self.translate_state(self.board.state, dy, dx)
+                translated = self.translate_state(state, dy, dx)
                 if translated is None:
                     continue  # Invalid translation
 
@@ -810,12 +637,12 @@ class CanonicalizationManager:
                     best_state = transformed
                     best_name = combined_name
 
-        inv = self.get_inverse_transform(best_name)
+        inv = self._get_inverse_transform(best_name)
         return best_state, best_name, inv
 
     # ======================  INVERSE TRANSFORMS  ===================
 
-    def get_inverse_transform(self, transform_name):
+    def _get_inverse_transform(self, transform_name):
         """
         Get the inverse of a symmetry transform.
 
@@ -840,27 +667,50 @@ class CanonicalizationManager:
         """
         # Check for combined transform (translation + rotation/mirror)
         if "_" in transform_name:
-            # Combined transform: "T{dy},{dx}_{rot_mirror}"
+            # Combined transform can be in two forms:
+            # 1. "T{dy},{dx}_{rot_mirror}" (translation first)
+            # 2. "{rot_mirror}_T{dy},{dx}" (rotation/mirror first)
             parts = transform_name.split("_")
             if len(parts) != 2:
                 raise ValueError(f"Invalid combined transform format: {transform_name}")
 
-            trans_part, rot_mirror_part = parts
+            first_part, second_part = parts
 
-            # Invert translation: T{dy},{dx} → T{-dy},{-dx}
-            if not trans_part.startswith("T"):
+            # Determine which form we have
+            if first_part.startswith("T"):
+                # Form 1: "T{dy},{dx}_{rot_mirror}"
+                trans_part = first_part
+                rot_mirror_part = second_part
+
+                # Extract dy, dx from "T{dy},{dx}"
+                coords = trans_part[1:]  # Remove "T"
+                dy, dx = map(int, coords.split(","))
+                inv_trans = f"T{-dy},{-dx}"
+
+                # Invert rotation/mirror part
+                inv_rot_mirror = self._get_inverse_transform(rot_mirror_part)
+
+                # Combine in reverse order: rot_mirror_inv _ trans_inv
+                return f"{inv_rot_mirror}_{inv_trans}"
+
+            elif second_part.startswith("T"):
+                # Form 2: "{rot_mirror}_T{dy},{dx}"
+                rot_mirror_part = first_part
+                trans_part = second_part
+
+                # Extract dy, dx from "T{dy},{dx}"
+                coords = trans_part[1:]  # Remove "T"
+                dy, dx = map(int, coords.split(","))
+                inv_trans = f"T{-dy},{-dx}"
+
+                # Invert rotation/mirror part
+                inv_rot_mirror = self._get_inverse_transform(rot_mirror_part)
+
+                # Combine in reverse order: trans_inv _ rot_mirror_inv
+                return f"{inv_trans}_{inv_rot_mirror}"
+
+            else:
                 raise ValueError(f"Expected translation in combined transform: {transform_name}")
-
-            # Extract dy, dx from "T{dy},{dx}"
-            coords = trans_part[1:]  # Remove "T"
-            dy, dx = map(int, coords.split(","))
-            inv_trans = f"T{-dy},{-dx}"
-
-            # Invert rotation/mirror part
-            inv_rot_mirror = self.get_inverse_transform(rot_mirror_part)
-
-            # Combine in reverse order: rot_mirror_inv _ trans_inv
-            return f"{inv_rot_mirror}_{inv_trans}"
 
         # Translation-only transform
         elif transform_name.startswith("T"):
@@ -896,24 +746,372 @@ class CanonicalizationManager:
         else:
             raise ValueError(f"Unknown transform name format: {transform_name}")
 
+    def _apply_transform(self, state, transform_name):
+        """Apply a named transform to a state.
+
+        Parses the transform name and applies the transformation to the given state.
+        Supports all transform types: rotations, mirrors, translations, and combinations.
+
+        Args:
+            state: Board state array to transform
+            transform_name: Transform name (e.g., "R60", "MR120", "T1,2", "T1,-1_R60")
+
+        Returns:
+            Transformed state array
+
+        Examples:
+            >>> # Apply 60° rotation
+            >>> rotated = manager.apply_transform(state, "R60")
+            >>> # Apply translation then mirror
+            >>> transformed = manager.apply_transform(state, "T2,1_MR0")
+        """
+        # Identity transform
+        if transform_name == "R0":
+            return np.copy(state)
+
+        # Parse combined transform (translation + rotation/mirror)
+        if "_" in transform_name:
+            # Combined transform can be in two forms:
+            # 1. "T{dy},{dx}_{rot_mirror}" (translation first)
+            # 2. "{rot_mirror}_T{dy},{dx}" (rotation/mirror first)
+            parts = transform_name.split("_")
+            if len(parts) != 2:
+                raise ValueError(f"Invalid combined transform format: {transform_name}")
+
+            first_part, second_part = parts
+
+            # Determine which form we have
+            if first_part.startswith("T"):
+                # Form 1: "T{dy},{dx}_{rot_mirror}" (translation first)
+                trans_part = first_part
+                rot_mirror_part = second_part
+
+                # Extract and apply translation
+                coords = trans_part[1:]  # Remove "T"
+                dy, dx = map(int, coords.split(","))
+                translated = self.translate_state(state, dy, dx)
+                if translated is None:
+                    raise ValueError(f"Invalid translation {trans_part} for given state")
+
+                # Then apply rotation/mirror to translated state
+                return self._apply_transform(translated, rot_mirror_part)
+
+            elif second_part.startswith("T"):
+                # Form 2: "{rot_mirror}_T{dy},{dx}" (rotation/mirror first)
+                rot_mirror_part = first_part
+                trans_part = second_part
+
+                # Apply rotation/mirror first
+                rotated = self._apply_transform(state, rot_mirror_part)
+
+                # Then apply translation
+                coords = trans_part[1:]  # Remove "T"
+                dy, dx = map(int, coords.split(","))
+                translated = self.translate_state(rotated, dy, dx)
+                if translated is None:
+                    raise ValueError(f"Invalid translation {trans_part} for given state")
+
+                return translated
+
+            else:
+                raise ValueError(f"Expected translation in combined transform: {transform_name}")
+
+        # Pure translation
+        elif transform_name.startswith("T"):
+            coords = transform_name[1:]  # Remove "T"
+            dy, dx = map(int, coords.split(","))
+            translated = self.translate_state(state, dy, dx)
+            if translated is None:
+                raise ValueError(f"Invalid translation {transform_name} for given state")
+            return translated
+
+        # Rotation/mirror transforms
+        elif transform_name.endswith("M") and not transform_name.startswith("MR"):
+            # R{k}M (mirror-then-rotate)
+            angle = int(transform_name[1:-1])  # Strip "R" and "M"
+            rot60_k = angle // 60
+            return self.transform_state_hex(state, rot60_k=rot60_k, mirror=True, mirror_first=True)
+
+        elif transform_name.startswith("MR"):
+            # MR{k} (rotate-then-mirror)
+            angle = int(transform_name[2:])
+            rot60_k = angle // 60
+            return self.transform_state_hex(state, rot60_k=rot60_k, mirror=True, mirror_first=False)
+
+        elif transform_name.startswith("R"):
+            # Pure rotation
+            angle = int(transform_name[1:])
+            rot60_k = angle // 60
+            return self.transform_state_hex(state, rot60_k=rot60_k, mirror=False)
+
+        else:
+            raise ValueError(f"Unknown transform name format: {transform_name}")
+
+    def decanonicalize(self, canonical_state, inverse_transform_name):
+        """Decanonicalize a state by applying its inverse transform.
+
+        Takes a canonical state and the inverse transform name (typically obtained from
+        canonicalize_state) and returns the original state before canonicalization.
+
+        This is the complement to canonicalize_state():
+        - canonicalize_state() transforms original → canonical using forward transform
+        - decanonicalize() transforms canonical → original using inverse transform
+
+        Args:
+            canonical_state: The canonical state array
+            inverse_transform_name: The inverse transform name (e.g., from canonicalize_state)
+
+        Returns:
+            Original state before canonicalization
+
+        Examples:
+            >>> # Canonicalize and then decanonicalize
+            >>> canonical, forward, inverse = manager.canonicalize_state()
+            >>> original = manager.decanonicalize(canonical, inverse)
+            >>> # original should match the pre-canonicalized state
+
+            >>> # Apply inverse to canonical state from another board
+            >>> original_state = manager.decanonicalize(canonical_state, "MR60_T-2,-1")
+        """
+        return self._apply_transform(canonical_state, inverse_transform_name)
+
+    @staticmethod
+    def _parse_rot_mirror(rot_mirror_name):
+        """Parse rotation/mirror transform name into parameters.
+
+        Args:
+            rot_mirror_name: Transform like "R60", "MR120", "R60M"
+
+        Returns:
+            tuple: (rot60_k, mirror, mirror_first) where rot60_k is number of 60° rotations
+        """
+        if rot_mirror_name == "R0":
+            return 0, False, False
+        elif rot_mirror_name.endswith("M") and not rot_mirror_name.startswith("MR"):
+            # R{k}M (mirror-then-rotate)
+            angle = int(rot_mirror_name[1:-1])
+            return angle // 60, True, True
+        elif rot_mirror_name.startswith("MR"):
+            # MR{k} (rotate-then-mirror)
+            angle = int(rot_mirror_name[2:])
+            return angle // 60, True, False
+        elif rot_mirror_name.startswith("R"):
+            # Pure rotation
+            angle = int(rot_mirror_name[1:])
+            return angle // 60, False, False
+        else:
+            raise ValueError(f"Unknown rotation/mirror format: {rot_mirror_name}")
+
+    def canonicalize_capture_mask(self, cap_mask, transform_name):
+        """Canonicalize a capture mask using a given transform.
+
+        Applies the same transformation to a capture mask that was applied to a state.
+        Typically used with the transform returned by canonicalize_state().
+
+        Args:
+            cap_mask: Capture mask array (6, H, W)
+            transform_name: Transform name from canonicalize_state() (e.g., "R60", "T1,2_MR120")
+
+        Returns:
+            tuple: (canonical_mask, transform_name, inverse_name)
+                - canonical_mask: The transformed mask
+                - transform_name: Same as input (for API consistency)
+                - inverse_name: Inverse transform to map back to original
+
+        Examples:
+            >>> # Canonicalize state and corresponding mask together
+            >>> canonical_state, transform, inverse = manager.canonicalize_state()
+            >>> canonical_mask, _, _ = manager.canonicalize_capture_mask(cap_mask, transform)
+        """
+        # Handle different transform formats by detecting order and applying appropriately
+        if transform_name == "R0":
+            # Identity
+            canonical_mask = np.copy(cap_mask)
+        elif "_" in transform_name:
+            # Combined transform - detect ordering
+            parts = transform_name.split("_")
+            if parts[0].startswith("T"):
+                # Form: "T{dy},{dx}_{rot_mirror}" - translation first
+                trans_part, rot_mirror_part = parts
+                coords = trans_part[1:]
+                dy, dx = map(int, coords.split(","))
+
+                # Extract rotation/mirror parameters
+                rot60_k, mirror, mirror_first = self._parse_rot_mirror(rot_mirror_part)
+
+                # Apply in order: translation first, then rotation/mirror
+                canonical_mask = self._transform_capture_mask(cap_mask, rot60_k, mirror, dy, dx, mirror_first)
+            elif parts[1].startswith("T"):
+                # Form: "{rot_mirror}_T{dy},{dx}" - rotation/mirror first
+                rot_mirror_part, trans_part = parts
+                coords = trans_part[1:]
+                dy, dx = map(int, coords.split(","))
+
+                # Extract rotation/mirror parameters
+                rot60_k, mirror, _ = self._parse_rot_mirror(rot_mirror_part)
+
+                # Apply in order: rotation/mirror first, then translation
+                # First apply rotation/mirror (no translation)
+                intermediate = self._transform_capture_mask(cap_mask, rot60_k, mirror, 0, 0)
+                # Then apply translation
+                canonical_mask = self._transform_capture_mask(intermediate, 0, False, dy, dx)
+            else:
+                raise ValueError(f"Expected translation in combined transform: {transform_name}")
+        elif transform_name.startswith("T"):
+            # Pure translation
+            coords = transform_name[1:]
+            dy, dx = map(int, coords.split(","))
+            canonical_mask = self._transform_capture_mask(cap_mask, 0, False, dy, dx)
+        else:
+            # Pure rotation/mirror
+            rot60_k, mirror, mirror_first = self._parse_rot_mirror(transform_name)
+            canonical_mask = self._transform_capture_mask(cap_mask, rot60_k, mirror, 0, 0, mirror_first)
+
+        inverse_name = self._get_inverse_transform(transform_name)
+        return canonical_mask, transform_name, inverse_name
+
+    def decanonicalize_capture_mask(self, canonical_mask, inverse_transform_name):
+        """Decanonicalize a capture mask by applying its inverse transform.
+
+        Takes a canonical capture mask and applies the inverse transform to recover
+        the original mask orientation.
+
+        Args:
+            canonical_mask: The canonical capture mask array (6, H, W)
+            inverse_transform_name: The inverse transform name (e.g., from canonicalize_capture_mask)
+
+        Returns:
+            Original mask before canonicalization
+
+        Examples:
+            >>> # Canonicalize and then decanonicalize
+            >>> canonical_mask, transform, inverse = manager.canonicalize_capture_mask(mask, "R60")
+            >>> original_mask = manager.decanonicalize_capture_mask(canonical_mask, inverse)
+        """
+        # Parse and apply inverse transform (reuse canonicalize logic)
+        result_mask, _, _ = self.canonicalize_capture_mask(canonical_mask, inverse_transform_name)
+        return result_mask
+
+    def canonicalize_put_mask(self, put_mask, transform_name):
+        """Canonicalize a put mask using a given transform.
+
+        Applies the same transformation to a put mask that was applied to a state.
+        Typically used with the transform returned by canonicalize_state().
+
+        Args:
+            put_mask: Put mask array (3, W*W, W*W+1)
+            transform_name: Transform name from canonicalize_state() (e.g., "R60", "T1,2_MR120")
+
+        Returns:
+            tuple: (canonical_mask, transform_name, inverse_name)
+                - canonical_mask: The transformed mask
+                - transform_name: Same as input (for API consistency)
+                - inverse_name: Inverse transform to map back to original
+
+        Examples:
+            >>> # Canonicalize state and corresponding mask together
+            >>> canonical_state, transform, inverse = manager.canonicalize_state()
+            >>> canonical_mask, _, _ = manager.canonicalize_put_mask(put_mask, transform)
+        """
+        # Handle different transform formats by detecting order and applying appropriately
+        if transform_name == "R0":
+            # Identity
+            canonical_mask = np.copy(put_mask)
+        elif "_" in transform_name:
+            # Combined transform - detect ordering
+            parts = transform_name.split("_")
+            if parts[0].startswith("T"):
+                # Form: "T{dy},{dx}_{rot_mirror}" - translation first
+                trans_part, rot_mirror_part = parts
+                coords = trans_part[1:]
+                dy, dx = map(int, coords.split(","))
+
+                # Extract rotation/mirror parameters
+                rot60_k, mirror, _ = self._parse_rot_mirror(rot_mirror_part)
+
+                # Apply in order: translation first, then rotation/mirror
+                canonical_mask = self._transform_put_mask(put_mask, rot60_k, mirror, dy, dx)
+            elif parts[1].startswith("T"):
+                # Form: "{rot_mirror}_T{dy},{dx}" - rotation/mirror first
+                rot_mirror_part, trans_part = parts
+                coords = trans_part[1:]
+                dy, dx = map(int, coords.split(","))
+
+                # Extract rotation/mirror parameters
+                rot60_k, mirror, _ = self._parse_rot_mirror(rot_mirror_part)
+
+                # Apply in order: rotation/mirror first, then translation
+                # First apply rotation/mirror (no translation)
+                intermediate = self._transform_put_mask(put_mask, rot60_k, mirror, 0, 0)
+                # Then apply translation
+                canonical_mask = self._transform_put_mask(intermediate, 0, False, dy, dx)
+            else:
+                raise ValueError(f"Expected translation in combined transform: {transform_name}")
+        elif transform_name.startswith("T"):
+            # Pure translation
+            coords = transform_name[1:]
+            dy, dx = map(int, coords.split(","))
+            canonical_mask = self._transform_put_mask(put_mask, 0, False, dy, dx)
+        else:
+            # Pure rotation/mirror
+            rot60_k, mirror, _ = self._parse_rot_mirror(transform_name)
+            canonical_mask = self._transform_put_mask(put_mask, rot60_k, mirror, 0, 0)
+
+        inverse_name = self._get_inverse_transform(transform_name)
+        return canonical_mask, transform_name, inverse_name
+
+    def decanonicalize_put_mask(self, canonical_mask, inverse_transform_name):
+        """Decanonicalize a put mask by applying its inverse transform.
+
+        Takes a canonical put mask and applies the inverse transform to recover
+        the original mask orientation.
+
+        Args:
+            canonical_mask: The canonical put mask array (3, W*W, W*W+1)
+            inverse_transform_name: The inverse transform name (e.g., from canonicalize_put_mask)
+
+        Returns:
+            Original mask before canonicalization
+
+        Examples:
+            >>> # Canonicalize and then decanonicalize
+            >>> canonical_mask, transform, inverse = manager.canonicalize_put_mask(mask, "R60")
+            >>> original_mask = manager.decanonicalize_put_mask(canonical_mask, inverse)
+        """
+        # Parse and apply inverse transform (reuse canonicalize logic)
+        result_mask, _, _ = self.canonicalize_put_mask(canonical_mask, inverse_transform_name)
+        return result_mask
+
     # ======================  MASK TRANSFORMATIONS  ===================
 
-    def dir_index_map(self, rot60_k=0, mirror=False):
+    def _dir_index_map(self, rot60_k=0, mirror=False, mirror_first=False):
         """
         Map capture direction indices (0..5) under the same symmetry used for state.
         We transform a direction vector v=(dy,dx) via axial:
            (dq,dr) = (dx, dy-dx)
            rotate/mirror in axial
            back to (dy',dx') with: dx' = dq, dy' = dr + dq
+
+        Args:
+            rot60_k: Number of 60° rotations
+            mirror: Whether to apply mirror transformation
+            mirror_first: If True, mirror then rotate. If False, rotate then mirror.
         """
         # Original direction vectors in your order:
         dirs = self.board.DIRECTIONS
 
         def xform_vec(dy, dx):
             dq, dr = dx, (dy - dx)
-            dq, dr = self.ax_rot60(dq, dr, rot60_k)
-            if mirror:
-                dq, dr = self.ax_mirror_q_axis(dq, dr)
+            if mirror_first:
+                # Mirror first, then rotate (for R{k}M transforms)
+                if mirror:
+                    dq, dr = self.ax_mirror_q_axis(dq, dr)
+                dq, dr = self.ax_rot60(dq, dr, rot60_k)
+            else:
+                # Rotate first, then mirror (for MR{k} transforms)
+                dq, dr = self.ax_rot60(dq, dr, rot60_k)
+                if mirror:
+                    dq, dr = self.ax_mirror_q_axis(dq, dr)
             dx2 = dq
             dy2 = dr + dq
             return (dy2, dx2)
@@ -925,43 +1123,97 @@ class CanonicalizationManager:
             idx_map[i] = j
         return idx_map
 
-    def transform_capture_mask(self, cap_mask, rot60_k=0, mirror=False):
+    def _transform_capture_mask(self, cap_mask, rot60_k=0, mirror=False, dy=0, dx=0, mirror_first=False):
         """
         cap_mask shape: (6, H, W). Returns transformed mask matching state xform.
+
+        Applies translation first, then rotation/mirror, matching the state transformation order.
+
+        Args:
+            cap_mask: Capture mask array (6, H, W)
+            rot60_k: Number of 60° rotations
+            mirror: Whether to apply mirror transformation
+            dy: Translation offset in y direction
+            dx: Translation offset in x direction
+            mirror_first: If True, mirror then rotate. If False, rotate then mirror.
         """
         self.build_axial_maps()
         out = np.zeros_like(cap_mask)
-        dmap = self.dir_index_map(rot60_k, mirror)
+        dmap = self._dir_index_map(rot60_k, mirror, mirror_first)
 
         for (y, x), (q, r) in self.board._yx_to_ax.items():
-            q2, r2 = self.ax_rot60(q, r, rot60_k)
-            if mirror:
-                q2, r2 = self.ax_mirror_q_axis(q2, r2)
+            # Apply translation to get translated position
+            y_trans, x_trans = y + dy, x + dx
+
+            # Get axial coordinates of translated position
+            if (y_trans, x_trans) not in self.board._yx_to_ax:
+                continue  # Translated position is not on the board
+            q_trans, r_trans = self.board._yx_to_ax[(y_trans, x_trans)]
+
+            # Apply rotation/mirror to translated axial coordinates
+            if mirror_first:
+                # Mirror first, then rotate (for R{k}M transforms)
+                if mirror:
+                    q2, r2 = self.ax_mirror_q_axis(q_trans, r_trans)
+                else:
+                    q2, r2 = q_trans, r_trans
+                q2, r2 = self.ax_rot60(q2, r2, rot60_k)
+            else:
+                # Rotate first, then mirror (for MR{k} transforms)
+                q2, r2 = self.ax_rot60(q_trans, r_trans, rot60_k)
+                if mirror:
+                    q2, r2 = self.ax_mirror_q_axis(q2, r2)
+
+            # Convert back to (y, x) coordinates
             dst = self.board._ax_to_yx.get((q2, r2))
             if dst is None:
                 continue
             y2, x2 = dst
+
+            # Map mask values: original position (y,x) → final position (y2,x2)
             for d in range(6):
                 out[dmap[d], y2, x2] = cap_mask[d, y, x]
         return out
 
-    def transform_put_mask(self, put_mask, rot60_k=0, mirror=False):
+    def _transform_put_mask(self, put_mask, rot60_k=0, mirror=False, dy=0, dx=0):
         """
         put_mask shape: (3, W*W, W*W+1). Applies same symmetry to (put, rem) indices.
+
+        Applies translation first, then rotation/mirror, matching the state transformation order.
+
+        Args:
+            put_mask: Put mask array (3, W*W, W*W+1)
+            rot60_k: Number of 60° rotations
+            mirror: Whether to apply mirror transformation
+            dy: Translation offset in y direction
+            dx: Translation offset in x direction
         """
         self.build_axial_maps()
         out = np.zeros_like(put_mask)
 
         # Build flat-index permutation for valid cells
         flat_map = {}  # src_flat -> dst_flat
-        for (y, x), (q, r) in self.board._yx_to_ax.items():
-            q2, r2 = self.ax_rot60(q, r, rot60_k)
+        for (y, x) in self.board._yx_to_ax.keys():
+            # Apply translation to get translated position
+            y_trans, x_trans = y + dy, x + dx
+
+            # Get axial coordinates of translated position
+            if (y_trans, x_trans) not in self.board._yx_to_ax:
+                continue  # Translated position is not on the board
+            q_trans, r_trans = self.board._yx_to_ax[(y_trans, x_trans)]
+
+            # Apply rotation/mirror to translated axial coordinates
+            q2, r2 = self.ax_rot60(q_trans, r_trans, rot60_k)
             if mirror:
                 q2, r2 = self.ax_mirror_q_axis(q2, r2)
+
+            # Convert back to (y, x) coordinates
             dst = self.board._ax_to_yx.get((q2, r2))
             if dst is None:
                 continue
             y2, x2 = dst
+
+            # Map flat indices: original (y,x) → final (y2,x2)
             flat_map[y * self.board.width + x] = y2 * self.board.width + x2
 
         M, P, R = put_mask.shape

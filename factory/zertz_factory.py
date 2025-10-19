@@ -38,6 +38,7 @@ class ZertzFactory:
         human_players: tuple[int, ...] | None = None,
         start_delay: float = 0.0,
         track_statistics: bool = False,
+        mcts_player2_iterations: int | None = None,
     ) -> ZertzGameController:
         """Create a fully-wired ZertzGameController with appropriate renderers."""
 
@@ -88,4 +89,5 @@ class ZertzFactory:
             renderer_or_factory=renderer_factory,
             human_players=human_players,
             track_statistics=track_statistics,
+            mcts_player2_iterations=mcts_player2_iterations,
         )

@@ -17,6 +17,7 @@ from game.zertz_game import (
     BLITZ_WIN_CONDITIONS,
 )
 from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer, HumanZertzPlayer
+from game.players.mcts_zertz_player import MCTSZertzPlayer
 
 
 class GameSession:
@@ -32,6 +33,7 @@ class GameSession:
         t=5,
         status_reporter: Callable[[str], None] | None = None,
         human_players: tuple[int, ...] | None = None,
+        mcts_player2_iterations: int | None = None,
     ):
         """Initialize a game session.
 
@@ -42,11 +44,13 @@ class GameSession:
             replay_actions: Tuple of (player1_actions, player2_actions) for replay mode
             partial_replay: If True, continue with random play after replay ends
             t: History depth for loop detection
+            mcts_player2_iterations: If not None, use MCTS player for player 2 with this many iterations
         """
         self.rings = rings
         self.blitz = blitz
         self.t = t
         self._status_reporter: Callable[[str], None] | None = status_reporter
+        self.mcts_player2_iterations = mcts_player2_iterations
 
         # Set marbles and win conditions based on variant
         if blitz:
@@ -134,12 +138,27 @@ class GameSession:
             self.player1 = ReplayZertzPlayer(self.game, 1, player1_actions)
             self.player2 = ReplayZertzPlayer(self.game, 2, player2_actions)
         else:
+            # Create player 1
             if 1 in self.human_players:
                 self.player1 = HumanZertzPlayer(self.game, 1)
             else:
                 self.player1 = RandomZertzPlayer(self.game, 1)
+
+            # Create player 2 (can be human, MCTS, or random)
             if 2 in self.human_players:
                 self.player2 = HumanZertzPlayer(self.game, 2)
+            elif self.mcts_player2_iterations is not None:
+                # Use MCTS player with specified iterations
+                # Don't persist data across moves (clear_table_each_move=True)
+                self.player2 = MCTSZertzPlayer(
+                    self.game,
+                    n=2,
+                    iterations=self.mcts_player2_iterations,
+                    use_transposition_table=True,
+                    use_transposition_lookups=True,
+                    clear_table_each_move=True,
+                    verbose=False
+                )
             else:
                 self.player2 = RandomZertzPlayer(self.game, 2)
 
@@ -166,13 +185,28 @@ class GameSession:
                 "Cannot switch to random play when partial_replay is False"
             )
 
-        self._report("Replay finished - continuing with random play")
+        self._report("Replay finished - continuing with random/MCTS play")
+
+        # Create player 1
         if 1 in self.human_players:
             self.player1 = HumanZertzPlayer(self.game, 1)
         else:
             self.player1 = RandomZertzPlayer(self.game, 1)
+
+        # Create player 2 (can be human, MCTS, or random)
         if 2 in self.human_players:
             self.player2 = HumanZertzPlayer(self.game, 2)
+        elif self.mcts_player2_iterations is not None:
+            # Use MCTS player with specified iterations
+            self.player2 = MCTSZertzPlayer(
+                self.game,
+                n=2,
+                iterations=self.mcts_player2_iterations,
+                use_transposition_table=True,
+                use_transposition_lookups=True,
+                clear_table_each_move=True,
+                verbose=False
+            )
         else:
             self.player2 = RandomZertzPlayer(self.game, 2)
 

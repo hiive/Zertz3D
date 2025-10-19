@@ -100,7 +100,7 @@ class TestHexRotation:
         test_state[board.MARBLE_TO_LAYER["w"], y, x] = 1  # Place white marble
 
         # Apply rotation
-        rotated = board._transform_state_hex(test_state, rot60_k=k)
+        rotated = board.canonicalizer.transform_state_hex(test_state, rot60_k=k)
 
         # Find where the marble ended up
         (end_y, end_x) = np.argwhere(rotated[board.MARBLE_TO_LAYER["w"]] == 1)[0]
@@ -128,7 +128,7 @@ class TestHexRotation:
         ] = 1
 
         for k in range(6):
-            rotated = small_board._transform_state_hex(test_state, rot60_k=k)
+            rotated = small_board.canonicalizer.transform_state_hex(test_state, rot60_k=k)
             assert np.sum(rotated[small_board.MARBLE_TO_LAYER["w"]]) == 1, (
                 f"White marbles not preserved for k={k}"
             )
@@ -164,7 +164,7 @@ class TestHexMirror:
         test_state[board.RING_LAYER] = board.state[board.RING_LAYER]
         test_state[board.MARBLE_TO_LAYER["w"], y, x] = 1
 
-        mirrored = board._transform_state_hex(test_state, mirror=True)
+        mirrored = board.canonicalizer.transform_state_hex(test_state, mirror=True)
         (end_y, end_x) = np.argwhere(mirrored[board.MARBLE_TO_LAYER["w"]] == 1)[0]
         end_pos = board.index_to_str((end_y, end_x))
 
@@ -179,8 +179,8 @@ class TestHexMirror:
         base[1, *small_board.str_to_index("A4")] = 1
         base[2, *small_board.str_to_index("B3")] = 1
 
-        once = small_board._transform_state_hex(base, mirror=True)
-        twice = small_board._transform_state_hex(once, mirror=True)
+        once = small_board.canonicalizer.transform_state_hex(base, mirror=True)
+        twice = small_board.canonicalizer.transform_state_hex(once, mirror=True)
 
         assert np.array_equal(base, twice), (
             "Mirror applied twice should return original"
@@ -195,9 +195,9 @@ class TestCombinedSymmetries:
         base[1, *small_board.str_to_index("A4")] = 1
 
         # Rotating by 120° twice should equal rotating by 240°
-        rot_120 = small_board._transform_state_hex(base, rot60_k=2)
-        rot_240_via_composition = small_board._transform_state_hex(rot_120, rot60_k=2)
-        rot_240_direct = small_board._transform_state_hex(base, rot60_k=4)
+        rot_120 = small_board.canonicalizer.transform_state_hex(base, rot60_k=2)
+        rot_240_via_composition = small_board.canonicalizer.transform_state_hex(rot_120, rot60_k=2)
+        rot_240_direct = small_board.canonicalizer.transform_state_hex(base, rot60_k=4)
 
         assert np.array_equal(rot_240_via_composition, rot_240_direct), (
             "Rotation composition failed"
@@ -219,11 +219,11 @@ class TestCombinedSymmetries:
         states = []
         # 6 rotations
         for k in range(6):
-            states.append(small_board._transform_state_hex(base, rot60_k=k))
+            states.append(small_board.canonicalizer.transform_state_hex(base, rot60_k=k))
         # 6 mirror + rotations
         for k in range(6):
             states.append(
-                small_board._transform_state_hex(base, rot60_k=k, mirror=True)
+                small_board.canonicalizer.transform_state_hex(base, rot60_k=k, mirror=True)
             )
 
         # Check all states are unique
@@ -305,11 +305,11 @@ class TestSymmetryPatterns:
         states = []
         # 6 rotations
         for k in range(6):
-            states.append(board._transform_state_hex(base_state, rot60_k=k))
+            states.append(board.canonicalizer.transform_state_hex(base_state, rot60_k=k))
         # 6 mirror + rotations
         for k in range(6):
             states.append(
-                board._transform_state_hex(base_state, rot60_k=k, mirror=True)
+                board.canonicalizer.transform_state_hex(base_state, rot60_k=k, mirror=True)
             )
 
         unique = {s.tobytes() for s in states}
@@ -441,13 +441,13 @@ class TestSymmetryPatterns:
         # Collect all rotation states
         rotation_states = set()
         for k in range(6):
-            state = small_board._transform_state_hex(base, rot60_k=k)
+            state = small_board.canonicalizer.transform_state_hex(base, rot60_k=k)
             rotation_states.add(state.tobytes())
 
         # Collect all mirror + rotation states
         mirror_states = set()
         for k in range(6):
-            state = small_board._transform_state_hex(base, rot60_k=k, mirror=True)
+            state = small_board.canonicalizer.transform_state_hex(base, rot60_k=k, mirror=True)
             mirror_states.add(state.tobytes())
 
         # Check for overlap
@@ -614,7 +614,7 @@ class TestSpiralMirror:
 
             try:
                 # Apply the mirror transformation
-                mirrored = small_board._transform_state_hex(base, mirror=True)
+                mirrored = small_board.canonicalizer.transform_state_hex(base, mirror=True)
 
                 # Record where each marble ended up
                 pattern_after = []
@@ -629,7 +629,7 @@ class TestSpiralMirror:
                 results[name] = pattern_after
 
                 # Check if it's involutive (applying twice returns original)
-                double_mirrored = small_board._transform_state_hex(
+                double_mirrored = small_board.canonicalizer.transform_state_hex(
                     mirrored, mirror=True
                 )
                 is_involutive = np.array_equal(double_mirrored, base)
@@ -637,7 +637,7 @@ class TestSpiralMirror:
                 # Check if it matches any rotation (it shouldn't for a true mirror)
                 matches_rotation = None
                 for k in range(6):
-                    rotated = small_board._transform_state_hex(base, rot60_k=k)
+                    rotated = small_board.canonicalizer.transform_state_hex(base, rot60_k=k)
                     if np.array_equal(mirrored, rotated):
                         matches_rotation = k * 60
                         break
@@ -697,7 +697,7 @@ class TestSpiralMirror:
             base[marble_layer, *small_board.str_to_index(pos)] = 1
 
         # Apply mirror
-        mirrored = small_board._transform_state_hex(base, mirror=True)
+        mirrored = small_board.canonicalizer.transform_state_hex(base, mirror=True)
 
         # For a vertical mirror (if that's what we have), the arrow should point left
         # Check that F4 (rightmost) marble is now at B4 (leftmost)
@@ -723,7 +723,7 @@ class TestSpiralMirror:
             # The exact positions depend on which axis the mirror uses
             # But it should NOT be the same as any rotation
             for k in range(1, 6):  # Skip identity
-                rotated = small_board._transform_state_hex(base, rot60_k=k)
+                rotated = small_board.canonicalizer.transform_state_hex(base, rot60_k=k)
                 assert not np.array_equal(mirrored, rotated), (
                     f"Mirror result matches {k * 60}° rotation - not a true reflection!"
                 )
@@ -777,7 +777,7 @@ class TestSpiralMirror:
             return sequence
 
         # Apply mirror
-        mirrored = small_board._transform_state_hex(base, mirror=True)
+        mirrored = small_board.canonicalizer.transform_state_hex(base, mirror=True)
         mirrored_sequence = get_spiral_sequence(mirrored)
         original_sequence = get_spiral_sequence(base)
 
@@ -789,7 +789,7 @@ class TestSpiralMirror:
         )
 
         for k in range(1, 6):
-            rotated = small_board._transform_state_hex(base, rot60_k=k)
+            rotated = small_board.canonicalizer.transform_state_hex(base, rot60_k=k)
             # Rotations preserve chirality, so if mirror equals any rotation,
             # it's not a true mirror
             if np.array_equal(mirrored, rotated):
@@ -799,7 +799,7 @@ class TestSpiralMirror:
                 )
 
         # Also verify involution
-        double_mirrored = small_board._transform_state_hex(mirrored, mirror=True)
+        double_mirrored = small_board.canonicalizer.transform_state_hex(mirrored, mirror=True)
         assert np.array_equal(double_mirrored, base), (
             "Mirror is not involutive - applying twice doesn't return original"
         )
@@ -820,13 +820,13 @@ class TestCanonicalTransform:
         base[3, *small_board.str_to_index("E3")] = 1
 
         # Get all transforms as a dictionary
-        transforms = dict(small_board._get_all_symmetry_transforms())
+        transforms = dict(small_board.canonicalizer.get_all_symmetry_transforms())
 
         # Test what MR120 actually does
         mr120 = transforms["MR120"](base)
 
         # Get the calculated inverse
-        inverse_name = small_board._get_inverse_transform("MR120")
+        inverse_name = small_board.canonicalizer._get_inverse_transform("MR120")
         print(f"\nCalculated inverse of MR120: {inverse_name}")
 
         # Apply the inverse
@@ -879,13 +879,13 @@ class TestCanonicalTransform:
 
         for k in test_angles:
             # === Test MR(k): rotate-then-mirror (default behavior) ===
-            mr_combined = board._transform_state_hex(
+            mr_combined = board.canonicalizer.transform_state_hex(
                 base, rot60_k=k, mirror=True, mirror_first=False
             )
 
             # Manual two-step: rotate then mirror
-            rotated = board._transform_state_hex(base, rot60_k=k)
-            rot_then_mirror = board._transform_state_hex(rotated, mirror=True)
+            rotated = board.canonicalizer.transform_state_hex(base, rot60_k=k)
+            rot_then_mirror = board.canonicalizer.transform_state_hex(rotated, mirror=True)
 
             # MR(k) should match manual rotate-then-mirror
             assert np.array_equal(mr_combined, rot_then_mirror), (
@@ -894,13 +894,13 @@ class TestCanonicalTransform:
             )
 
             # === Test R(k)M: mirror-then-rotate ===
-            rm_combined = board._transform_state_hex(
+            rm_combined = board.canonicalizer.transform_state_hex(
                 base, rot60_k=k, mirror=True, mirror_first=True
             )
 
             # Manual two-step: mirror then rotate
-            mirrored = board._transform_state_hex(base, mirror=True)
-            mirror_then_rot = board._transform_state_hex(mirrored, rot60_k=k)
+            mirrored = board.canonicalizer.transform_state_hex(base, mirror=True)
+            mirror_then_rot = board.canonicalizer.transform_state_hex(mirrored, rot60_k=k)
 
             # R(k)M should match manual mirror-then-rotate
             assert np.array_equal(rm_combined, mirror_then_rot), (
@@ -925,19 +925,19 @@ class TestCanonicalTransform:
         # === Test that pure rotation and pure mirror work correctly ===
         # Pure rotation (no mirror)
         for k in test_angles:
-            pure_rot = board._transform_state_hex(base, rot60_k=k, mirror=False)
+            pure_rot = board.canonicalizer.transform_state_hex(base, rot60_k=k, mirror=False)
             assert np.sum(pure_rot) == np.sum(base), (
                 f"{board.rings}-ring: Pure rotation R({k*60}°) should preserve marble count"
             )
 
         # Pure mirror (no rotation)
-        pure_mirror = board._transform_state_hex(base, rot60_k=0, mirror=True)
+        pure_mirror = board.canonicalizer.transform_state_hex(base, rot60_k=0, mirror=True)
         assert np.sum(pure_mirror) == np.sum(base), (
             f"{board.rings}-ring: Pure mirror should preserve marble count"
         )
 
         # Verify pure mirror is involutive (applying twice returns original)
-        double_mirror = board._transform_state_hex(pure_mirror, rot60_k=0, mirror=True)
+        double_mirror = board.canonicalizer.transform_state_hex(pure_mirror, rot60_k=0, mirror=True)
         assert np.array_equal(base, double_mirror), (
             f"{board.rings}-ring: Mirror applied twice should return to original"
         )
@@ -955,7 +955,7 @@ class TestCanonicalTransform:
         base[3, *small_board.str_to_index("E3")] = 1
 
         # Get all transforms as a dictionary
-        transforms = dict(small_board._get_all_symmetry_transforms())
+        transforms = dict(small_board.canonicalizer.get_all_symmetry_transforms())
 
         # Test all transformations and their calculated inverses
         failures = []
@@ -965,7 +965,7 @@ class TestCanonicalTransform:
             transformed = transform_fn(base)
 
             # Get the calculated inverse
-            inverse_name = small_board._get_inverse_transform(transform_name)
+            inverse_name = small_board.canonicalizer._get_inverse_transform(transform_name)
 
             # Check the inverse exists
             if inverse_name not in transforms:
@@ -1002,7 +1002,7 @@ class TestCanonicalTransform:
 
         # Apply the inverse to the canonical form
         # This should give us back the original
-        transforms = dict(small_board._get_all_symmetry_transforms())
+        transforms = dict(small_board.canonicalizer.get_all_symmetry_transforms())
 
         if inverse_transform in transforms:
             recovered = transforms[inverse_transform](canonical)
@@ -1020,7 +1020,7 @@ class TestTranslationCanonicalization:
 
     def test_bounding_box_full_board(self, small_board):
         """Test that full board has expected bounding box."""
-        bbox = small_board._get_bounding_box()
+        bbox = small_board.canonicalizer.get_bounding_box()
         assert bbox is not None, "Full board should have bounding box"
 
         min_y, max_y, min_x, max_x = bbox
@@ -1037,7 +1037,7 @@ class TestTranslationCanonicalization:
             y, x = small_board.str_to_index(pos)
             small_board.state[small_board.RING_LAYER, y, x] = 0
 
-        bbox = small_board._get_bounding_box()
+        bbox = small_board.canonicalizer.get_bounding_box()
         assert bbox is not None, "Board with removed edges should have bounding box"
 
         # Bounding box should be smaller than full board now
@@ -1051,14 +1051,14 @@ class TestTranslationCanonicalization:
         # Remove all rings
         small_board.state[small_board.RING_LAYER] = 0
 
-        bbox = small_board._get_bounding_box()
+        bbox = small_board.canonicalizer.get_bounding_box()
         assert bbox is None, "Empty board should return None for bounding box"
 
     def test_translation_identity(self, small_board):
         """Test that translating by (0, 0) returns the same state."""
         original = np.copy(small_board.state)
 
-        translated = small_board._translate_state(original, 0, 0)
+        translated = small_board.canonicalizer.translate_state(original, 0, 0)
 
         assert translated is not None, "Identity translation should be valid"
         assert np.array_equal(translated, original), "T(0,0) should preserve state"
@@ -1075,7 +1075,7 @@ class TestTranslationCanonicalization:
         original_marbles = np.sum(original[small_board.MARBLE_LAYERS])
 
         # Try translation by (1, 0)
-        translated = small_board._translate_state(original, 1, 0)
+        translated = small_board.canonicalizer.translate_state(original, 1, 0)
 
         if translated is not None:
             translated_rings = np.sum(translated[small_board.RING_LAYER])
@@ -1087,13 +1087,13 @@ class TestTranslationCanonicalization:
     def test_translation_invalid_off_board(self, small_board):
         """Test that translation moving rings off-board returns None."""
         # Try to translate by large offset that would move rings off-board
-        translated = small_board._translate_state(small_board.state, 10, 10)
+        translated = small_board.canonicalizer.translate_state(small_board.state, 10, 10)
 
         assert translated is None, "Translation moving rings off-board should return None"
 
     def test_get_all_translations_full_board(self, small_board):
         """Test that full board has minimal translation options."""
-        translations = small_board._get_all_translations()
+        translations = small_board.canonicalizer.get_all_translations()
 
         assert len(translations) > 0, "Should have at least identity translation"
 
@@ -1118,14 +1118,14 @@ class TestTranslationCanonicalization:
             except:
                 pass  # Some positions might not exist
 
-        translations = small_board._get_all_translations()
+        translations = small_board.canonicalizer.get_all_translations()
 
         # Should have more than just identity with a small cluster
         assert len(translations) > 1, f"Board with small cluster should have multiple valid translations, got {len(translations)}"
 
         # All translations should be valid (not None)
         for name, dy, dx in translations:
-            translated = small_board._translate_state(small_board.state, dy, dx)
+            translated = small_board.canonicalizer.translate_state(small_board.state, dy, dx)
             assert translated is not None, f"Translation {name} should be valid"
 
     def test_get_all_translations_empty_board(self, small_board):
@@ -1133,7 +1133,7 @@ class TestTranslationCanonicalization:
         # Remove all rings
         small_board.state[small_board.RING_LAYER] = 0
 
-        translations = small_board._get_all_translations()
+        translations = small_board.canonicalizer.get_all_translations()
 
         assert len(translations) == 1, "Empty board should only have identity"
         assert translations[0] == ("T0,0", 0, 0), "Empty board should return T0,0"
@@ -1263,7 +1263,7 @@ class TestTranslationCanonicalization:
         ]
 
         for transform, expected_inverse in test_cases:
-            inverse = small_board._get_inverse_transform(transform)
+            inverse = small_board.canonicalizer._get_inverse_transform(transform)
             assert inverse == expected_inverse, (
                 f"Inverse of {transform} should be {expected_inverse}, got {inverse}"
             )
@@ -1279,7 +1279,7 @@ class TestTranslationCanonicalization:
         ]
 
         for transform, expected_inverse in test_cases:
-            inverse = small_board._get_inverse_transform(transform)
+            inverse = small_board.canonicalizer._get_inverse_transform(transform)
             assert inverse == expected_inverse, (
                 f"Inverse of {transform} should be {expected_inverse}, got {inverse}"
             )
@@ -1298,11 +1298,11 @@ class TestTranslationCanonicalization:
 
         for dy, dx in translations_to_test:
             # Apply translation
-            translated = small_board._translate_state(original, dy, dx)
+            translated = small_board.canonicalizer.translate_state(original, dy, dx)
 
             if translated is not None:
                 # Apply inverse translation
-                recovered = small_board._translate_state(translated, -dy, -dx)
+                recovered = small_board.canonicalizer.translate_state(translated, -dy, -dx)
 
                 assert recovered is not None, f"Inverse translation ({-dy},{-dx}) should be valid"
                 assert np.array_equal(recovered, original), (
@@ -1335,7 +1335,7 @@ class TestTranslationCanonicalization:
         temp_board.state = canonical
 
         # Get transform functions
-        transforms = dict(temp_board._get_all_symmetry_transforms())
+        transforms = dict(temp_board.canonicalizer.get_all_symmetry_transforms())
 
         # If the transform is combined (has translation), we need to apply inverse differently
         if "_" in transform:
@@ -1408,7 +1408,7 @@ class TestTranslationCanonicalization:
         original_capture = board_with_history.state[board_with_history.CAPTURE_LAYER].copy()
 
         # Apply translation
-        translated = board_with_history._translate_state(board_with_history.state, 1, 0)
+        translated = board_with_history.canonicalizer.translate_state(board_with_history.state, 1, 0)
 
         if translated is not None:
             # History layers should be preserved (not translated)
@@ -1431,7 +1431,7 @@ class TestBoardSizeSymmetries:
         """37-ring board should have D6 symmetry (18 transforms: 6R + 6MR + 6RM)."""
         small_board._build_axial_maps()
 
-        transforms = dict(small_board._get_all_symmetry_transforms())
+        transforms = dict(small_board.canonicalizer.get_all_symmetry_transforms())
 
         # Should have exactly 18 transforms
         assert len(transforms) == 18, (
@@ -1457,7 +1457,7 @@ class TestBoardSizeSymmetries:
         """48-ring board should have D3 symmetry (9 transforms: 3R + 3MR + 3RM)."""
         medium_board._build_axial_maps()
 
-        transforms = dict(medium_board._get_all_symmetry_transforms())
+        transforms = dict(medium_board.canonicalizer.get_all_symmetry_transforms())
 
         # Should have exactly 9 transforms
         assert len(transforms) == 9, (
@@ -1495,7 +1495,7 @@ class TestBoardSizeSymmetries:
         """61-ring board should have D6 symmetry (18 transforms: 6R + 6MR + 6RM)."""
         large_board._build_axial_maps()
 
-        transforms = dict(large_board._get_all_symmetry_transforms())
+        transforms = dict(large_board.canonicalizer.get_all_symmetry_transforms())
 
         # Should have exactly 18 transforms
         assert len(transforms) == 18, (
@@ -1532,7 +1532,7 @@ class TestBoardSizeSymmetries:
         board = request.getfixturevalue(board_fixture)
         board._build_axial_maps()
 
-        transforms = dict(board._get_all_symmetry_transforms())
+        transforms = dict(board.canonicalizer.get_all_symmetry_transforms())
 
         assert len(transforms) == expected_count, (
             f"Expected {expected_count} transforms, got {len(transforms)}"
@@ -1541,7 +1541,7 @@ class TestBoardSizeSymmetries:
         # Every transform should have an inverse that exists in the dictionary
         missing_inverses = []
         for transform_name in transforms:
-            inverse_name = board._get_inverse_transform(transform_name)
+            inverse_name = board.canonicalizer._get_inverse_transform(transform_name)
             if inverse_name not in transforms:
                 missing_inverses.append(f"{transform_name} -> {inverse_name}")
 
@@ -1571,7 +1571,7 @@ class TestBoardSizeSymmetries:
         for pos, layer in positions:
             base[layer, *board.str_to_index(pos)] = 1
 
-        transforms = dict(board._get_all_symmetry_transforms())
+        transforms = dict(board.canonicalizer.get_all_symmetry_transforms())
         failures = []
 
         for transform_name, transform_fn in transforms.items():
@@ -1579,7 +1579,7 @@ class TestBoardSizeSymmetries:
             transformed = transform_fn(base)
 
             # Get and apply inverse
-            inverse_name = board._get_inverse_transform(transform_name)
+            inverse_name = board.canonicalizer._get_inverse_transform(transform_name)
             if inverse_name in transforms:
                 recovered = transforms[inverse_name](transformed)
 
@@ -1601,7 +1601,7 @@ class TestBoardSizeSymmetries:
         base[2, *medium_board.str_to_index("B4")] = 1
         base[3, *medium_board.str_to_index("F4")] = 1
 
-        transforms = dict(medium_board._get_all_symmetry_transforms())
+        transforms = dict(medium_board.canonicalizer.get_all_symmetry_transforms())
         unique_states = set()
 
         for transform_fn in transforms.values():
@@ -1619,8 +1619,8 @@ class TestBoardSizeSymmetries:
         small_board._build_axial_maps()
         large_board._build_axial_maps()
 
-        small_transforms = set(dict(small_board._get_all_symmetry_transforms()).keys())
-        large_transforms = set(dict(large_board._get_all_symmetry_transforms()).keys())
+        small_transforms = set(dict(small_board.canonicalizer.get_all_symmetry_transforms()).keys())
+        large_transforms = set(dict(large_board.canonicalizer.get_all_symmetry_transforms()).keys())
 
         # Both should have identical transform names
         assert small_transforms == large_transforms, (
@@ -1680,7 +1680,7 @@ class TestGetAllTransformations:
         board = request.getfixturevalue(board_fixture)
 
         transforms = board.canonicalizer.get_all_transformations(
-            include_translation=False
+            include_translation=False, deduplicate=False
         )
 
         assert len(transforms) == expected_rot_mirror_count, (

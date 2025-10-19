@@ -95,6 +95,15 @@ def main() -> None:
         action="store_true",
         help="Track and report statistics for each game",
     )
+    parser.add_argument(
+        "--mcts-player2",
+        type=int,
+        nargs='?',
+        const=100,
+        default=None,
+        metavar="ITERATIONS",
+        help="Use MCTS player for player 2 with N iterations (default: 100 if not specified)",
+    )
     args = parser.parse_args()
 
     factory = ZertzFactory()
@@ -116,6 +125,7 @@ def main() -> None:
         human_players=(1,) if args.human else None,
         start_delay=args.start_delay,
         track_statistics=args.stats,
+        mcts_player2_iterations=args.mcts_player2,
     )
     controller.run()
 
