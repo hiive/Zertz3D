@@ -676,7 +676,7 @@ class ZertzBoard:
         return stateless_logic.get_capture_moves(self.state, self.global_state, config)
 
     def _get_open_rings(self):
-        """Return empty ring indices in the main connected region.
+        """Return indices of all empty rings on the board.
 
         Delegates to stateless_logic.get_open_rings() for zero code duplication.
         """

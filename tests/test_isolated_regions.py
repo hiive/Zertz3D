@@ -4,8 +4,7 @@ Tests for isolated region handling according to official Zèrtz rules.
 Key Rules:
 1. If a move isolates rings, you MAY claim marbles on those rings
 2. BUT ONLY IF all rings in the isolated region have marbles (no vacant rings)
-3. If isolated region has ANY vacant rings: marbles are NOT captured
-4. Isolated regions with vacant rings stay on board as "frozen" - inaccessible but present
+3. If isolated region has ANY vacant rings: marbles are NOT captured (the region simply remains on the board)
 """
 
 import pytest
@@ -67,8 +66,8 @@ class TestIsolatedRegionCaptureRules:
             == 0
         )
 
-    def test_isolated_single_ring_vacant_stays_frozen(self, small_board):
-        """Isolating a single vacant ring should leave it frozen."""
+    def test_isolated_single_ring_vacant_remains_playable(self, small_board):
+        """Isolating a single vacant ring should leave it available for future play."""
         # G1 is vacant (no marble)
 
         # Remove G2 and F1 manually
@@ -93,11 +92,14 @@ class TestIsolatedRegionCaptureRules:
             small_board.global_state[small_board.P1_CAP_SLICE], p1_captures_before
         )
 
-        # G1 ring should still exist (frozen)
+        # G1 ring should still exist
         assert (
             small_board.state[small_board.RING_LAYER, *small_board.str_to_index("G1")]
             == 1
         )
+
+        # G1 should appear as an open ring
+        assert small_board.str_to_index("G1") in small_board._get_open_rings()
 
     def test_isolated_two_rings_all_occupied_captures(self, small_board):
         """Isolating two rings both with marbles should capture both."""
@@ -147,8 +149,8 @@ class TestIsolatedRegionCaptureRules:
             == 0
         )
 
-    def test_isolated_two_rings_one_vacant_stays_frozen(self, small_board):
-        """Isolating two rings where one is vacant should freeze both (no capture)."""
+    def test_isolated_two_rings_one_vacant_remains_playable(self, small_board):
+        """Isolating two rings where one is vacant should leave both available (no capture)."""
         # Isolate G1 and G2, but G1 is vacant
 
         # Place marble only on G2 (G1 remains vacant)
@@ -175,7 +177,7 @@ class TestIsolatedRegionCaptureRules:
         assert isolated is None or len(isolated) == 0
         assert small_board.global_state[small_board.P1_CAP_W] == p1_white_before
 
-        # Both rings should remain (frozen)
+        # Both rings should remain
         assert (
             small_board.state[small_board.RING_LAYER, *small_board.str_to_index("G1")]
             == 1
@@ -193,13 +195,17 @@ class TestIsolatedRegionCaptureRules:
             == 1
         )
 
+        open_rings = small_board._get_open_rings()
+        assert small_board.str_to_index("G1") in open_rings
+        assert small_board.str_to_index("G2") not in open_rings  # occupied
 
-class TestFrozenRegionProperties:
-    """Test properties of frozen isolated regions."""
 
-    def test_frozen_region_appears_in_get_regions(self, small_board):
-        """Frozen regions should still appear in _get_regions()."""
-        # Create frozen region: G1 vacant, isolated
+class TestPartiallyIsolatedRegionProperties:
+    """Test properties of isolated regions that still contain empty rings."""
+
+    def test_isolated_region_appears_in_get_regions(self, small_board):
+        """Partially isolated regions should still appear in _get_regions()."""
+        # Create isolated region: G1 vacant, separated from main board
         small_board.state[small_board.RING_LAYER, *small_board.str_to_index("G2")] = 0
         small_board.state[small_board.RING_LAYER, *small_board.str_to_index("F1")] = 0
 
@@ -227,9 +233,9 @@ class TestFrozenRegionProperties:
         assert g1_region is not None
         assert len(g1_region) == 1  # Just G1
 
-    def test_frozen_region_rings_not_in_placement_moves(self, small_board):
-        """Frozen region rings should not be valid placement targets."""
-        # Create frozen region with G1 vacant
+    def test_partially_isolated_ring_is_placeable(self, small_board):
+        """Partially isolated rings should remain valid placement targets."""
+        # Create isolated region with G1 vacant
         small_board.state[small_board.RING_LAYER, *small_board.str_to_index("G2")] = 0
         small_board.state[small_board.RING_LAYER, *small_board.str_to_index("F1")] = 0
 
@@ -243,15 +249,10 @@ class TestFrozenRegionProperties:
         # Get valid moves
         placement_moves, _ = small_board.get_valid_moves()
 
-        # G1 should NOT be a valid placement location
+        # G1 should be a valid placement location
         g1_flat = small_board._2d_to_flat(*small_board.str_to_index("G1"))
 
-        # Check no placement action targets G1
-        for marble_type in range(3):
-            for rem_idx in range(placement_moves.shape[2]):
-                assert not placement_moves[marble_type, g1_flat, rem_idx], (
-                    "Frozen ring G1 should not be placeable"
-                )
+        assert placement_moves[:, g1_flat, :].any(), "Isolated ring G1 should remain placeable"
 
 
 class TestNoIsolation:

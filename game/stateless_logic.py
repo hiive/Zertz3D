@@ -184,29 +184,19 @@ def get_regions(board_state: np.ndarray, config: BoardConfig) -> list:
 
 
 def get_open_rings(board_state: np.ndarray, config: BoardConfig, regions: list = None) -> list:
-    """Get list of empty ring indices in the main connected region.
+    """Get list of empty ring indices across the entire board.
 
     Pure function version of ZertzBoard._get_open_rings()
 
     Args:
         board_state: Board state array
         config: BoardConfig
-        regions: Pre-computed regions (optional, for optimization)
+        regions: Unused (retained for API compatibility)
     """
-    # Get all vacant rings
-    all_open = list(
+    # Vacant rings are those with a ring present but no marble on top
+    return list(
         zip(*np.where(np.sum(board_state[config.board_layers], axis=0) == 1))
     )
-
-    # Check for multiple regions
-    if regions is None:
-        regions = get_regions(board_state, config)
-    if len(regions) <= 1:
-        return all_open
-
-    # Return only rings from largest region
-    main_region = max(regions, key=len)
-    return [ring for ring in all_open if ring in main_region]
 
 
 def is_removable(index: Tuple[int, int], board_state: np.ndarray, config: BoardConfig) -> bool:
@@ -239,7 +229,7 @@ def is_removable(index: Tuple[int, int], board_state: np.ndarray, config: BoardC
     return False
 
 
-def get_removable_rings(board_state: np.ndarray, config: BoardConfig, regions: list = None) -> list:
+def get_removable_rings(board_state: np.ndarray, config: BoardConfig) -> list:
     """Get list of removable ring indices.
 
     Pure function version of ZertzBoard._get_removable_rings()
@@ -247,9 +237,8 @@ def get_removable_rings(board_state: np.ndarray, config: BoardConfig, regions: l
     Args:
         board_state: Board state array
         config: BoardConfig
-        regions: Pre-computed regions (optional, for optimization)
     """
-    open_rings = get_open_rings(board_state, config, regions)
+    open_rings = get_open_rings(board_state, config)
     return [ring for ring in open_rings if is_removable(ring, board_state, config)]
 
 
@@ -276,12 +265,9 @@ def get_placement_moves(
     """
     moves = np.zeros((3, config.width**2, config.width**2 + 1), dtype=bool)
 
-    # Compute regions once and reuse for both calls (performance optimization)
-    regions = get_regions(board_state, config)
-
     # Get open and removable rings
-    open_rings = get_open_rings(board_state, config, regions)
-    removable_rings = get_removable_rings(board_state, config, regions)
+    open_rings = get_open_rings(board_state, config)
+    removable_rings = get_removable_rings(board_state, config)
 
     # Determine which marbles can be placed
     supply_counts = global_state[config.supply_slice]

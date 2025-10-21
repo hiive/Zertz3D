@@ -1,235 +1,201 @@
 # ZÈRTZ – Rules of Play
 
 *A game by Kris Burm, part of the GIPF Project*  
-© 2016 Rio Grande Games / HUCH! & friends
+GIPF, TAMSK, ZÈRTZ, DVONN, YINSH and PÜNCT ® & © Don & Co NV. Content © Kris Burm.
 
 ---
 
-## Contents
+## Introduction
+
+> “A game about making sacrifices! The third game of Project GIPF. For 2 players.”  
+> The board shrinks as the game progresses and both players draw from the same pool of marbles. Master timing and placement to gain control and secure the winning combination.
+
+---
+
+## Components
+
 - 6 white marbles  
 - 8 grey marbles  
 - 10 black marbles  
-- 61 rings
+- 49 round board pieces (“rings”)
 
 ---
 
-## Aim of the Game
-You must try to capture **one of the following combinations**:
-- 3 marbles of each color, **or**
-- 4 white marbles, **or**
-- 5 grey marbles, **or**
-- 6 black marbles.
+## Aim
 
-The **winner** is the first player to achieve any of these goals.
+Capture **one** of the following sets to win:
+
+- 3 marbles of each color  
+- 4 white marbles  
+- 5 grey marbles  
+- 6 black marbles
+
+The first player to satisfy a set wins immediately.
 
 ---
 
 ## Preparation
-1. There are **61 rings** in total.  
-   To play the **basic game**, use only **37 rings**. The remaining 24 rings are used for advanced play (see *Expanded Board*).
-2. Arrange the 37 rings into a **hexagonal game board**.
-3. Place all marbles beside the board as a **shared pool** — these marbles belong to **both players**.
-4. Draw lots to decide who plays first.
 
-> 💡 **Note:** The marbles are shared — neither player owns specific colors.
+In total there are 49 rings. The **basic game** uses only **37 rings**; keep the remaining 12 in reserve for larger-board play (see “Expanded Board”).
 
----
-
-## Gameplay Overview
-On your turn, you must perform **one** of the two possible moves:
-1. **Place a marble** on the board and then **remove a ring**.
-2. **Capture one or more marbles**.
-
-After completing your move, your opponent takes their turn.
+1. Assemble the 37 rings into a hexagonal board.  
+2. Place all marbles beside the board as a shared **pool** that either player may draw from.  
+3. Determine the starting player by lot.
 
 ---
 
-## Move Type 1: Placing a Marble
-1. Select **any marble** from the pool.  
-   You may choose any color and place it on **any vacant ring**.
-2. After placing a marble, you must **remove an empty ring** from the **edge** of the board.  
-   - The ring must be **vacant** (no marble).  
-   - It must be possible to remove it **without disturbing** other rings.  
-3. If no edge rings can be removed safely, **you skip removing a ring** — your turn ends after placing the marble.
-4. Stack removed rings aside (they can hold captured marbles later).
+## Making a Move
 
-> Each placement and ring removal together count as **one complete move**.
+On your turn you must take **exactly one** of the two actions below:
 
----
+1. **Place** a marble on the board and then **remove** a ring.  
+2. **Capture** one or more marbles.
 
-## Move Type 2: Capturing Marbles
-Capturing is **compulsory** if possible.
+Play alternates until someone wins.
 
-1. You must **jump over an adjacent marble** into an empty space directly beyond it — like checkers.  
-2. You may jump **in any direction**, provided the landing ring is empty.  
-3. The color of marbles **does not matter**. You may capture with or over **any color**.  
-4. If you can make multiple jumps in one sequence, you **must** continue until no more jumps are possible.  
-5. If multiple capture paths exist, you may choose which to perform.  
-6. A capturing sequence (one or more jumps) counts as your **entire turn** — you may not place a marble or remove a ring afterward.
+### Placing a Marble and Removing a Ring
+
+1. Choose any marble from the pool and place it on any vacant ring. Marbles belong to both players; colors are unrestricted.  
+2. After placing, you must remove a **free** ring. A ring is free if it is vacant, lies on the edge, and can be lifted away without disturbing adjacent rings.  
+3. Placing and removing together constitute one turn. If no vacant edge ring can be removed safely, the placement stands and no ring is removed.  
+4. Set removed rings aside—they are handy platforms for storing captured marbles.
+
+### Capturing Marbles
+
+1. Capturing is **compulsory**: if you can capture, you must.  
+2. Jump a marble over an adjacent marble into the vacant ring immediately beyond it (as in checkers). You may jump in any direction provided the landing ring is empty.  
+3. The color of the jumping and captured marbles is irrelevant.  
+4. If, after a jump, another capture is available with the same marble, you must continue until no further jump is possible.  
+5. When multiple capture routes exist (with different lengths), you may choose any of them.  
+6. A capture sequence (one or more jumps) completes your turn; you do not place a marble or remove a ring afterward.
 
 ---
 
 ## Isolating Marbles
-1. If your move results in one or more rings being **isolated** (disconnected from the main board), you may **claim all marbles** on those isolated rings.  
-2. You can only claim an isolated group if **none** of its rings are vacant.  
-3. Isolated captures are **not compulsory** but occur **as a result of a move** (they are not separate actions).
 
-> it is absolutely possible (and common in real play) to isolate a region that still has empty rings inside it.
-However, the players never gain those marbles; that region is considered non-scoring and inaccessible for the remainder of the game.
-> marbles in isolated regions are not reusable once disconnected — even if both the shared pool and captured pool are empty.
-> They stay on the board as inert pieces, unplayable and uncapturable, until the game ends.
-
-| Source of Marbles           | Usable? | Notes |
-|------------------------------|:--------:|-------|
-| Shared pool                  | ✅       | Normal use during the main phase of play. |
-| Your captured marbles        | ✅       | Used only after the shared pool becomes empty. |
-| Opponent’s captured marbles  | ❌       | Never usable — ownership is exclusive. |
-| Marbles in isolated regions  | ❌       | Permanently inaccessible once disconnected from the main board. | 
+1. If your move disconnects one or more rings from the main board, you may claim those isolated rings and the marbles on them. Treat this as a second way to capture; it is not mandatory.  
+2. You may only claim an isolated group when **all rings in that group are occupied**. You either remove the ring that causes the isolation or place the final marble that fills a pre-isolated cluster. The capture happens as a consequence of the move that created the isolation.
 
 ---
 
 ## End of the Game
-The game ends immediately when one player has:
-- 3 marbles of each color, **or**
-- 4 white marbles, **or**
-- 5 grey marbles, **or**
-- 6 black marbles.
 
-That player is the **winner**.
+The game ends immediately when a player holds one of the target sets listed under **Aim**. That player wins at once.
 
 ---
 
 ## Special Cases
-1. If the **pool is empty**, continue playing with your **captured marbles**.
-   You may play any color from your collection, just as from the pool.
-2. If the **entire board becomes occupied** before a win condition is met, the **player making the last move** wins and claims all remaining marbles.
-3. If both players repeat the same sequence of moves indefinitely, the game is a **tie**.
+
+1. If the pool is empty before anyone wins, continue playing using your **captured marbles**. As with the pool, you may choose any color from your captures on your turn.  
+2. If every ring becomes occupied before a win condition is met, the player who filled the final vacant ring wins by claiming the now-isolated board.  
+3. If both players repeat the same sequence of moves indefinitely, the game is declared a tie.
 
 ---
 
-## Player Immobilization and Loop Detection
+## Strategy Example
 
-### Case 1: Single Player Immobilized
-- If a player has no legal moves (no marbles to play, no captures possible), their turn is **automatically skipped** (they "pass").
-- The opponent continues playing until:
-  - They also cannot move, or
-  - They win via standard marble combination.
-- **No penalty** for being unable to move.
-
-### Case 2: Both Players Immobilized
-- When neither player can move (consecutive passes), the game **ends immediately**.
-- Winner is determined by checking standard victory conditions:
-  - 3 marbles of each color, **or**
-  - 4 white, **or**
-  - 5 grey, **or**
-  - 6 black.
-- If neither player has met a win condition, the game is a **tie**.
-
-### Case 3: Infinite Loop Detection
-- If the last 2 move-pairs (4 total moves) exactly match the preceding 2 move-pairs, an infinite loop is detected.
-- The game ends immediately in a **tie**.
-- This prevents players from repeating the same sequence indefinitely.
+Consider the situation described in the official rules (Diagram 5): Player A, behind by five marbles, can still win. A places a black marble on ring 1 and removes ring 2, forcing B to capture but not to win. On the follow-up, A plays a white marble on ring 3, removes ring 4, and claims the isolated white marbles for the winning set of four whites. Precision timing and forced play are key themes throughout ZÈRTZ.
 
 ---
 
 ## Expanded Board
-After mastering the 37-ring board, you can expand to larger boards:
 
-| Configuration | Added Rings | Description              |
-|---------------|-------------|--------------------------|
-| 48 rings      | +11         | Tournament configuration |
-| 61 rings      | +24         | Large configuration      |
-- You **do not need extra marbles**; the win conditions remain unchanged.
+ZÈRTZ was originally released with just 37 rings—enough to learn the fundamentals. Once you are comfortable with sacrifices and forced sequences, you can enlarge the board by adding rings from GIPF Set 2 or the modern boxed edition.
 
+- Adding a handful of rings (e.g., a 3-ring strip) creates an irregular hexagon and broadens the opening landscape without overwhelming complexity.  
+- Larger additions (6–7 rings) offer a steeper challenge.  
+- Tournament play traditionally uses **48 rings** (37 + 11).  
+- With GIPF Set 2 you can add up to 24 extra rings, creating a 61-ring board—an ultimate, demanding configuration.
 
-- The 37 ring board is a regular hexagon with D6 symmetry. Side length is 4 rings.
-- The 48 ring board is an irregular hexagon with D3 symmetry. Side lengths are 5-4-5-4-5-4 rings.
-- The 61 ring board is a regular hexagon with D6 symmetry. Side length is 5 rings.
-
-> ⚠️ Expanding too soon makes the game slower and less dynamic — it’s recommended only for experienced players.
+**Notes:**  
+1. You do not need extra marbles; the supply and victory conditions stay the same.  
+2. The 49th ring in the set is a spare piece, useful if you expand to 61 rings.
 
 ---
 
 ## Tournament Rules
-1. Tournament play uses a board with **at least 48 rings** (up to 61 with Potentials).  
-2. **Touch rules:**
-   - Once you select a marble from the pool, you **must play it**.  
-   - Once a marble **touches a ring**, you must place it there.  
-   - Once you **touch a removable ring** at the edge, you must remove it.
-3. Capturing remains **compulsory**.  
-   If a player fails to capture when possible, their opponent may **force them to undo their move**, including replacing any removed ring.
+
+1. Tournaments use a board of at least 48 rings (up to 61 when all extras are added).  
+2. “Touch” rules apply: once you take a marble from the pool you must play it; once a marble touches a ring you must place it there; once you touch a removable edge ring you must remove it.  
+3. Because capturing is compulsory, you may force an opponent to retract an illegal non-capturing move, including replacing any ring they removed, before play continues.
 
 ---
 
 ## Blitz Variant
-A faster, more aggressive version of the game.
 
-- Board: 37 rings  
-- Marbles:  
-  - 5 white
-  - 7 grey  
-  - 9 black  
-- Win by capturing:
-  - 2 marbles of each color, **or**
-  - 3 white, **or**
-  - 4 grey, **or**
-  - 5 black marbles.
+The Blitz variant adapts the basic 37-ring board for a sharper, faster contest. Use one fewer marble of each color (5 white, 7 grey, 9 black). Victory now requires:
 
-> Designed for quick, tactical play. Games are short and unforgiving.
+- 2 marbles of each color, or  
+- 3 white marbles, or  
+- 4 grey marbles, or  
+- 5 black marbles.
+
+Games are short, aggressive, and unforgiving—ideal once you know the fundamentals.
+
+---
+
+## Have Fun!
+
+Enjoy exploring sacrifices, tempo, and control—the hallmarks of ZÈRTZ.
+
+---
+
+## Player Immobilization & Loop Detection (Engine Notes)
+
+The official rulebook treats these situations implicitly; the Hiive implementation follows the conventions below for clarity:
+
+- **Single-player immobilization:** If the active player has no legal move (no placements or captures), their turn is skipped automatically. Play resumes with the opponent.  
+- **Mutual immobilization:** Two consecutive passes end the game immediately. Check the standard victory conditions; if neither player qualifies, the result is a tie.  
+- **Loop detection:** If the last two move-pairs repeat the previous two move-pairs exactly, the game is declared a tie to prevent infinite cycling.
 
 ---
 
 ## Summary of Key Principles
-- Marbles belong to **both players**.
-- Capturing is **mandatory** when available.
-- The board **shrinks** every turn.
-- Isolating connected groups can lead to **strategic captures**.
-- The game rewards **sacrifice**, **timing**, and **control**.
+
+- All marbles are communal; color selection is strategic, not assigned.  
+- Captures are mandatory whenever available.  
+- The playable board shrinks over time as rings are removed.  
+- Fully occupied isolated regions yield bonus captures when disconnected.  
+- Successful play revolves around sacrifice, timing, and long forced sequences.
 
 ---
 
 ## Notation
 
-The official ZÈRTZ notation system follows the standard defined at [http://www.gipf.com/zertz/notations/notation.html](http://www.gipf.com/zertz/notations/notation.html).
-
-### Coordinate System
-- **Columns**: Lowercase letters `a` through `g` (for 37-ring board)
-  - 61-ring boards use `a` through `j` (skipping `i`)
-- **Rows**: Numbers counted from bottom upward (e.g., `a1` is at the bottom of column `a`)
-- **Example coordinate**: `d4`
+The official notation system is documented at [http://www.gipf.com/zertz/notations/notation.html](http://www.gipf.com/zertz/notations/notation.html). The conventions below follow that reference.
 
 ### Marble Colors
-Marble colors are represented by **uppercase** letters:
-- **W** = White
-- **G** = Grey (or Gray)
+
+- **W** = White  
+- **G** = Grey  
 - **B** = Black
 
 ### Placement Moves
+
 Format: `[Color][Destination][,Removed Ring]`
 
-**Examples:**
-- `Wd4` - Place white marble on d4, no ring removed
-- `Bd7,b2` - Place black marble on d7, remove ring at b2
+- `Wd4` – place a white marble on d4, no ring removed  
+- `Bd7,b2` – place a black marble on d7 and remove the ring at b2
 
 ### Capture Moves
+
 Format: `x [Source][Captured Color][Destination]`
 
-**Examples:**
-- `x e3Wg3` - Capture from e3 to g3, capturing white marble at f3
-- `x d1Gd3Wd5` - Multi-jump capture
+- `x e3Wg3` – capture from e3 to g3 by jumping over a white marble on f3  
+- `x d1Gd3Wd5` – multiple jumps within a single capture sequence
 
 ### Isolation Captures
-When a placement causes isolation, the notation shows the isolated marbles after an `x`:
 
-**Format:** `[Placement] x [Color][Position]...`
+When a placement isolates occupied rings, list the captured marbles after an `x`.
 
-**Example:**
-- `Bd7,b2 x Wa1Wa2` - Place black on d7, remove b2, capture isolated white marbles at a1 and a2
+- `Bd7,b2 x Wa1Wa2` – place black on d7, remove b2, claim the isolated white marbles on a1 and a2
 
 ### Pass
-A pass is represented by a single hyphen: `-`
+
+A pass is recorded as a single hyphen: `-`
 
 ### Move Sequence Example
+
 ```
 Wd4,d1
 Ge5,c3
@@ -238,9 +204,8 @@ x c2We4
 -
 ```
 
-This represents:
-1. White on d4, remove d1
-2. Grey on e5, remove c3
-3. Black on f6, remove d2
-4. Capture from c2 to e4, capturing white at d3
+1. White on d4, remove d1  
+2. Grey on e5, remove c3  
+3. Black on f6, remove d2  
+4. Capture from c2 to e4, capturing the white marble on d3  
 5. Pass
