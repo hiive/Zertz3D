@@ -566,13 +566,16 @@ class MCTSTree:
         Uses root parallelization: Each process runs independent MCTS search,
         then results are merged. This bypasses Python's GIL for true parallel speedup.
 
+        Each process creates its own local transposition table (if enabled), providing
+        symmetry caching benefits within each process without cross-process sharing.
+
         Args:
             game: ZertzGame instance to search from
             iterations: Total number of MCTS iterations to run
             exploration_constant: UCB1 exploration parameter (default: √2)
             max_simulation_depth: Max simulation depth (None = play to end)
-            transposition_table: TranspositionTable for caching (not used in multiprocess mode)
-            use_transposition_lookups: Not used in multiprocess mode
+            transposition_table: Enable per-process transposition tables (pass table object or None)
+            use_transposition_lookups: Use cached stats to initialize nodes in each process
             time_limit: Maximum search time in seconds (None = no limit)
             verbose: Print search statistics
             num_processes: Number of worker processes (default: 16)
@@ -586,6 +589,9 @@ class MCTSTree:
         board_state = game.board.state.copy()
         global_state = game.board.global_state.copy()
         rings = game.board.rings  # Board size for reconstruction
+
+        # Determine if transposition tables should be used per-process
+        use_transposition_table = transposition_table is not None
 
         # Distribute iterations across processes
         iters_per_process = iterations // num_processes
@@ -603,7 +609,9 @@ class MCTSTree:
                 process_iters,
                 exploration_constant,
                 max_simulation_depth,
-                i  # process_id for seeding RNG
+                i,  # process_id for seeding RNG
+                use_transposition_table,
+                use_transposition_lookups
             ))
 
         # Run MCTS in parallel processes
@@ -661,12 +669,15 @@ def _mcts_worker(args):
 
     Args:
         args: Tuple of (board_state, global_state, rings, iterations,
-                       exploration_constant, max_simulation_depth, process_id)
+                       exploration_constant, max_simulation_depth, process_id,
+                       use_transposition_table, use_transposition_lookups)
 
     Returns:
         Dict mapping actions to (visits, value) tuples
     """
-    board_state, global_state, rings, iterations, exploration_constant, max_simulation_depth, process_id = args
+    (board_state, global_state, rings, iterations, exploration_constant,
+     max_simulation_depth, process_id, use_transposition_table,
+     use_transposition_lookups) = args
 
     # Seed RNG uniquely for this process
     import random
@@ -679,17 +690,26 @@ def _mcts_worker(args):
     game.board.state = board_state.copy()
     game.board.global_state = global_state.copy()
 
+    # Create local transposition table for this process if enabled
+    if use_transposition_table:
+        from learner.mcts.transposition_table import TranspositionTable
+        transposition_table = TranspositionTable()
+        lookup_table = transposition_table if use_transposition_lookups else None
+    else:
+        transposition_table = None
+        lookup_table = None
+
     # Run MCTS locally
     mcts = MCTSTree()
     config = game.board._get_config()
 
-    # Create root node
+    # Create root node (with local transposition table lookup if enabled)
     root = MCTSNode(
         game.board.state,
         game.board.global_state,
         config,
         game.board.canonicalizer,
-        transposition_table=None  # No transposition table in multiprocess mode
+        transposition_table=lookup_table
     )
 
     # Run iterations
@@ -697,15 +717,15 @@ def _mcts_worker(args):
         # Selection
         node = mcts.select(root, exploration_constant)
 
-        # Expansion
+        # Expansion (with local table)
         if not node.is_terminal():
-            node = mcts.expand(node, transposition_table=None)
+            node = mcts.expand(node, transposition_table=lookup_table)
 
         # Simulation
         result = mcts.simulate(node, max_simulation_depth)
 
-        # Backpropagation
-        mcts.backpropagate(node, result, transposition_table=None)
+        # Backpropagation (always update local table if provided)
+        mcts.backpropagate(node, result, transposition_table=transposition_table)
 
     # Return action statistics
     action_stats = {}

@@ -114,7 +114,7 @@ class PandaRenderer(ShowBase):
         move_duration=0.666,
         start_delay=0.0,
     ):
-        # self.rotation = 0.
+        self.rotation = math.pi / 6
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
@@ -276,7 +276,7 @@ class PandaRenderer(ShowBase):
         # self.rotation += 0.002
         # if self.rotation > 2* math.pi:
         #     self.rotation = 0.
-        # self.set_board_rotation(self.rotation)
+        self.set_board_rotation(self.rotation)
 
         # Handle board→world reparenting BEFORE animation updates
         self._handle_board_to_world_reparenting(task)

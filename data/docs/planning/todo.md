@@ -465,3 +465,5 @@ policy = PolicyHead(combined)
 - ✅ for MCTS player, optimization is when single capture move is only option do it without checking tree.
 - unit test to verify MCTS is actually being the right player at each level.
 - Tree visualizer.
+- Need visual details in graphical mode (which player and what they are thinking)
+- 

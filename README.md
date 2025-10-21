@@ -11,8 +11,11 @@ Full game rules: http://www.gipf.com/zertz/rules/rules.html
 - **Multiple Board Sizes**: Play on 37, 48, or 61 ring boards
 - **3D Visualization**: Panda3D rendering with water reflections and dynamic lighting
 - **Replay System**: Record and replay games from text files in two formats (transcript/notation)
+- **AI Opponents**: Monte Carlo Tree Search (MCTS) player with configurable search depth
+- **Rust Acceleration**: Optional hiivelabs_zertz_mcts extension for fast MCTS rollouts
 - **Deterministic Gameplay**: Seeded random number generation for reproducible games
 - **Headless Mode**: Run games without rendering for testing or simulation
+- **Performance Metrics**: Collect timing/win/loss stats across batches of games
 - **Official Notation**: Full support for official Zèrtz notation format
 
 ## Installation
@@ -21,6 +24,14 @@ This project uses `uv` for dependency management. Install dependencies with:
 
 ```bash
 uv sync
+```
+
+To enable the Rust-accelerated MCTS backend, install the Rust toolchain and run either:
+
+```bash
+./rust-dev.sh                        # Builds the extension in editable mode
+# or
+cd rust && uv run python -m maturin develop --release
 ```
 
 ## Usage
@@ -49,6 +60,7 @@ uv run main.py --headless                    # Run without 3D renderer
 uv run main.py --human                       # Control player 1 manually (requires renderer)
 uv run main.py --move-duration 0.5           # Duration between moves in seconds (default: 0.5)
 uv run main.py --start-delay 2.0             # Delay before first move in seconds (default: 0)
+uv run main.py --stats                       # Print timing and win/loss stats after each batch
 
 # Logging Options
 uv run main.py --transcript-file             # Log to zertzlog_<seed>.txt (current dir)
@@ -65,60 +77,51 @@ uv run main.py --transcript-screen --notation-screen
 # Visual Options (3D renderer only)
 uv run main.py --highlight-choices           # Highlight valid moves before each turn
 uv run main.py --show-coords                 # Display coordinate labels on rings
+
+# AI Options (falls back to Python backend if Rust extension is unavailable)
+uv run main.py --mcts-player2                # Use MCTS for player 2 (default 100 iterations)
+uv run main.py --mcts-player2 500            # Override iteration count for the MCTS opponent
 ```
 
 ## Project Structure
 
 ```
 Zertz3D/
-├── game/                           # Core game logic
-│   ├── zertz_board.py             # Board state and move validation
-│   ├── zertz_game.py              # Game controller and rules
-│   ├── zertz_player.py            # Player implementations (Random, Replay, MCTS)
-│   ├── zertz_position.py          # Position/state representation
-│   ├── action_result.py           # Action result data structure
-│   ├── writers.py                 # Log file writers
-│   ├── formatters/                # Output formatters
-│   │   ├── notation_formatter.py  # Official Zèrtz notation
-│   │   └── transcript_formatter.py # Dictionary format
-│   ├── loaders/                   # Replay file loaders
-│   │   ├── notation_loader.py     # Parse notation files
-│   │   └── transcript_loader.py   # Parse dictionary files
-│   └── utils/                     # Utility functions
-│       └── diagram.py             # ASCII board diagrams
-├── renderer/                       # 3D rendering components
-│   ├── zertz_renderer.py          # Main Panda3D renderer
-│   ├── zertz_models.py            # 3D model classes (marbles, rings)
-│   ├── water_node.py              # Water reflection effects
-│   ├── animation_manager.py       # Animation queue system
-│   ├── highlighting_manager.py    # Move highlighting
-│   ├── interaction_helper.py      # Mouse interaction
-│   ├── material_modifier.py       # Material state management
-│   └── entities/                  # Model entity classes
+├── main.py                         # Entry point and CLI
+├── factory/                        # Wiring for controllers/renderers
+│   └── zertz_factory.py            # Creates configured ZertzGameController
 ├── controller/                     # Game flow control
-│   ├── zertz_game_controller.py   # Main game loop coordinator
-│   ├── game_session.py            # Session management
-│   ├── game_loop.py               # Turn execution
-│   ├── game_logger.py             # Logging system
-│   ├── action_processor.py        # Action execution
-│   └── action_text_formatter.py   # Human-readable action text
-├── shared/                         # Shared utilities
-│   ├── render_data.py             # Data transfer objects
-│   ├── constants.py               # Global constants
-│   └── materials_modifiers.py     # Material definitions
-├── tests/                          # Test suite
-│   ├── test_notation.py           # Notation system tests
-│   ├── test_win_conditions.py     # Win detection tests
-│   ├── test_pass_and_loops.py     # Pass/loop mechanics
-│   ├── test_zertz_board.py        # Board logic tests
-│   ├── test_zertz_game_methods.py # Game method tests
-│   └── ...                        # 20+ additional test files
-├── data/                           # Game data and logs
-│   ├── docs/                      # Documentation
-│   │   └── zertz_rules.md        # Official game rules
-│   ├── logfiles/                  # Game replay files
-│   └── models/                    # 3D model assets
-└── main.py                         # Entry point
+│   ├── zertz_game_controller.py    # Main game loop coordinator
+│   ├── game_session.py             # Session management
+│   ├── game_loop.py                # Turn scheduling & pacing
+│   ├── game_logger.py              # Transcript/notation logging
+│   └── ...                         # Action processing & human input glue
+├── game/                           # Core game logic
+│   ├── zertz_board.py              # Board state and move validation
+│   ├── zertz_game.py               # Rule engine and state management
+│   ├── zertz_player.py             # Base player interface
+│   ├── players/                    # Player implementations (MCTS, random, replay)
+│   ├── loaders/                    # Replay file loaders
+│   ├── formatters/                 # Output formatters
+│   ├── writers.py                  # Log file writers
+│   └── utils/                      # Diagram rendering & helpers
+├── learner/                        # Machine learning components
+│   ├── mcts/                       # Python MCTS implementation
+│   └── backend.py                  # Backend detection (Python vs Rust)
+├── renderer/                       # Rendering backends
+│   ├── panda_renderer.py           # Panda3D renderer entry point
+│   ├── text_renderer.py            # Console/text renderer
+│   ├── composite_renderer.py       # Fan-out to multiple renderers
+│   └── panda3d/                    # Scene graph helpers, shaders, models
+├── shared/                         # Shared DTOs and constants
+├── tests/                          # Pytest suite covering rules and integrations
+├── rust/                           # hiivelabs_zertz_mcts Rust extension
+│   ├── Cargo.toml                  # Rust package manifest
+│   └── src/                        # Rust MCTS implementation
+├── data/                           # Game data, documentation, logs
+├── models/                         # Saved ML checkpoints and assets
+├── train_mcts*.py                  # Training and evaluation scripts
+└── README.md
 ```
 
 ## Game Mechanics

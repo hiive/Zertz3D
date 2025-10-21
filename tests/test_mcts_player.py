@@ -5,6 +5,7 @@ import numpy as np
 from game.zertz_game import ZertzGame
 from game.players.mcts_zertz_player import MCTSZertzPlayer
 from game.zertz_player import RandomZertzPlayer
+from learner.mcts.backend import HAS_RUST
 
 
 class TestMCTSZertzPlayer:
@@ -141,6 +142,47 @@ class TestMCTSZertzPlayer:
         # Game should end (either win or tie)
         assert game.get_game_ended() is not None or move_count >= max_moves
 
+    @pytest.mark.skipif(not HAS_RUST, reason="Rust backend not available")
+    def test_rust_backend_respects_parameters(self):
+        game = ZertzGame(rings=37)
+        player = MCTSZertzPlayer(
+            game,
+            n=1,
+            iterations=8,
+            max_simulation_depth=4,
+            time_limit=0.01,
+            use_transposition_table=True,
+            use_transposition_lookups=False,
+            clear_table_each_move=True,
+            parallel='thread',
+            num_workers=2,
+            backend='rust',
+            verbose=False,
+        )
+
+        action = player.get_action()
+        assert action[0] in ["PUT", "CAP", "PASS"]
+
+    @pytest.mark.skipif(not HAS_RUST, reason="Rust backend not available")
+    def test_rust_transposition_persistence(self):
+        game = ZertzGame(rings=37)
+        player = MCTSZertzPlayer(
+            game,
+            n=1,
+            iterations=6,
+            use_transposition_table=True,
+            use_transposition_lookups=True,
+            clear_table_each_move=False,
+            backend='rust',
+            verbose=False,
+        )
+
+        first_action = player.get_action()
+        second_action = player.get_action()
+
+        assert first_action[0] in ["PUT", "CAP", "PASS"]
+        assert second_action[0] in ["PUT", "CAP", "PASS"]
+
 
 class TestMCTSCorrectness:
     """Tests to verify MCTS algorithm correctness and player perspective handling."""
@@ -269,7 +311,7 @@ class TestMCTSCorrectness:
         for _ in range(games):
             game = ZertzGame(rings=37)
             player1 = RandomZertzPlayer(game, n=1)
-            player2 = MCTSZertzPlayer(game, n=2, iterations=200, verbose=False)
+            player2 = MCTSZertzPlayer(game, n=2, iterations=200, verbose=False, parallel=False)
 
             move_count = 0
             max_moves = 100
