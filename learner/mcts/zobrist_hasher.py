@@ -27,28 +27,29 @@ class ZobristHasher:
             width: Board width (7 for 37 rings, 8 for 48, 9 for 61)
             seed: Random seed for reproducibility (MUST be same across runs)
         """
-        # Use fixed seed for reproducibility - critical for loading saved tables!
-        rng = np.random.RandomState(seed)
+        # Use PCG64 for compatibility with Rust implementation
+        # Note: This matches the Rust rand_pcg::Pcg64 generator
+        rng = np.random.Generator(np.random.PCG64(seed))
 
         # Random numbers for ring existence (width × width)
-        self.ring_zobrist = rng.randint(0, 2**63, (width, width), dtype=np.uint64)
+        self.ring_zobrist = rng.integers(0, 2**63, (width, width), dtype=np.uint64)
 
         # Random numbers for marbles at each position (3 types × width × width)
         self.marble_zobrist = {
-            'w': rng.randint(0, 2**63, (width, width), dtype=np.uint64),
-            'g': rng.randint(0, 2**63, (width, width), dtype=np.uint64),
-            'b': rng.randint(0, 2**63, (width, width), dtype=np.uint64),
+            'w': rng.integers(0, 2**63, (width, width), dtype=np.uint64),
+            'g': rng.integers(0, 2**63, (width, width), dtype=np.uint64),
+            'b': rng.integers(0, 2**63, (width, width), dtype=np.uint64),
         }
 
         # Random numbers for captured marbles (2 players × 3 types × max 20 each)
         # We hash the count directly, so need numbers for each possible count
-        self.captured_zobrist = rng.randint(0, 2**63, (2, 3, 20), dtype=np.uint64)
+        self.captured_zobrist = rng.integers(0, 2**63, (2, 3, 20), dtype=np.uint64)
 
         # Random numbers for supply marbles (3 types × max 20 each)
-        self.supply_zobrist = rng.randint(0, 2**63, (3, 20), dtype=np.uint64)
+        self.supply_zobrist = rng.integers(0, 2**63, (3, 20), dtype=np.uint64)
 
         # Random number for current player (XOR if player 2)
-        self.player_zobrist = rng.randint(0, 2**63, dtype=np.uint64)
+        self.player_zobrist = rng.integers(0, 2**63, dtype=np.uint64)
 
         self.width = width
 

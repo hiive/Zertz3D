@@ -36,18 +36,46 @@ class MCTSNode:
         self.children = {}  # action -> MCTSNode
         self.untried_actions = None  # Will be populated on first visit
 
-        # Try to initialize from transposition table if available
+        self._transposition_table_entry = None
+        self._visits = 0
+        self._value = 0.0
+
         if transposition_table is not None:
-            cached = transposition_table.lookup(self.board_state, self.global_state, self.canonicalizer)
-            if cached is not None:
-                self.visits = cached['visits']
-                self.value = cached['value']
-            else:
-                self.visits = 0
-                self.value = 0.0
+            entry = transposition_table.get_entry(
+                self.board_state,
+                self.global_state,
+                self.canonicalizer,
+                config=self.config,
+                create=True,
+            )
+            if entry is not None:
+                self._transposition_table_entry = entry
+
+    @property
+    def visits(self):
+        if self._transposition_table_entry is not None:
+            return self._transposition_table_entry['visits']
+        return self._visits
+
+    @visits.setter
+    def visits(self, value):
+        if self._transposition_table_entry is not None:
+            self._transposition_table_entry['visits'] = value
         else:
-            self.visits = 0
-            self.value = 0.0
+            self._visits = value
+
+    @property
+    def value(self):
+        if self._transposition_table_entry is not None:
+            return self._transposition_table_entry['value']
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        if self._transposition_table_entry is not None:
+            self._transposition_table_entry['value'] = value
+        else:
+            self._value = value
 
     def is_fully_expanded(self, progressive_widening=True, widening_constant=10.0):
         """Check if node should be expanded further.

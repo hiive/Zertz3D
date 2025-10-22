@@ -48,93 +48,72 @@ class TranspositionTable:
 
         return zobrist_hash, canonical_state
 
-    def lookup(self, board_state, global_state, canonicalizer, config=None):
-        """Retrieve cached statistics for canonical state.
-
-        Uses separate chaining to handle hash collisions.
-
-        Args:
-            board_state: Board state array
-            global_state: Global state array
-            canonicalizer: Canonicalizer instance
-            config: BoardConfig (optional for backwards compat)
-
-        Returns:
-            dict with 'visits' and 'value' or None if not found
-        """
+    def get_entry(self, board_state, global_state, canonicalizer, *, config=None, create=False):
+        """Retrieve (and optionally create) mutable stats entry for a state."""
         if config is None:
-            # Backwards compatibility - extract from canonicalizer
             config = canonicalizer.board._get_config()
 
         zobrist_hash, canonical_state = self.get_canonical_key(
             board_state, global_state, canonicalizer, config
         )
 
-        if zobrist_hash in self.table:
-            # Separate chaining: table[hash] is a list of entries
-            chain = self.table[zobrist_hash]
-
-            # Search chain for matching canonical state
+        chain = self.table.get(zobrist_hash)
+        if chain is not None:
             for entry in chain:
                 if np.array_equal(entry['canonical_state'], canonical_state):
-                    self.hits += 1
-                    return {'visits': entry['visits'], 'value': entry['value']}
+                    if not create:
+                        self.hits += 1
+                    return entry
 
-            # Hash collision: same hash, different state
-            # This is fine with separate chaining - just a miss
+            if create:
+                self.collisions += 1
+                entry = {
+                    'visits': 0,
+                    'value': 0.0,
+                    'canonical_state': canonical_state.copy(),
+                }
+                chain.append(entry)
+                return entry
+
             self.misses += 1
             return None
-        else:
-            self.misses += 1
+
+        if create:
+            entry = {
+                'visits': 0,
+                'value': 0.0,
+                'canonical_state': canonical_state.copy(),
+            }
+            self.table[zobrist_hash] = [entry]
+            return entry
+
+        self.misses += 1
+        return None
+
+    def lookup(self, board_state, global_state, canonicalizer, config=None):
+        """Return stats dict for canonical state or None if absent."""
+        entry = self.get_entry(
+            board_state,
+            global_state,
+            canonicalizer,
+            config=config,
+            create=False,
+        )
+        if entry is None:
             return None
+        return {'visits': entry['visits'], 'value': entry['value']}
 
     def update(self, board_state, global_state, canonicalizer, visits_delta, value_delta, config=None):
-        """Update statistics for canonical state.
-
-        Uses separate chaining to handle hash collisions.
-
-        Args:
-            board_state: Board state array
-            global_state: Global state array
-            canonicalizer: Canonicalizer instance
-            visits_delta: Visits to add
-            value_delta: Value to add
-            config: BoardConfig (optional for backwards compat)
-        """
-        if config is None:
-            # Backwards compatibility - extract from canonicalizer
-            config = canonicalizer.board._get_config()
-
-        zobrist_hash, canonical_state = self.get_canonical_key(
-            board_state, global_state, canonicalizer, config
+        """Update statistics for canonical state."""
+        entry = self.get_entry(
+            board_state,
+            global_state,
+            canonicalizer,
+            config=config,
+            create=True,
         )
-
-        if zobrist_hash in self.table:
-            # Separate chaining: search chain for matching state
-            chain = self.table[zobrist_hash]
-
-            for entry in chain:
-                if np.array_equal(entry['canonical_state'], canonical_state):
-                    # Found matching entry - update it
-                    entry['visits'] += visits_delta
-                    entry['value'] += value_delta
-                    return
-
-            # Hash collision: same hash, different state
-            # Append new entry to chain
-            self.collisions += 1
-            chain.append({
-                'visits': visits_delta,
-                'value': value_delta,
-                'canonical_state': canonical_state.copy()
-            })
-        else:
-            # New hash - create chain with first entry
-            self.table[zobrist_hash] = [{
-                'visits': visits_delta,
-                'value': value_delta,
-                'canonical_state': canonical_state.copy()
-            }]
+        entry['visits'] += visits_delta
+        entry['value'] += value_delta
 
     def get_hit_rate(self):
         """Calculate cache hit rate (for performance monitoring)."""

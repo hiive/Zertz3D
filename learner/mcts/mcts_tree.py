@@ -314,15 +314,18 @@ class MCTSTree:
             transposition_table: TranspositionTable to update (optional)
         """
         while node is not None:
-            node.visits += 1
-            node.value += result
+            node.visits = node.visits + 1
+            node.value = node.value + result
 
-            # Update transposition table if provided
-            if transposition_table is not None:
-                transposition_table.update(node.board_state, node.global_state, node.canonicalizer,
-                                         visits_delta=1, value_delta=result)
+            if transposition_table is not None and getattr(node, "_transposition_table_entry", None) is None:
+                transposition_table.update(
+                    node.board_state,
+                    node.global_state,
+                    node.canonicalizer,
+                    visits_delta=1,
+                    value_delta=result,
+                )
 
-            # Flip result for parent (opponent's perspective)
             result = -result
             node = node.parent
 

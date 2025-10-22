@@ -20,7 +20,7 @@ Usage:
 """
 
 from collections import deque
-from typing import NamedTuple, Tuple
+from typing import Dict, NamedTuple, Tuple
 import numpy as np
 
 
@@ -197,6 +197,310 @@ def get_open_rings(board_state: np.ndarray, config: BoardConfig, regions: list =
     return list(
         zip(*np.where(np.sum(board_state[config.board_layers], axis=0) == 1))
     )
+
+
+# ============================================================================
+# ACTION TRANSFORMATIONS (used for symmetry-aware move handling)
+# ============================================================================
+
+_LAYOUT_MASK_CACHE: Dict[Tuple[int, int, bytes | None], np.ndarray] = {}
+_AXIAL_CACHE: Dict[Tuple[int, int, bytes | None], Tuple[Dict[Tuple[int, int], Tuple[int, int]], Dict[Tuple[int, int], Tuple[int, int]]]] = {}
+
+
+def _generate_standard_layout_mask(rings: int) -> np.ndarray:
+    """Generate boolean layout mask for standard boards (37/48/61)."""
+    width_map = {37: 7, 48: 8, 61: 9}
+    if rings not in width_map:
+        raise ValueError(f"Unsupported board size for standard layout: {rings}")
+
+    width = width_map[rings]
+    mask = np.zeros((width, width), dtype=bool)
+
+    if rings == 37:
+        letters = "ABCDEFG"
+    elif rings == 48:
+        letters = "ABCDEFGH"
+    else:  # 61
+        letters = "ABCDEFGHJ"
+
+    r_max = len(letters)
+    is_even = r_max % 2 == 0
+
+    def h_max(idx: int) -> int:
+        return r_max - abs(letters.index(letters[idx]) - (r_max // 2))
+
+    r_min = h_max(0)
+    if is_even:
+        r_min += 1
+
+    for row_idx in range(r_max):
+        hh = h_max(row_idx)
+        letters_row = letters[:hh] if row_idx < hh / 2 else letters[-hh:]
+        num_max = r_max - row_idx
+        num_min = max(r_min - row_idx, 1)
+
+        for k, letter in enumerate(letters_row):
+            col = min(k + num_min, num_max)
+            col_idx = letters.find(letter)
+            mask[row_idx, col_idx] = True
+
+    return mask
+
+
+def _get_layout_mask(config: BoardConfig) -> np.ndarray:
+    """Return boolean mask for valid board cells."""
+    layout = config.board_layout
+    if layout is not None:
+        return layout.astype(bool)
+
+    key = (int(config.rings), int(config.width), None)
+    cached = _LAYOUT_MASK_CACHE.get(key)
+    if cached is None:
+        mask = _generate_standard_layout_mask(int(config.rings))
+        _LAYOUT_MASK_CACHE[key] = mask
+        return mask
+    return cached
+
+
+def _build_axial_maps(config: BoardConfig) -> Tuple[Dict[Tuple[int, int], Tuple[int, int]], Dict[Tuple[int, int], Tuple[int, int]]]:
+    """Build mapping between (y, x) and axial coordinates."""
+    layout = _get_layout_mask(config)
+    layout_bytes = layout.astype(np.uint8).tobytes()
+    key = (int(config.rings), int(config.width), layout_bytes)
+    cached = _AXIAL_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    ys, xs = np.where(layout)
+    width = layout.shape[0]
+    c = width // 2
+    sqrt3 = np.sqrt(3.0)
+
+    records = []
+    for y, x in zip(ys, xs):
+        q = x - c
+        r = y - x
+        xc = sqrt3 * (q + r / 2.0)
+        yc = 1.5 * r
+        records.append((int(y), int(x), q, r, xc, yc))
+
+    xc_center = sum(rec[4] for rec in records) / len(records)
+    yc_center = sum(rec[5] for rec in records) / len(records)
+    q_center = (sqrt3 / 3.0) * xc_center - (1.0 / 3.0) * yc_center
+    r_center = (2.0 / 3.0) * yc_center
+    scale = 3 if int(config.rings) == 48 else 1
+
+    yx_to_ax: Dict[Tuple[int, int], Tuple[int, int]] = {}
+    ax_to_yx: Dict[Tuple[int, int], Tuple[int, int]] = {}
+    for y, x, q, r, _, _ in records:
+        q_centered = q - q_center
+        r_centered = r - r_center
+        q_adj = int(round(scale * q_centered))
+        r_adj = int(round(scale * r_centered))
+        axial = (q_adj, r_adj)
+        yx_to_ax[(y, x)] = axial
+        ax_to_yx[axial] = (y, x)
+
+    _AXIAL_CACHE[key] = (yx_to_ax, ax_to_yx)
+    return yx_to_ax, ax_to_yx
+
+
+def _ax_rot60(q: int, r: int, k: int = 1) -> Tuple[int, int]:
+    """Rotate axial coordinate by k * 60° counterclockwise."""
+    k %= 6
+    for _ in range(k):
+        q, r = -r, q + r
+    return q, r
+
+
+def _ax_mirror_q_axis(q: int, r: int) -> Tuple[int, int]:
+    """Mirror axial coordinate across the q-axis."""
+    return q, -q - r
+
+
+def _transform_coordinate(y: int, x: int, rot60_k: int, mirror: bool, mirror_first: bool, config: BoardConfig) -> Tuple[int, int]:
+    """Apply rotation/mirror to a coordinate (capture behaviour, honours mirror order)."""
+    yx_to_ax, ax_to_yx = _build_axial_maps(config)
+    key = (int(y), int(x))
+    if key not in yx_to_ax:
+        raise ValueError(f"Coordinate {(y, x)} is not on the board")
+
+    q, r = yx_to_ax[key]
+    if mirror_first:
+        if mirror:
+            q, r = _ax_mirror_q_axis(q, r)
+        q, r = _ax_rot60(q, r, rot60_k)
+    else:
+        q, r = _ax_rot60(q, r, rot60_k)
+        if mirror:
+            q, r = _ax_mirror_q_axis(q, r)
+
+    dest = ax_to_yx.get((q, r))
+    if dest is None:
+        raise ValueError("Rotated coordinate is not on the board")
+    return dest
+
+
+def _transform_coordinate_put(y: int, x: int, rot60_k: int, mirror: bool, config: BoardConfig) -> Tuple[int, int]:
+    """Apply rotation/mirror to placement coordinate (rotation then optional mirror)."""
+    yx_to_ax, ax_to_yx = _build_axial_maps(config)
+    key = (int(y), int(x))
+    if key not in yx_to_ax:
+        raise ValueError(f"Coordinate {(y, x)} is not on the board")
+
+    q, r = yx_to_ax[key]
+    q, r = _ax_rot60(q, r, rot60_k)
+    if mirror:
+        q, r = _ax_mirror_q_axis(q, r)
+
+    dest = ax_to_yx.get((q, r))
+    if dest is None:
+        raise ValueError("Rotated coordinate is not on the board")
+    return dest
+
+
+def _dir_index_map(rot60_k: int, mirror: bool, mirror_first: bool, config: BoardConfig) -> Dict[int, int]:
+    """Map direction indices under rotation/mirror."""
+    mapping = {}
+    for idx, (dy, dx) in enumerate(config.directions):
+        dq = dx
+        dr = dy - dx
+        if mirror_first:
+            if mirror:
+                dq, dr = _ax_mirror_q_axis(dq, dr)
+            dq, dr = _ax_rot60(dq, dr, rot60_k)
+        else:
+            dq, dr = _ax_rot60(dq, dr, rot60_k)
+            if mirror:
+                dq, dr = _ax_mirror_q_axis(dq, dr)
+        new_dx = dq
+        new_dy = dr + dq
+        try:
+            new_idx = config.directions.index((new_dy, new_dx))
+        except ValueError as exc:
+            raise ValueError(f"Transformed direction {(new_dy, new_dx)} not in direction set") from exc
+        mapping[idx] = new_idx
+    return mapping
+
+
+def _translate_action(action, dy: int, dx: int, config: BoardConfig):
+    """Translate action coordinates by (dy, dx)."""
+    layout = _get_layout_mask(config)
+    width = config.width
+    action_type, payload = action
+
+    if action_type == "PUT":
+        marble_idx, put_flat, rem_flat = payload
+        py, px = divmod(int(put_flat), width)
+        new_py, new_px = py + dy, px + dx
+        if not (0 <= new_py < width and 0 <= new_px < width and layout[new_py, new_px]):
+            raise ValueError(f"Translation moves placement {(py, px)} outside board")
+
+        if rem_flat == width * width:
+            new_rem_flat = rem_flat
+        else:
+            ry, rx = divmod(int(rem_flat), width)
+            new_ry, new_rx = ry + dy, rx + dx
+            if not (0 <= new_ry < width and 0 <= new_rx < width and layout[new_ry, new_rx]):
+                raise ValueError(f"Translation moves removal {(ry, rx)} outside board")
+            new_rem_flat = new_ry * width + new_rx
+
+        new_put_flat = new_py * width + new_px
+        return "PUT", (marble_idx, new_put_flat, new_rem_flat)
+
+    if action_type == "CAP":
+        direction, y, x = payload
+        new_y, new_x = int(y) + dy, int(x) + dx
+        if not (0 <= new_y < width and 0 <= new_x < width and layout[new_y, new_x]):
+            raise ValueError(f"Translation moves capture {(y, x)} outside board")
+        return "CAP", (direction, new_y, new_x)
+
+    if action_type == "PASS":
+        return action
+
+    raise ValueError(f"Unknown action type: {action_type}")
+
+
+def _apply_orientation(action, rot60_k: int, mirror: bool, mirror_first: bool, config: BoardConfig):
+    """Apply rotation/mirror orientation components to an action."""
+    action_type, payload = action
+    width = config.width
+
+    if action_type == "PUT":
+        marble_idx, put_flat, rem_flat = payload
+        py, px = divmod(int(put_flat), width)
+        new_py, new_px = _transform_coordinate_put(py, px, rot60_k, mirror, config)
+        if rem_flat == width * width:
+            new_rem_flat = rem_flat
+        else:
+            ry, rx = divmod(int(rem_flat), width)
+            new_ry, new_rx = _transform_coordinate_put(ry, rx, rot60_k, mirror, config)
+            new_rem_flat = new_ry * width + new_rx
+        new_put_flat = new_py * width + new_px
+        return "PUT", (marble_idx, new_put_flat, new_rem_flat)
+
+    if action_type == "CAP":
+        direction, y, x = payload
+        dir_map = _dir_index_map(rot60_k, mirror, mirror_first, config)
+        new_dir = dir_map[int(direction)]
+        new_y, new_x = _transform_coordinate(int(y), int(x), rot60_k, mirror, mirror_first, config)
+        return "CAP", (new_dir, new_y, new_x)
+
+    if action_type == "PASS":
+        return action
+
+    raise ValueError(f"Unknown action type: {action_type}")
+
+
+def _rotate_action(action, angle_degrees: int, config: BoardConfig):
+    """Rotate action by specified angle (multiple of 60 degrees)."""
+    angle = angle_degrees % 360
+    if angle == 0:
+        return action
+    rot60_k = (angle // 60) % 6
+    if rot60_k == 0:
+        return action
+    return _apply_orientation(action, rot60_k, mirror=False, mirror_first=False, config=config)
+
+
+def _mirror_action(action, angle_degrees: int, mirror_first: bool, config: BoardConfig):
+    """Apply mirror combined with rotation component."""
+    angle = angle_degrees % 360
+    rot60_k = (angle // 60) % 6
+    return _apply_orientation(action, rot60_k, mirror=True, mirror_first=mirror_first, config=config)
+
+
+def transform_action(action, transform: str, config: BoardConfig):
+    """
+    Transform an action according to canonicalization transform string.
+
+    Supports combined transforms involving translations (Tdy,dx),
+    rotations (Rk where k is multiple of 60), and mirrors (MRk or RkM).
+    """
+    if not transform or transform == "R0":
+        return action
+
+    current = action
+    parts = transform.split("_")
+    for part in parts:
+        if not part or part == "R0":
+            continue
+        if part.startswith("T"):
+            coords = part[1:]
+            dy, dx = map(int, coords.split(","))
+            current = _translate_action(current, dy, dx, config)
+        elif part.startswith("MR"):
+            angle = int(part[2:]) if len(part) > 2 else 0
+            current = _mirror_action(current, angle, mirror_first=False, config=config)
+        elif part.endswith("M") and part.startswith("R"):
+            angle = int(part[1:-1]) if len(part) > 1 else 0
+            current = _mirror_action(current, angle, mirror_first=True, config=config)
+        elif part.startswith("R"):
+            angle = int(part[1:]) if len(part) > 1 else 0
+            current = _rotate_action(current, angle, config=config)
+        else:
+            raise ValueError(f"Unknown transform component: {part}")
+    return current
 
 
 def is_removable(index: Tuple[int, int], board_state: np.ndarray, config: BoardConfig) -> bool:
