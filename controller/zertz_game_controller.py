@@ -10,6 +10,7 @@ import numpy as np
 
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
 from game.loaders import TranscriptLoader, NotationLoader
+from game.formatters.notation_formatter import NotationFormatter
 from controller.game_logger import GameLogger
 from controller.action_text_formatter import ActionTextFormatter
 from controller.action_processor import ActionProcessor
@@ -270,6 +271,10 @@ class ZertzGameController:
         # Get next action from current player
         player = self.session.get_current_player()
 
+        # Update player indicator in renderer (without notation - action hasn't been taken yet)
+        if self.renderer and hasattr(self.renderer, 'update_player_indicator'):
+            self.renderer.update_player_indicator(player.n)
+
         placement_mask, capture_mask = self.session.game.get_valid_actions()
         self._resolve_player_context(player, placement_mask, capture_mask)
 
@@ -325,10 +330,14 @@ class ZertzGameController:
         self.session.game.board.canonicalize_state()
         # END TEMPORARY
 
-        # Generate complete notation WITH action_result (includes isolation in one pass)
-        # notation = self.session.game.action_to_notation(action_dict, action_result)
-        # self._report(f"Player {player.n}: {action_dict} ({notation})")
-        #
+        # Generate notation string for this action
+        notation_formatter = NotationFormatter()
+        notation = notation_formatter.action_to_notation(action_dict, action_result)
+
+        # Update player indicator with notation
+        if self.renderer and hasattr(self.renderer, 'update_player_indicator'):
+            self.renderer.update_player_indicator(player.n, notation)
+
         # Log action with action_result (used by NotationWriter for isolation captures)
         self._log_action(player.n, action_dict, action_result)
 

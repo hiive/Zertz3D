@@ -245,6 +245,9 @@ class PandaRenderer(ShowBase):
             ActionVisualizationSequencer(self) if self.highlight_choices else None
         )
 
+        # Create player turn indicator
+        self._create_player_indicator()
+
     def attach_update_loop(
         self, update_fn: Callable[[], bool], interval: float
     ) -> bool:
@@ -1504,6 +1507,41 @@ class PandaRenderer(ShowBase):
     def report_status(self, message: str) -> None:
         """Handle textual status reports for compatibility with composite renderers."""
         logger.info(message)
+
+    def _create_player_indicator(self) -> None:
+        """Create on-screen text indicator showing which player's turn it is."""
+        from direct.gui.OnscreenText import OnscreenText
+
+        self.player_indicator = OnscreenText(
+            text="",
+            pos=(-1.3, -0.9),  # Bottom-left corner
+            scale=0.065,
+            fg=(1, 1, 1, 1),  # White text
+            align=TextNode.ALeft,
+            mayChange=True,
+            font=self.loader.loadFont("cmtt12.egg"),  # Monospace font
+            shadow=(0, 0, 0, 1),  # Black shadow for bold/readable effect
+            shadowOffset=(0.04, 0.04),  # Shadow offset for depth
+        )
+
+    def update_player_indicator(self, player_number: int, notation: str = "") -> None:
+        """Update the player indicator to show the current player and move notation.
+
+        Args:
+            player_number: The player number (1 or 2)
+            notation: Optional move notation to display after the player number
+        """
+        if hasattr(self, 'player_indicator'):
+            if notation:
+                text = f"Player {player_number}: {notation}"
+            else:
+                text = f"Player {player_number}"
+            self.player_indicator.setText(text)
+            # Change color based on player
+            if player_number == 1:
+                self.player_indicator['fg'] = (0.0, 0.2, 1.0, 1)  # Dark blue for Player 1
+            else:
+                self.player_indicator['fg'] = (0.7, 0.2, 0.0, 1)  # Dark red for Player 2
 
     def set_board_rotation(self, angle_radians: float) -> None:
         """Set the rotation angle of the board around the Z-axis.

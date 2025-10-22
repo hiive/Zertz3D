@@ -125,6 +125,12 @@ class CompositeRenderer(IRenderer):
             if hasattr(renderer, "apply_context_masks"):
                 renderer.apply_context_masks(board, placement_mask, capture_mask)
 
+    def update_player_indicator(self, player_number: int, notation: str = "") -> None:
+        """Update player indicator on all child renderers that support it."""
+        for renderer in self._renderers:
+            if hasattr(renderer, "update_player_indicator"):
+                renderer.update_player_indicator(player_number, notation)
+
     def report_status(self, message: str) -> None:
         for renderer in self._renderers:
             renderer.report_status(message)
