@@ -7,6 +7,9 @@ This exhaustively searches for gaps by:
 2. Computing the FULL equivalence class for each
 3. Comparing T→g exploration vs full exploration
 4. Quantifying any missed states
+
+Note: This is a slow test marked with @pytest.mark.slow
+Use pytest -m "not slow" to skip in fast CI runs.
 """
 
 import sys
@@ -14,6 +17,7 @@ from pathlib import Path
 import numpy as np
 from collections import defaultdict
 import random
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -320,7 +324,14 @@ def print_summary(results):
         print(f"   Current T→g approach appears complete for tested configurations")
 
 
+@pytest.mark.slow
 def test_for_canonicalization_gaps():
+    """Exhaustive canonicalization gap testing (slow).
+
+    This test is marked as slow because it runs 100 random configurations
+    with full BFS equivalence class exploration. Use pytest -m "not slow"
+    to skip in regular CI runs.
+    """
     print("COMPREHENSIVE CANONICALIZATION GAP ANALYSIS")
     print("=" * 80)
     print("\nThis will:")

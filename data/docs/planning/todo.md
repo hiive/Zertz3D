@@ -4,6 +4,119 @@
 - Add game statistics tracking
 - Network multiplayer support
 
+## MCTS Enhancement Roadmap (from Architecture Report 9)
+
+### Phase 1: Quick Wins (1 week, 9-13 hours) → 25-40% improvement
+**Priority: HIGH** | **Start Date**: TBD
+
+- [ ] **Virtual Loss for Parallel Search** (4-6 hours) - CRITICAL
+  - Add `add_virtual_loss()` / `remove_virtual_loss()` / `update_with_real_value()` to `rust/src/node.rs`
+  - Add virtual loss mechanism to `rust/src/mcts.rs` selection phase
+  - Expected gain: 10-20% better parallel efficiency
+  - Files: `rust/src/node.rs:116-147`, `rust/src/mcts.rs` parallel iteration
+  - Status: Not started
+
+- [ ] **First Play Urgency (FPU)** (2-3 hours)
+  - Replace `f32::INFINITY` with `parent_value - fpu_reduction` in `rust/src/node.rs:152-164`
+  - Add adaptive FPU parameter to MCTSSearch (default: 0.2)
+  - Expected gain: 5-15% stronger play
+  - Files: `rust/src/node.rs` ucb1_score method
+  - Status: Not started
+
+- [ ] **Adaptive Exploration Constant** (3-4 hours)
+  - Add `adaptive_exploration_constant()` to `rust/src/mcts.rs`
+  - Adjust based on: rings_remaining, num_legal_actions, parent_visits
+  - Expected gain: 5-10% stronger play
+  - Files: `rust/src/mcts.rs` search methods
+  - Status: Not started
+
+**Phase 1 ROI**: 9-13 hours → 25-40% stronger play
+
+### Phase 2: RAVE/AMAF (2 weeks, 16-22 hours) → 20-35% improvement
+**Priority: MEDIUM** | **Depends on**: Phase 1 completion
+
+- [ ] **RAVE (Rapid Action Value Estimation)** (12-16 hours)
+  - Add `rave_visits: AtomicU32`, `rave_total_value: AtomicI32` to `rust/src/node.rs`
+  - Implement `rave_ucb_score()` with beta mixing parameter
+  - Track actions during simulation for AMAF updates
+  - Update backpropagation to update RAVE stats for all actions in path
+  - Expected gain: 15-25% stronger play (high branching factor benefit)
+  - Memory: +8 bytes per node
+  - Files: `rust/src/node.rs`, `rust/src/mcts.rs` simulate/backpropagate
+  - Status: Not started
+
+- [ ] **Progressive History Heuristic** (4-6 hours)
+  - Add global `HistoryTable` in `rust/src/mcts.rs`
+  - Track success rates: `history[action] = (wins, total_tries)`
+  - Use for move ordering and initial priors
+  - Expected gain: 5-10% stronger play
+  - Files: `rust/src/mcts.rs` (new HistoryTable struct)
+  - Status: Not started
+
+**Phase 2 ROI**: 16-22 hours → 20-35% stronger play
+
+### Phase 3: Neural Network Integration (3-4 weeks, 40-60 hours) → 2-5× improvement
+**Priority: LOW (Research Phase)** | **Depends on**: Self-play data collection
+
+- [ ] **Policy/Value Network** (40-60 hours)
+  - Design network architecture (ResNet-based for spatial, dense for global)
+  - Implement self-play game generation
+  - Train network on self-play data (PyTorch)
+  - Replace random rollouts with learned evaluation
+  - Add PUCT (predictor + UCT) formula with neural priors
+  - Expected gain: 2-5× stronger play
+  - Files: New `learner/neural/` directory, integration with MCTS
+  - Status: Not started
+
+**Phase 3 ROI**: 40-60 hours → 2-5× stronger play
+
+### Total MCTS Investment
+- **Quick Wins**: 9-13 hours → 25-40% improvement ⭐ Highest ROI
+- **RAVE/AMAF**: 16-22 hours → 20-35% improvement
+- **Neural Networks**: 40-60 hours → 2-5× improvement (long-term)
+- **TOTAL**: 65-95 hours for state-of-the-art MCTS
+
+## Backend Infrastructure (from Architecture Report 9.0)
+
+### Completed ✅
+- ✅ Dual Python/Rust backends with functional parity
+- ✅ Zobrist hashing with PCG64 for both languages
+- ✅ Canonicalization with translation + symmetry ordering
+- ✅ Transposition tables with shared statistics
+- ✅ Comprehensive parity tests (Python ↔ Rust)
+
+### Remaining Tasks
+- [ ] **Backend Selector Enhancement** (2-3 hours)
+  - Formalize fallback logic: try Rust → fall back to Python
+  - Add runtime performance comparison
+  - Document backend selection criteria
+  - Files: `learner/mcts/backend.py`
+
+- [ ] **Performance Telemetry** (3-4 hours)
+  - Add iteration throughput tracking per backend
+  - Track per parallelization mode (serial/threaded/multiprocess)
+  - Log statistics to structured format (JSON)
+  - Files: `rust/src/mcts.rs`, `learner/mcts/mcts_tree.py`
+
+## Testing Enhancements (from Architecture Report 9)
+
+- [ ] **Parallel Correctness Tests** (4-6 hours)
+  - Test determinism: serial vs parallel with same seed
+  - Test statistical equivalence of search results
+  - Test for race conditions in transposition table
+  - Files: `tests/test_mcts_parallel.py` (new)
+
+- [ ] **Performance Regression Tests** (2-3 hours)
+  - Establish baseline benchmarks
+  - 10% tolerance on iteration speed
+  - Memory usage caps
+  - Files: `tests/test_mcts_performance.py` (new)
+
+- [ ] **Memory Leak Detection** (2-3 hours)
+  - Use tracemalloc for Python
+  - Valgrind/heaptrack for Rust
+  - Test stability over 100+ searches
+  - Files: `tests/test_mcts_memory.py` (new)
 
 ## Test Coverage Status:
 
@@ -14,7 +127,6 @@
   - ✅ Transition from supply to captured marbles
   - ✅ Player 2 uses correct captured pool
   - ✅ Partial supply depletion doesn't allow captured marble use
-
   2. Isolated Regions (✅ COMPLETED - 7 tests in test_isolated_regions.py)
 
   - ✅ Single ring with marble (captured)
@@ -199,6 +311,18 @@ policy = PolicyHead(combined)
 - Creates separate notation log file: `zertzlog_{seed}_notation.txt` or `zertzlog_blitz_{seed}_notation.txt`
 - File format:
   - First line: board size and variant (e.g., "37" or "37 Blitz")
+
+## Recently Completed (2025-10-13)
+
+### ✅ Canonicalization & Transposition Alignment
+- Rust backend now mirrors Python canonicalization ordering (translation + symmetry) using byte masks for lexicographic comparison
+- Added shared canonicalization parity tests (Python ↔ Rust) targeting rotations, mirrors, and translations on all board sizes
+- Zobrist hashing infrastructure ported to Rust with identical seed strategy (42) and feature coverage (rings, marbles, supply, captures, current player)
+- Rust transposition table now hashes canonical states via Zobrist keys and shares statistics through `Arc<TranspositionEntry>`; Python remains reference implementation with stored canonical states for collision detection
+
+### ✅ MCTS Backend Consistency Tasks
+- Node statistics in both implementations now proxy through shared transposition entries, keeping visit/value counts aligned for symmetrical states
+- Canonical states are exposed from the Rust backend (`BoardState.canonicalize_state`) for parity checks and future tooling
   - Subsequent lines: one move per line in official notation
 - Supports isolation notation: `Bd7,b2 x Wa1Wa2` (placement that isolates marbles)
 - Can be used with `--log` to generate both dictionary and notation formats simultaneously
@@ -255,72 +379,107 @@ policy = PolicyHead(combined)
 - Document status reporter/TextRenderer defaults and provide a way to silence text output for service deployments
 - Allow `ZertzFactory` to opt out of the text renderer when running non-interactive builds
 
-## Architecture Recommendations (from architecture_report8.md)
+## Architecture Recommendations (from architecture_report9.md - 2025-10-21)
 
-### High Priority (Weeks 1-3) - 12-16 hours total
+### MCTS Implementation - Phase 1: Quick Wins (1 week)
+**Impact**: 25-40% improvement | **Effort**: Low-Medium
 
-1. **Variant Configuration Object** (1-2 hours) - Easy win
+1. **Virtual Loss for Parallel Search** (4-6 hours) - CRITICAL for parallel efficiency
+   - Add virtual loss mechanism to prevent thread collision
+   - Expected gain: 10-20% better parallel efficiency
+   - Implementation: `rust/src/node.rs` add `add_virtual_loss()` / `remove_virtual_loss()`
+   - **Priority**: HIGH | **Complexity**: Low
+
+2. **First Play Urgency (FPU)** (2-3 hours) - Better unvisited node handling
+   - Replace `f32::INFINITY` with estimated value (parent_value - 0.2)
+   - Expected gain: 5-15% stronger play
+   - Implementation: `rust/src/node.rs` modify `ucb1_score()`
+   - **Priority**: HIGH | **Complexity**: Low
+
+3. **Adaptive Exploration Constant** (3-4 hours) - Phase-aware exploration
+   - Dynamically adjust c based on game phase (rings remaining, branching factor)
+   - Expected gain: 5-10% stronger play
+   - Implementation: `rust/src/mcts.rs` add `adaptive_exploration_constant()`
+   - **Priority**: MEDIUM | **Complexity**: Low
+
+**Phase 1 Total**: 9-13 hours → 25-40% improvement
+
+### MCTS Implementation - Phase 2: RAVE/AMAF (2 weeks)
+**Impact**: 15-25% improvement | **Effort**: Medium
+
+4. **RAVE (Rapid Action Value Estimation)** (12-16 hours)
+   - Add AMAF statistics to nodes (rave_visits, rave_value)
+   - Implement RAVE-UCB scoring formula
+   - Update backpropagation to track all actions in playout
+   - Expected gain: 15-25% stronger play (high branching factor benefit)
+   - Implementation:
+     - `rust/src/node.rs`: add RAVE fields, `rave_ucb_score()`
+     - `rust/src/mcts.rs`: track actions during simulation
+   - **Priority**: HIGH | **Complexity**: Medium
+   - **Memory**: +8 bytes per node
+
+5. **Progressive History Heuristic** (4-6 hours)
+   - Global move success tracking across tree
+   - Warm-start priors for move ordering
+   - Expected gain: 5-10% stronger play
+   - Implementation: Add `HistoryTable` in `rust/src/mcts.rs`
+   - **Priority**: MEDIUM | **Complexity**: Low
+
+**Phase 2 Total**: 16-22 hours → 20-35% improvement
+
+### MCTS Implementation - Phase 3: Neural Network Integration (3-4 weeks)
+**Impact**: 2-5× improvement | **Effort**: High
+
+6. **Policy/Value Network** (40-60 hours)
+   - Train neural network on self-play games
+   - Replace random rollouts with learned evaluation
+   - Add PUCT (predictor + UCT) formula
+   - Expected gain: 2-5× stronger play
+   - Technologies: PyTorch, AlphaZero-style architecture
+   - **Priority**: LOW (research phase) | **Complexity**: Very High
+
+### Controller/Renderer Architecture (from architecture_report8.md)
+
+**High Priority** (Weeks 1-3) - 12-16 hours total
+
+1. **Variant Configuration Object** (1-2 hours)
    - Create `VariantConfig` dataclass with marble counts, rules, constraints
-   - Centralize variant-specific parameters currently scattered across codebase
-   - Benefits: Single source of truth, easier to add new variants, better testability
    - **Impact**: Medium | **Effort**: Low
 
-2. **Extract HoverFeedbackCoordinator** (4-6 hours) - Reduces controller complexity
-   - Move hover feedback logic (~400 lines) from `ZertzGameController` to dedicated class
-   - Reduces controller from ~1,200 to ~800 lines
-   - Encapsulates hover state management, coordinate calculation, highlight coordination
-   - Benefits: Better separation of concerns, easier testing, improved maintainability
+2. **Extract HoverFeedbackCoordinator** (4-6 hours)
+   - Move hover feedback logic (~400 lines) from controller to dedicated class
    - **Impact**: High | **Effort**: Medium
 
-3. **Refactor update_game() Method** (4-6 hours) - Improves maintainability
-   - Break down complex method into smaller, focused methods:
-     - `_get_player_action()` - Get action from current player
-     - `_execute_action()` - Execute action and handle results
-     - `_handle_post_action()` - Process captures, isolation, logging
-     - `_check_game_end()` - Check win conditions
-   - Benefits: Easier to understand, test, and modify
+3. **Refactor update_game() Method** (4-6 hours)
+   - Break down into `_get_player_action()`, `_execute_action()`, etc.
    - **Impact**: Medium | **Effort**: Medium
 
-### Medium Priority (Week 4+)
+**Medium Priority** (Week 4+) - 11-15 hours
 
 4. **Player Factory Pattern** (2-3 hours)
-   - Create `PlayerFactory` to encapsulate player creation logic
-   - Support player type registry for easy addition of new player types
-   - Benefits: Better extensibility, cleaner main.py
-   - **Impact**: Low | **Effort**: Low
-
 5. **Test Fixture Builders** (3-4 hours)
-   - Create fixture builders for common test scenarios:
-     - `BoardBuilder` - Build boards with specific configurations
-     - `GameBuilder` - Build games with specific states
-     - `ActionBuilder` - Build action dictionaries
-   - Benefits: More readable tests, reduced duplication, easier test maintenance
-   - **Impact**: Medium | **Effort**: Medium
-
 6. **Placement State Machine** (6-8 hours)
-   - Extract placement action handling into state machine
-   - Phases: select marble → select position → select removal ring → execute
-   - Benefits: Better UX for interactive play, clearer code structure
-   - **Impact**: Medium | **Effort**: High
 
-### Low Priority (Future)
+**Low Priority** (Future) - 10-14 hours
 
 7. **Command Pattern for Actions** (4-6 hours)
-   - Implement Command pattern for undo/redo support
-   - Create `ActionCommand` base class with `execute()` and `undo()` methods
-   - Benefits: Undo/redo functionality, better action encapsulation
-   - **Impact**: Low (nice-to-have) | **Effort**: Medium
-
 8. **Event System** (6-8 hours)
-   - Implement event bus for game events (marble captured, ring removed, etc.)
-   - Benefits: Better decoupling, easier to add features like sound effects
-   - **Impact**: Low | **Effort**: High
 
-### Total Estimated Investment
-- **High Priority**: 12-16 hours for significant improvements
-- **Medium Priority**: 11-15 hours for enhanced features
-- **Low Priority**: 10-14 hours for future enhancements
-- **TOTAL**: 33-45 hours for all recommendations
+### Total Investment Summary
+
+**MCTS Enhancements**:
+- Phase 1 (Quick Wins): 9-13 hours → 25-40% improvement
+- Phase 2 (RAVE): 16-22 hours → 20-35% improvement
+- Phase 3 (Neural Network): 40-60 hours → 2-5× improvement
+- **MCTS Total**: 65-95 hours for state-of-the-art MCTS
+
+**Controller/Renderer**:
+- High Priority: 12-16 hours
+- Medium Priority: 11-15 hours
+- Low Priority: 10-14 hours
+- **Architecture Total**: 33-45 hours
+
+**GRAND TOTAL**: 98-140 hours for all improvements
 
 ## Recently Completed (2025-10-15)
 
@@ -442,7 +601,7 @@ policy = PolicyHead(combined)
   9. Contributing Guidelines - Currently a placeholder "[Add contribution guidelines]"
   10. Troubleshooting/FAQ - No section for common issues
 
-  Would you like me to add any of these sections? The most valuable additions would likely be:
+### Priority
   - Programmatic Usage section with code examples
   - ML Integration Examples
   - Python version requirements

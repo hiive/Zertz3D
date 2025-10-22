@@ -1,0 +1,95 @@
+# Coverage.py configuration for Zertz3D
+# https://coverage.readthedocs.io/en/latest/config.html
+
+[run]
+# Source packages to measure
+source = game, learner, renderer
+
+# Omit specific files/patterns
+omit =
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */venv/*
+    */.venv/*
+    */site-packages/*
+    # Temporary/debug files
+    test_mcts_debug.py
+    test_mcts_timing.py
+    test_single_game.py
+    # Training scripts (not core functionality)
+    train_*.py
+    view_*.py
+    backend_parity_check.py
+
+# Enable branch coverage
+branch = True
+
+# Measure multiprocessing
+concurrency = multiprocessing
+
+[report]
+# Reporting precision
+precision = 2
+
+# Show missing lines
+show_missing = True
+
+# Skip empty files
+skip_empty = True
+
+# Sort by coverage percentage (descending)
+sort = Cover
+
+# Fail if coverage is below this threshold
+# fail_under = 80
+
+# Exclude lines from coverage
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug code
+    def __repr__
+    def __str__
+
+    # Don't complain if tests don't hit defensive assertion code
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't complain if non-runnable code isn't run
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+
+    # Don't complain about abstract methods
+    @abstract
+    @abstractmethod
+
+    # Don't complain about debug logging
+    logger.debug
+
+    # Don't complain about pass statements
+    pass
+
+    # Don't complain about ellipsis in protocols/stubs
+    \.\.\.
+
+# Ignore errors for source files that can't be found
+ignore_errors = False
+
+[html]
+# Directory for HTML output
+directory = htmlcov
+
+# Title for HTML report
+title = Zertz3D Code Coverage Report
+
+# Show contexts in HTML report
+show_contexts = True
+
+[paths]
+# Map import paths to source paths
+source =
+    game/
+    learner/
+    renderer/

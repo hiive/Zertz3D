@@ -20,7 +20,7 @@ class ZobristHasher:
     - Current player
     """
 
-    def __init__(self, width=7, seed=42):
+    def __init__(self, width=7, seed=None):
         """Initialize Zobrist random number tables.
 
         Args:

@@ -2,6 +2,9 @@
 API Comparison tests between Python and Rust MCTS implementations.
 
 These tests ensure that the public APIs are identical and return compatible data.
+
+NOTE: These tests will become obsolete once the Python MCTS implementation is removed.
+They are marked with @pytest.mark.backend_comparison for easy identification and removal.
 """
 
 import pytest
@@ -10,7 +13,11 @@ from game.zertz_game import ZertzGame
 from learner.mcts.backend import HAS_RUST
 
 # Skip all tests if Rust backend not available
-pytestmark = pytest.mark.skipif(not HAS_RUST, reason="Rust backend not available")
+# Also mark as backend_comparison for eventual removal when Python MCTS is deprecated
+pytestmark = [
+    pytest.mark.skipif(not HAS_RUST, reason="Rust backend not available"),
+    pytest.mark.backend_comparison
+]
 
 
 class TestMCTSSearchAPI:
