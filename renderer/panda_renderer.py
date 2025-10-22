@@ -245,8 +245,9 @@ class PandaRenderer(ShowBase):
             ActionVisualizationSequencer(self) if self.highlight_choices else None
         )
 
-        # Create player turn indicator
-        self._create_player_indicator()
+        if self.show_coords or True: # todo - temp - add flag
+            # Create player turn indicator
+            self._create_player_indicator()
 
     def attach_update_loop(
         self, update_fn: Callable[[], bool], interval: float
@@ -272,7 +273,7 @@ class PandaRenderer(ShowBase):
 
     def update(self, task):
         """Update all animations - delegating to manager classes."""
-        # self.rotation += 0.002
+        # self.rotation += 0.001
         # if self.rotation > 2* math.pi:
         #     self.rotation = 0.
         self.set_board_rotation(self.rotation)
@@ -567,22 +568,6 @@ class PandaRenderer(ShowBase):
                     self.pos_to_base[pos] = base_piece
                     self.pos_to_coords[pos] = coords
 
-                    # Create coordinate label if show_coords is enabled
-                    # Labels are also parented to board_node so they rotate with rings
-                    if self.show_coords:
-                        text_node = TextNode(f"label_{pos}")
-                        text_node.setText(pos)
-                        text_node.setAlign(TextNode.ACenter)
-                        text_node.setTextColor(1, 1, 1, 1)  # White text
-                        text_node_path = self.board_node.attachNewNode(text_node)
-                        # Position label above the ring
-                        label_z = 0.4  # Height above ring
-                        text_node_path.setPos(x, y, label_z)
-                        text_node_path.setScale(0.15)  # Text size
-                        # Make text face camera (billboard effect)
-                        text_node_path.setBillboardPointEye()
-                        self.pos_to_label[pos] = text_node_path
-
             logger.debug(f"Board row {i}: {self.pos_array[i]}")
 
     def _position_board_node(self):
@@ -634,6 +619,102 @@ class PandaRenderer(ShowBase):
                 world_coords[2] - self.geometric_center[2] + label_z
             )
             label.setPos(local_coords)
+
+        # Create column coordinate labels if show_coords is enabled
+        if self.show_coords:
+            self._create_column_labels()
+
+    def _create_column_labels(self) -> None:
+        """Create column coordinate labels at top and bottom of each column.
+
+        Labels are positioned one ring-space beyond the highest and lowest positions
+        in each column, using the spacing vector calculated from adjacent positions.
+        """
+        from collections import defaultdict
+
+        # Group positions by column letter
+        columns = defaultdict(list)
+        for pos_str in self.pos_to_coords.keys():
+            letter = pos_str[0]
+            number = int(pos_str[1:])
+            columns[letter].append((number, pos_str))
+
+        # Load monospace font for labels
+        font = self.loader.loadFont("cmtt12.egg")
+
+        # Create labels for each column
+        for letter in self.letters:
+            if letter not in columns:
+                continue
+
+            # Sort positions in this column by number
+            column_positions = sorted(columns[letter])
+            if len(column_positions) < 2:
+                continue  # Need at least 2 positions to calculate spacing
+
+            # Get the lowest and highest positions
+            min_number, min_pos = column_positions[0]
+            max_number, max_pos = column_positions[-1]
+
+            # Get the second-lowest position to calculate spacing vector
+            second_min_number, second_min_pos = column_positions[1]
+
+            # Calculate spacing vector from adjacent positions
+            min_coords = np.array(self.pos_to_coords[min_pos])
+            second_min_coords = np.array(self.pos_to_coords[second_min_pos])
+            spacing_vector = min_coords - second_min_coords
+            spacing_factor = 0.775
+
+            # Position for bottom label (2/3 ring-space below minimum)
+            bottom_label_coords = min_coords + (spacing_vector * spacing_factor)
+            bottom_label_world = (
+                bottom_label_coords[0],
+                bottom_label_coords[1],
+                bottom_label_coords[2]
+            )
+
+            # Position for top label (2/3 ring-space above maximum)
+            max_coords = np.array(self.pos_to_coords[max_pos])
+            top_label_coords = max_coords - (spacing_vector * spacing_factor)
+            top_label_world = (
+                top_label_coords[0],
+                top_label_coords[1],
+                top_label_coords[2]
+            )
+
+            # Convert to board-local coordinates
+            bottom_label_local = self._world_to_board_local(bottom_label_world)
+            top_label_local = self._world_to_board_local(top_label_world)
+
+            # font color
+            font_color = (0, 0, 0, 1) # Black text
+            # Create bottom label
+            bottom_text_node = TextNode(f"col_label_bottom_{letter}")
+            bottom_text_node.setText(f"{letter.lower()}{min_number}")
+            bottom_text_node.setAlign(TextNode.ACenter)
+            bottom_text_node.setTextColor(*font_color)
+            # bottom_text_node.setShadow(0.06, 0.06)  # Larger shadow for bold effect
+            # bottom_text_node.setShadowColor(0, 0, 0, 1)
+            bottom_text_node.setFont(font)
+            bottom_label_path = self.board_node.attachNewNode(bottom_text_node)
+            bottom_label_path.setPos(bottom_label_local[0], bottom_label_local[1], 0.1)
+            bottom_label_path.setScale(0.20)
+            bottom_label_path.setBillboardPointEye()
+            self.pos_to_label[f"col_bottom_{letter}"] = bottom_label_path
+
+            # Create top label
+            top_text_node = TextNode(f"col_label_top_{letter}")
+            top_text_node.setText(f"{letter.lower()}{max_number}")
+            top_text_node.setAlign(TextNode.ACenter)
+            top_text_node.setTextColor(*font_color)
+            top_text_node.setShadow(0.06, 0.06)  # Larger shadow for bold effect
+            # top_text_node.setShadowColor(0, 0, 0, 1)
+            top_text_node.setFont(font)
+            top_label_path = self.board_node.attachNewNode(top_text_node)
+            top_label_path.setPos(top_label_local[0], top_label_local[1], 0.1)
+            top_label_path.setScale(0.20)
+            top_label_path.setBillboardPointEye()
+            self.pos_to_label[f"col_top_{letter}"] = top_label_path
 
     def _world_to_board_local(self, world_coords):
         """Convert world coordinates to board-local coordinates.
@@ -1531,17 +1612,18 @@ class PandaRenderer(ShowBase):
             player_number: The player number (1 or 2)
             notation: Optional move notation to display after the player number
         """
-        if hasattr(self, 'player_indicator'):
-            if notation:
-                text = f"Player {player_number}: {notation}"
-            else:
-                text = f"Player {player_number}"
-            self.player_indicator.setText(text)
-            # Change color based on player
-            if player_number == 1:
-                self.player_indicator['fg'] = (0.0, 0.2, 1.0, 1)  # Dark blue for Player 1
-            else:
-                self.player_indicator['fg'] = (0.7, 0.2, 0.0, 1)  # Dark red for Player 2
+        if not hasattr(self, 'player_indicator'):
+            return
+        if notation:
+            text = f"Player {player_number}: {notation}"
+        else:
+            text = f"Player {player_number}"
+        self.player_indicator.setText(text)
+        # Change color based on player
+        if player_number == 1:
+            self.player_indicator['fg'] = (0.0, 0.2, 1.0, 1)  # Dark blue for Player 1
+        else:
+            self.player_indicator['fg'] = (0.7, 0.2, 0.0, 1)  # Dark red for Player 2
 
     def set_board_rotation(self, angle_radians: float) -> None:
         """Set the rotation angle of the board around the Z-axis.
