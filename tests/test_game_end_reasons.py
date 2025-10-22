@@ -12,7 +12,7 @@ import numpy as np
 # Add parent directory to path to import game modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from game.zertz_game import ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN, TIE, BLITZ_MARBLES, BLITZ_WIN_CONDITIONS
+from game.zertz_game import ZertzGame, BLITZ_MARBLES, BLITZ_WIN_CONDITIONS
 from game.zertz_board import ZertzBoard
 
 

@@ -124,7 +124,7 @@ class NotationLoader:
                 self._report(f"Warning: Unknown board size {rings}, defaulting to 37")
                 self.detected_rings = ZertzBoard.SMALL_BOARD_37
         except ValueError:
-            self._report(f"Warning: Invalid board size in header, defaulting to 37")
+            self._report("Warning: Invalid board size in header, defaulting to 37")
             self.detected_rings = ZertzBoard.SMALL_BOARD_37
 
         # Check for variant in remaining parts

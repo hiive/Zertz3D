@@ -1,7 +1,6 @@
 """Debug MCTS player to see what's happening."""
 
 import random
-from statistics import mean, stdev, pstdev
 
 import numpy as np
 from game.formatters.transcript_formatter import TranscriptFormatter
@@ -32,7 +31,7 @@ stats = {
 
 print(f"Running {NUM_GAMES} games to gather MCTS statistics")
 print(f"MCTS iterations per move: {MCTS_ITERATIONS}")
-print(f"=" * 70)
+print("=" * 70)
 
 for game_num in range(NUM_GAMES):
     # Alternate which player is MCTS
@@ -67,7 +66,7 @@ for game_num in range(NUM_GAMES):
 
     if game_num == 0 and VERBOSE_FIRST_GAME:
         print(f"\nGame {game_num + 1}/{NUM_GAMES} ({game_type}) - VERBOSE MODE")
-        print(f"=" * 70)
+        print("=" * 70)
     else:
         print(f"\nGame {game_num + 1}/{NUM_GAMES} ({game_type})...", end=" ", flush=True)
 
@@ -175,7 +174,7 @@ for game_num in range(NUM_GAMES):
 print(f"\n{'='*70}")
 print(f"AGGREGATE STATISTICS ({NUM_GAMES} games)")
 print(f"{'='*70}")
-print(f"\nOverall Results:")
+print("\nOverall Results:")
 print(f"  Player 1 wins: {stats['p1_wins']} ({stats['p1_wins']/NUM_GAMES*100:.1f}%)")
 print(f"  Player 2 wins: {stats['p2_wins']} ({stats['p2_wins']/NUM_GAMES*100:.1f}%)")
 print(f"  Ties: {stats['ties']} ({stats['ties']/NUM_GAMES*100:.1f}%)")
@@ -184,7 +183,7 @@ if stats['win_record']:
     win_values = [1 if r == 1 else (0 if r == -1 else 0.5) for r in stats['win_record']]
     print(f"  Win rate mean: {overall_mean*100:.1f}%")
 
-print(f"\nMCTS as Player 1:")
+print("\nMCTS as Player 1:")
 mcts_p1_games = sum(stats['mcts_as_p1'].values())
 if mcts_p1_games > 0:
     print(f"  Wins: {stats['mcts_as_p1']['wins']}/{mcts_p1_games} ({stats['mcts_as_p1']['wins']/mcts_p1_games*100:.1f}%)")
@@ -194,7 +193,7 @@ if mcts_p1_games > 0:
         p1_rate = stats['mcts_as_p1']['wins'] / max(1, (stats['mcts_as_p1']['wins'] + stats['mcts_as_p1']['losses']))
         print(f"  Win rate mean as P1: {p1_rate*100:.1f}%")
 
-print(f"\nMCTS as Player 2:")
+print("\nMCTS as Player 2:")
 mcts_p2_games = sum(stats['mcts_as_p2'].values())
 if mcts_p2_games > 0:
     print(f"  Wins: {stats['mcts_as_p2']['wins']}/{mcts_p2_games} ({stats['mcts_as_p2']['wins']/mcts_p2_games*100:.1f}%)")
@@ -206,12 +205,12 @@ if mcts_p2_games > 0:
 
 total_mcts_games = mcts_p1_games + mcts_p2_games
 total_mcts_wins = stats['mcts_as_p1']['wins'] + stats['mcts_as_p2']['wins']
-print(f"\nOverall MCTS Performance:")
+print("\nOverall MCTS Performance:")
 print(f"  Total wins: {total_mcts_wins}/{total_mcts_games} ({total_mcts_wins/total_mcts_games*100:.1f}%)")
 
 avg_moves = sum(stats['total_moves']) / len(stats['total_moves'])
 std_moves = np.std(stats['total_moves'])
-print(f"\nGame Length:")
+print("\nGame Length:")
 print(f"  Average moves per game: {avg_moves:.1f}, std: {std_moves:.1f}")
 print(f"  Min: {min(stats['total_moves'])}, Max: {max(stats['total_moves'])}")
 print(f"{'='*70}")

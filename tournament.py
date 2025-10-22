@@ -231,7 +231,7 @@ def run_tournament(
             matchup_time = time.time() - matchup_start
 
             # Matchup summary
-            print(f"\n  Results:")
+            print("\n  Results:")
             print(f"    {config1['id']} wins: {results[1]}")
             print(f"    {config2['id']} wins: {results[-1]}")
             print(f"    Ties: {results[0]}")

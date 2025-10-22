@@ -1,7 +1,7 @@
 """Tests for CompositeRenderer functionality."""
 
 import pytest
-from unittest.mock import Mock, MagicMock, call
+from unittest.mock import Mock
 
 from renderer.composite_renderer import CompositeRenderer
 from shared.interfaces import IRenderer

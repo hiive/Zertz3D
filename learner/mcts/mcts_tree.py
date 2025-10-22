@@ -1,6 +1,5 @@
 import math
 import time
-import threading
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from threading import Lock
 
@@ -348,7 +347,6 @@ class MCTSTree:
             Best action found, or None if no legal actions
         """
         # Import stateless logic
-        from game import stateless_logic
 
         # Get config from game
         config = game.board._get_config()
@@ -406,7 +404,7 @@ class MCTSTree:
         if verbose:
             elapsed = time.time() - start_time
             actual_iterations = root.visits
-            print(f"\nMCTS Search Statistics:")
+            print("\nMCTS Search Statistics:")
             print(f"  Iterations: {actual_iterations}")
             print(f"  Time: {elapsed:.2f}s")
             print(f"  Iterations/sec: {actual_iterations / elapsed:.1f}")
@@ -422,7 +420,7 @@ class MCTSTree:
             sorted_children = sorted(root.children.items(),
                                      key=lambda item: item[1].visits,
                                      reverse=True)
-            print(f"\n  Top moves:")
+            print("\n  Top moves:")
             for i, (action, child) in enumerate(sorted_children[:3], 1):
                 avg_value = child.value / child.visits if child.visits > 0 else 0
                 print(f"    {i}. {action[0]}: {child.visits} visits, "
@@ -454,7 +452,6 @@ class MCTSTree:
             Best action found, or None if no legal actions
         """
         # Import stateless logic
-        from game import stateless_logic
 
         # Get config from game
         config = game.board._get_config()
@@ -553,7 +550,7 @@ class MCTSTree:
             sorted_children = sorted(root.children.items(),
                                      key=lambda item: item[1].visits,
                                      reverse=True)
-            print(f"\n  Top moves:")
+            print("\n  Top moves:")
             for i, (action, child) in enumerate(sorted_children[:3], 1):
                 avg_value = child.value / child.visits if child.visits > 0 else 0
                 print(f"    {i}. {action[0]}: {child.visits} visits, "
@@ -657,7 +654,7 @@ class MCTSTree:
             sorted_actions = sorted(action_stats.items(),
                                    key=lambda item: item[1][0],
                                    reverse=True)
-            print(f"\n  Top moves:")
+            print("\n  Top moves:")
             for i, (action, (visits, value)) in enumerate(sorted_actions[:3], 1):
                 avg_value = value / visits if visits > 0 else 0
                 print(f"    {i}. {action[0]}: {visits} visits, "

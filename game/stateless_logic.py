@@ -183,7 +183,7 @@ def get_regions(board_state: np.ndarray, config: BoardConfig) -> list:
     return regions
 
 
-def get_open_rings(board_state: np.ndarray, config: BoardConfig, regions: list = None) -> list:
+def get_open_rings(board_state: np.ndarray, config: BoardConfig) -> list:
     """Get list of empty ring indices across the entire board.
 
     Pure function version of ZertzBoard._get_open_rings()
@@ -191,7 +191,6 @@ def get_open_rings(board_state: np.ndarray, config: BoardConfig, regions: list =
     Args:
         board_state: Board state array
         config: BoardConfig
-        regions: Unused (retained for API compatibility)
     """
     # Vacant rings are those with a ring present but no marble on top
     return list(

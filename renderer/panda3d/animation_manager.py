@@ -3,8 +3,6 @@
 import math
 from queue import SimpleQueue, Empty
 
-import numpy as np
-from panda3d.core import TransparencyAttrib
 
 
 class AnimationManager:

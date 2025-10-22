@@ -18,7 +18,6 @@ from panda3d.core import (
     TextNode,
     NodePath,
 )
-from sympy import capture
 
 from renderer.panda3d.action_sequencer import ActionVisualizationSequencer
 from renderer.panda3d.animation_manager import AnimationManager
@@ -39,9 +38,6 @@ from shared.materials_modifiers import (
     HOVER_SECONDARY_MATERIAL_MOD,
     HOVER_SUPPLY_MATERIAL_MOD,
     HOVER_CAPTURED_MATERIAL_MOD,
-    SUPPLY_HIGHLIGHT_WHITE_MATERIAL_MOD,
-    SUPPLY_HIGHLIGHT_GREY_MATERIAL_MOD,
-    SUPPLY_HIGHLIGHT_BLACK_MATERIAL_MOD,
 )
 
 
@@ -731,7 +727,6 @@ class PandaRenderer(ShowBase):
         Configures two directional lights with shadow mapping for better
         intra-object shadows (self-shadowing on curved surfaces like marbles).
         """
-        from panda3d.core import OrthographicLens
 
         # Main directional light (primary shadow caster)
         p_light = DirectionalLight("p_light")

@@ -4,7 +4,6 @@ Unit tests for ActionResult.
 Tests the ActionResult value object that encapsulates action execution results.
 """
 
-import pytest
 import sys
 from pathlib import Path
 

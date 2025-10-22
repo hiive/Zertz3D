@@ -15,7 +15,6 @@ Use pytest -m "not slow" to skip in fast CI runs.
 import sys
 from pathlib import Path
 import numpy as np
-from collections import defaultdict
 import random
 import pytest
 
@@ -313,15 +312,15 @@ def print_summary(results):
         print(f"Both orderings coverage: avg={avg_coverage*100:.1f}%, min={min_coverage*100:.1f}%")
 
     if results['gaps_found'] > 0:
-        print(f"\n❌ GAPS CONFIRMED!")
+        print("\n❌ GAPS CONFIRMED!")
         print(f"   Maximum gap size: {results['max_gap_size']} states")
-        print(f"\n   Example gaps:")
+        print("\n   Example gaps:")
         for ex in results['gap_examples'][:3]:
             print(f"   - Test #{ex['test_num']}: {ex['num_marbles']} marbles, {ex['num_removed']} removed")
             print(f"     Missed {ex['analysis']['missed_by_T_then_g']} states out of {ex['analysis']['full_size']}")
     else:
         print(f"\n✓ NO GAPS FOUND in {results['total']} tests")
-        print(f"   Current T→g approach appears complete for tested configurations")
+        print("   Current T→g approach appears complete for tested configurations")
 
 
 @pytest.mark.slow

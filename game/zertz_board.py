@@ -1,4 +1,3 @@
-from collections import deque
 import numpy as np
 
 from game.zertz_position import ZertzPosition, ZertzPositionCollection

@@ -1192,7 +1192,7 @@ class TestTranslationCanonicalization:
         if "_" in transform:
             parts = transform.split("_")
             assert not any(p.startswith("T") and p != "T0,0" for p in parts), (
-                f"Should not have non-identity translation with ROTATION_MIRROR flag"
+                "Should not have non-identity translation with ROTATION_MIRROR flag"
             )
 
     def test_canonicalize_with_all_transforms(self, small_board):

@@ -133,7 +133,7 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
             temp_files.append(tmp_canon.name)
             canonical_board = ZertzBoard(loader.detected_rings)
             canonical_board.state = canonical_state.copy()
-            renderer.save_board(canonical_board, tmp_canon.name, title=f"Canonical (R0)", width=512)
+            renderer.save_board(canonical_board, tmp_canon.name, title="Canonical (R0)", width=512)
             images_to_concat.append(Image.open(tmp_canon.name))
 
             # 3. Optionally add all other unique transformations

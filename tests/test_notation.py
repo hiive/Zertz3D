@@ -79,8 +79,8 @@ class TestNotationGeneration:
         assert notation.startswith("Bd4,c3 x "), (
             f"Expected 'Bd4,c3 x ...' prefix, got '{notation}'"
         )
-        assert "Wa1" in notation, f"Expected 'Wa1' in isolation captures"
-        assert "Gb2" in notation, f"Expected 'Gb2' in isolation captures"
+        assert "Wa1" in notation, "Expected 'Wa1' in isolation captures"
+        assert "Gb2" in notation, "Expected 'Gb2' in isolation captures"
 
     @pytest.mark.parametrize("rings", [
         ZertzBoard.SMALL_BOARD_37,

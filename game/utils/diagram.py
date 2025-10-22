@@ -507,7 +507,7 @@ def parse_notation_string(notation_str: str) -> tuple[list[dict], list[dict], in
             else:
                 player2_actions.append(action_dict)
             current_player = 2 if current_player == 1 else 1
-        except ValueError as e:
+        except ValueError:
             # Skip invalid notation lines
             continue
 

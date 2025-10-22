@@ -2,10 +2,7 @@
 
 import math
 from queue import SimpleQueue, Empty
-from typing import Optional, Callable
 
-import numpy as np
-from panda3d.core import Material
 
 from renderer.panda3d.material_modifier import MaterialModifier
 from renderer.panda3d.material_manager import MaterialManager

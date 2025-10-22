@@ -8,7 +8,6 @@ Tests methods that aren't covered by other test files:
 - Render data generation
 """
 
-import pytest
 import sys
 import numpy as np
 from pathlib import Path
@@ -17,7 +16,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from game.zertz_game import ZertzGame
-from game.zertz_board import ZertzBoard
 from shared.render_data import RenderData
 
 

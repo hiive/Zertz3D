@@ -6,14 +6,12 @@ import random
 
 from controller.game_session import GameSession
 from game.zertz_game import (
-    ZertzGame,
     STANDARD_MARBLES,
     BLITZ_MARBLES,
     STANDARD_WIN_CONDITIONS,
     BLITZ_WIN_CONDITIONS,
 )
 from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer, HumanZertzPlayer
-from game.zertz_board import ZertzBoard
 
 
 class TestGameSession:
