@@ -1,4 +1,4 @@
-"""Main entry point for Zertz 3D game."""
+"""Main entry point for Zèrtz 3D game."""
 
 import argparse
 
@@ -6,7 +6,7 @@ from factory import ZertzFactory
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Zertz 3D Game")
+    parser = argparse.ArgumentParser(description="Zèrtz 3D Game")
     parser.add_argument(
         "--replay", type=str, help="Path to transcript/notationre file (board size auto-detected)"
     )

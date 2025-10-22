@@ -39,7 +39,7 @@ class TestMarbleSupplyLogic:
     def test_one_marble_type_empty_cannot_use_captured(self, board):
         """Test that players cannot use captured marbles when ANY supply marble is available.
 
-        Per Zertz rules: Players must use the general supply first. Only when ALL
+        Per Zèrtz rules: Players must use the general supply first. Only when ALL
         marble types are depleted from the supply can players use their captured marbles.
 
         Scenario:

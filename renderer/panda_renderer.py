@@ -348,6 +348,42 @@ class PandaRenderer(ShowBase):
         y -= self.y_base_size
         self._build_color_supply("w", self.white_marbles, y)
 
+    def _reposition_supply_marbles(self):
+        """Reposition all supply marbles to their correct locations.
+
+        Used after reset_board() to recalculate marble positions that may have
+        been affected by board rotation. Supply marbles are in world space
+        (not parented to board_node), so their positions don't auto-update.
+        """
+        y = self.SUPPLY_Y_OFFSET
+        x_off = self.SUPPLY_MARBLE_SCALE * 2.0
+
+        # Reposition black marbles
+        supply_count = len(self.marble_supply["b"])
+        xx = (self.x_base_size / 2.0 - (x_off * supply_count)) / 2.0
+        for marble in self.marble_supply["b"]:
+            marble.set_pos((xx, y, 0))
+            marble.configure_as_supply_marble(self._supply_key(marble), self.SUPPLY_MARBLE_SCALE)
+            xx += x_off
+
+        # Reposition grey marbles
+        y -= self.y_base_size
+        supply_count = len(self.marble_supply["g"])
+        xx = (self.x_base_size / 2.0 - (x_off * supply_count)) / 2.0
+        for marble in self.marble_supply["g"]:
+            marble.set_pos((xx, y, 0))
+            marble.configure_as_supply_marble(self._supply_key(marble), self.SUPPLY_MARBLE_SCALE)
+            xx += x_off
+
+        # Reposition white marbles
+        y -= self.y_base_size
+        supply_count = len(self.marble_supply["w"])
+        xx = (self.x_base_size / 2.0 - (x_off * supply_count)) / 2.0
+        for marble in self.marble_supply["w"]:
+            marble.set_pos((xx, y, 0))
+            marble.configure_as_supply_marble(self._supply_key(marble), self.SUPPLY_MARBLE_SCALE)
+            xx += x_off
+
     def _setup_camera(self):
         """Setup camera position and orientation based on board size."""
         # Get camera configuration for this board size
@@ -1089,16 +1125,14 @@ class PandaRenderer(ShowBase):
             base_piece.model.clearColorScale()
             base_piece.model.clearTransparency()
 
-        # 4. Move marbles back to pool and clear their visual state
+        # 4. Return marbles to supply pools and clear their visual state
         for color, marbles in self.marbles_in_play.items():
-            for marble, pos in marbles:
-
+            for marble, _ in marbles:  # Ignore stored position - will be recalculated
                 self.marble_supply[color].append(marble)
                 self._marble_registry[id(marble)] = marble
-
                 marble.model.clearMaterial()  # Clear any highlight materials
-                marble.set_pos(pos)
-                marble.configure_as_supply_marble(self._supply_key(marble), self.SUPPLY_MARBLE_SCALE)
+                # Reparent to world space (marbles on board are parented to board_node)
+                marble.model.reparentTo(self.render)
 
         # 5. Clear marbles_in_play dict (important - this accumulates otherwise!)
         self.marbles_in_play = self._make_marble_dict()
@@ -1109,7 +1143,11 @@ class PandaRenderer(ShowBase):
         # 7. Rebuild player pools
         self._build_players_marble_supply()
 
-        # 8. Recreate highlight state machine
+        # 8. Reposition all supply marbles to correct locations
+        # This recalculates positions accounting for any board rotation
+        self._reposition_supply_marbles()
+
+        # 9. Recreate highlight state machine
         if self.highlight_choices:
             self.action_visualization_sequencer = ActionVisualizationSequencer(self)
         self._action_context = None

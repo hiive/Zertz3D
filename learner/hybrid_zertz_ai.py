@@ -8,7 +8,7 @@ from learner.gnn_feature_extractor import GNNFeatureExtractor
 
 class HybridZertzAI(nn.Module):
     """
-    Hybrid Neural Network combining C6-equivariant CNN and GNN for ZERTZ AI.
+    Hybrid Neural Network combining C6-equivariant CNN and GNN for ZÈRTZ AI.
     Outputs policy (move probabilities for PUT-REM and CAP actions) and value (position evaluation).
     """
 
