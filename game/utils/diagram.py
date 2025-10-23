@@ -38,7 +38,8 @@ try:
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
-from game.zertz_game import ZertzGame, STANDARD_MARBLES, BLITZ_MARBLES, STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS
+from game.zertz_game import ZertzGame
+from game.constants import STANDARD_MARBLES, BLITZ_MARBLES, STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS
 from game.zertz_board import ZertzBoard
 from game.formatters import NotationFormatter
 from game.loaders import NotationLoader

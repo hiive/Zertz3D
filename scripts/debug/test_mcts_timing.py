@@ -1,13 +1,31 @@
 """Quick test to measure MCTS timing per move."""
 
 import time
+import sys
+from pathlib import Path
+
+# Add project root to Python path to support running from any directory
+# Find project root by looking for pyproject.toml
+def find_project_root(start_path: Path) -> Path:
+    """Find project root by searching for pyproject.toml."""
+    current = start_path.resolve()
+    while current != current.parent:
+        if (current / 'pyproject.toml').exists():
+            return current
+        current = current.parent
+    raise RuntimeError("Could not find project root (pyproject.toml not found)")
+
+project_root = find_project_root(Path(__file__).parent)
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from game.zertz_game import ZertzGame
 from game.players.mcts_zertz_player import MCTSZertzPlayer
 
 # Create game
 game = ZertzGame(rings=37)
 
-iterations = 1000
+iterations = 10000
 # Create players with 100 iterations
 player1 = MCTSZertzPlayer(
     game, n=1,
@@ -37,7 +55,7 @@ move_times = []
 move_count = 0
 game_start = time.time()
 
-print("Playing test game with 100 iterations per move...")
+print(f"Playing test game with {iterations} iterations per move...")
 print()
 
 while game.get_game_ended() is None:
@@ -62,7 +80,7 @@ game_time = time.time() - game_start
 # Print statistics
 print()
 print("="*60)
-print("Timing Results (100 iterations per move)")
+print(f"Timing Results ({iterations} iterations per move)")
 print("="*60)
 print(f"Total moves: {move_count}")
 print(f"Total game time: {game_time:.2f}s")
