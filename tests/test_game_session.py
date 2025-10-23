@@ -5,7 +5,7 @@ import numpy as np
 import random
 
 from controller.game_session import GameSession
-from game.zertz_game import (
+from game.constants import (
     STANDARD_MARBLES,
     BLITZ_MARBLES,
     STANDARD_WIN_CONDITIONS,

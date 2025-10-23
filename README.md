@@ -310,6 +310,7 @@ uv run pytest --cov=game --cov=controller --cov=shared --cov-report=html tests/
 - **ML Integration**: State separated into spatial (L×H×W board features) and global (10-element vector) components for machine learning applications
 - **Official Notation**: Game outputs moves in official Zèrtz notation format (e.g., `Wd4`, `x e3Wg3`, `-`) alongside internal dictionary format
 - **Unified Animation System**: Single animation queue handles both movement animations and highlight effects (material changes). Type discrimination (`'move'` vs `'highlight'`) allows different processing paths while maintaining consistent timing and lifecycle. Highlights apply instantly; moves interpolate over time
+- **Code Architecture**: Both Python and Rust follow delegation pattern - MCTS delegates to pure game logic functions (mcts.rs → game.rs, mcts_tree.py → zertz_logic.py) ensuring single source of truth for all game rules
 
 
 ## Dependencies

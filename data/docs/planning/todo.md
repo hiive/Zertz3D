@@ -1,5 +1,23 @@
 # Zertz3D TODO and Improvement Suggestions
 
+## Recently Completed (2025-01-22)
+
+### ✅ Rust MCTS Code Duplication Elimination
+- **Refactoring**: Eliminated ~150 lines of duplicated game logic between rust/src/mcts.rs and rust/src/game.rs
+- **Changes**:
+  - Added `is_game_over()` and `get_game_outcome()` to game.rs as single source of truth (lines 915-1140)
+  - Refactored `is_terminal_state()` in mcts.rs from ~80 lines to 3 lines (delegates to game::is_game_over)
+  - Refactored `evaluate_terminal()` in mcts.rs from ~100 lines to ~30 lines (delegates to game::get_game_outcome)
+  - Updated imports in mcts.rs to include new functions
+- **Benefits**:
+  - Single source of truth for game termination logic
+  - Matches Python architecture (mcts_tree.py → stateless_logic.py)
+  - Easier maintenance (rule changes only in one place)
+  - Reduced risk of divergence between MCTS and game logic
+- **Files**: rust/src/game.rs (added functions), rust/src/mcts.rs (refactored)
+- **Testing**: All 727 tests pass, no behavioral changes
+- **Documentation**: See data/docs/architecture/architecture_update_code_duplication_fix.md
+
 ## Feature Ideas
 - Add game statistics tracking
 - Network multiplayer support

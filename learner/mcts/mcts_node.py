@@ -116,10 +116,10 @@ class MCTSNode:
         Checks both standard terminal conditions (win, board full, no marbles)
         and consecutive passes (both players must pass = draw).
         """
-        from game import stateless_logic
+        from game import zertz_logic
 
         # Check standard terminal conditions
-        if stateless_logic.is_game_over(self.board_state, self.global_state, self.config):
+        if zertz_logic.is_game_over(self.board_state, self.global_state, self.config):
             return True
 
         # Check for consecutive passes using parent pointer
@@ -127,7 +127,7 @@ class MCTSNode:
         # then both players passed consecutively → terminal (draw)
         if self.parent is not None and self.action == ("PASS", None):
             # Parent passed to get here, check if current player must also pass
-            p_actions, c_actions = stateless_logic.get_valid_actions(
+            p_actions, c_actions = zertz_logic.get_valid_actions(
                 self.board_state, self.global_state, self.config
             )
 
@@ -144,9 +144,9 @@ class MCTSNode:
             return
 
         # Use stateless functions to get valid actions
-        from game import stateless_logic
+        from game import zertz_logic
 
-        p_actions, c_actions = stateless_logic.get_valid_actions(
+        p_actions, c_actions = zertz_logic.get_valid_actions(
             self.board_state, self.global_state, self.config
         )
 

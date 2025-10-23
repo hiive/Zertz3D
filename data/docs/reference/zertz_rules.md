@@ -62,19 +62,21 @@ Play alternates until someone wins.
 
 ### Capturing Marbles
 
-1. Capturing is **compulsory**: if you can capture, you must.  
-2. Jump a marble over an adjacent marble into the vacant ring immediately beyond it (as in checkers). You may jump in any direction provided the landing ring is empty.  
-3. The color of the jumping and captured marbles is irrelevant.  
-4. If, after a jump, another capture is available with the same marble, you must continue until no further jump is possible.  
-5. When multiple capture routes exist (with different lengths), you may choose any of them.  
-6. A capture sequence (one or more jumps) completes your turn; you do not place a marble or remove a ring afterward.
+1. Capturing is **compulsory**: if you can capture, you must.
+2. Jump a marble over an adjacent marble into the vacant ring immediately beyond it (as in checkers). You may jump in any direction provided the landing ring is empty.
+3. The color of the jumping and captured marbles is irrelevant.
+4. If, after a jump, another capture is available with the same marble, you must continue until no further jump is possible.
+5. When multiple capture routes exist (with different lengths), you may choose any of them.
+6. **Important:** When multiple capture options are available (including captures created by a previous player's move), you may freely choose whichever capture you prefer. You are not required to capture the marble that was just moved by your opponent.
+7. A capture sequence (one or more jumps) completes your turn; you do not place a marble or remove a ring afterward.
 
 ---
 
 ## Isolating Marbles
 
-1. If your move disconnects one or more rings from the main board, you may claim those isolated rings and the marbles on them. Treat this as a second way to capture; it is not mandatory.  
+1. If your move disconnects one or more rings from the main board, you may claim those isolated rings and the marbles on them. Treat this as a second way to capture; it is not mandatory.
 2. You may only claim an isolated group when **all rings in that group are occupied**. You either remove the ring that causes the isolation or place the final marble that fills a pre-isolated cluster. The capture happens as a consequence of the move that created the isolation.
+3. **Important:** If you isolate a ring without a marble on it, that ring stays on the board. When you or your opponent later places a marble on it, that player removes both the ring and captures that marble. Alternatively, players can place marbles elsewhere and choose to remove the isolated ring as their required ring removal.
 
 ---
 
@@ -86,9 +88,10 @@ The game ends immediately when a player holds one of the target sets listed unde
 
 ## Special Cases
 
-1. If the pool is empty before anyone wins, continue playing using your **captured marbles**. As with the pool, you may choose any color from your captures on your turn.  
-2. If every ring becomes occupied before a win condition is met, the player who filled the final vacant ring wins by claiming the now-isolated board.  
+1. If the pool is empty before anyone wins, continue playing using your **captured marbles**. As with the pool, you may choose any color from your captures on your turn.
+2. If every ring becomes occupied before a win condition is met, the player who filled the final vacant ring wins by claiming the now-isolated board.
 3. If both players repeat the same sequence of moves indefinitely, the game is declared a tie.
+4. **Tournament Rule:** If all marbles are placed on the board and the current player hasn't captured any marbles yet, this indicates prohibited player collaboration. In official tournament play, both players lose the game (ties are not permitted).
 
 ---
 

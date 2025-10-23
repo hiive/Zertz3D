@@ -47,7 +47,8 @@ def test_board_full_last_move_awards_previous_player():
     board.global_state[board.SUPPLY_W] = 1
     board.global_state[board.SUPPLY_G] = 0
     board.global_state[board.SUPPLY_B] = 0
-    board.global_state[board.P1_CAP_SLICE] = 0
+    # Give Player 1 one captured marble to avoid BOTH_LOSE condition
+    board.global_state[board.P1_CAP_SLICE] = [1, 0, 0]
     board.global_state[board.P2_CAP_SLICE] = 0
     board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 

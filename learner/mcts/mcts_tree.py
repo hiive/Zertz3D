@@ -88,7 +88,7 @@ class MCTSTree:
             return node  # No untried actions (shouldn't happen in normal flow)
 
         # Import stateless logic
-        from game import stateless_logic
+        from game import zertz_logic
 
         # Get current player before applying action
         current_player = int(node.global_state[node.config.cur_player])
@@ -101,7 +101,7 @@ class MCTSTree:
             new_global_state = node.global_state.copy()
             new_global_state[node.config.cur_player] = 1 - current_player
         else:
-            new_board_state, new_global_state = stateless_logic.apply_action(
+            new_board_state, new_global_state = zertz_logic.apply_action(
                 node.board_state,
                 node.global_state,
                 action_data,
@@ -154,7 +154,7 @@ class MCTSTree:
             return self.evaluate_terminal(node, leaf_player)
 
         # Import stateless logic
-        from game import stateless_logic
+        from game import zertz_logic
 
         # Clone state for simulation
         sim_board_state = node.board_state.copy()
@@ -166,7 +166,7 @@ class MCTSTree:
         # Play randomly until terminal or max depth
         while True:
             # Check terminal conditions using stateless function
-            if stateless_logic.is_game_over(sim_board_state, sim_global_state, node.config):
+            if zertz_logic.is_game_over(sim_board_state, sim_global_state, node.config):
                 return self.evaluate_terminal_game(sim_board_state, sim_global_state,
                                                    node.config, leaf_player)
 
@@ -181,7 +181,7 @@ class MCTSTree:
                                               node.config, leaf_player)
 
             # Get random action using stateless functions
-            p_actions, c_actions = stateless_logic.get_valid_actions(
+            p_actions, c_actions = zertz_logic.get_valid_actions(
                 sim_board_state, sim_global_state, node.config
             )
 
@@ -210,7 +210,7 @@ class MCTSTree:
                 sim_global_state[node.config.cur_player] = 1 - current_player
             else:
                 consecutive_passes = 0  # Reset pass counter
-                sim_board_state, sim_global_state = stateless_logic.apply_action(
+                sim_board_state, sim_global_state = zertz_logic.apply_action(
                     sim_board_state, sim_global_state, action_data, action_type, node.config
                 )
 
@@ -242,24 +242,27 @@ class MCTSTree:
             root_player: Player (0 or 1) from whose perspective to evaluate
 
         Returns:
-            +1 if root_player won, -1 if lost, 0 if draw
+            +1 if root_player won, -1 if lost, 0 if draw, -2 if both lose
         """
-        from game import stateless_logic
+        from game import zertz_logic
+        from game.constants import PLAYER_1_WIN, PLAYER_2_WIN, TIE, BOTH_LOSE
 
         # Use stateless function to get outcome
-        outcome = stateless_logic.get_game_outcome(board_state, global_state, config)
+        outcome = zertz_logic.get_game_outcome(board_state, global_state, config)
 
         if outcome is None:
             return 0  # Not terminal (shouldn't happen in simulation)
 
-        # Outcome: 1 (P1 win), -1 (P2 win), or 0 (tie)
+        # Outcome: PLAYER_1_WIN (1), PLAYER_2_WIN (-1), TIE (0), or BOTH_LOSE (-2)
         # Convert to root_player's perspective
-        if outcome == 0:
+        if outcome == TIE:
             return 0  # Tie
-        elif outcome == 1:
+        elif outcome == PLAYER_1_WIN:
             return 1 if root_player == 0 else -1  # P1 won
-        elif outcome == -1:
+        elif outcome == PLAYER_2_WIN:
             return 1 if root_player == 1 else -1  # P2 won
+        elif outcome == BOTH_LOSE:
+            return -2  # Both players lose (collaboration detected)
         else:
             return 0  # Shouldn't happen
 

@@ -3,6 +3,7 @@ import random
 import numpy as np
 
 from game.zertz_player import ZertzPlayer
+from game.constants import BLITZ_WIN_CONDITIONS
 from learner.mcts.mcts_tree import MCTSTree
 from learner.mcts.transposition_table import TranspositionTable
 from learner.mcts.backend import get_backend, Backend, HAS_RUST
@@ -137,6 +138,12 @@ class MCTSZertzPlayer(ZertzPlayer):
 
         return action
 
+    def _is_blitz_mode(self):
+        """Detect if the game is in blitz mode by checking win conditions."""
+        # Blitz mode is identified by the first win condition: {"w": 2, "g": 2, "b": 2}
+        # Standard mode has: {"w": 3, "g": 3, "b": 3}
+        return self.game.win_con == BLITZ_WIN_CONDITIONS
+
     def _rust_search(self):
         """Run MCTS search using Rust backend."""
         # Get current state
@@ -154,6 +161,9 @@ class MCTSZertzPlayer(ZertzPlayer):
             self.rust_mcts.set_seed(self.rng_seed)
             self._rust_seed_initialized = True
 
+        # Detect game mode and pass to Rust
+        is_blitz = self._is_blitz_mode()
+
         rust_kwargs = dict(
             rings=self.game.board.rings,
             iterations=self.iterations,
@@ -164,6 +174,7 @@ class MCTSZertzPlayer(ZertzPlayer):
             use_transposition_lookups=self.use_transposition_lookups,
             clear_table=self.clear_table_each_move,
             verbose=self.verbose,
+            blitz=is_blitz,
         )
 
         # Run search (serial or parallel)

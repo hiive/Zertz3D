@@ -23,6 +23,8 @@ from collections import deque
 from typing import Dict, NamedTuple, Tuple
 import numpy as np
 
+from .constants import PLAYER_1_WIN, PLAYER_2_WIN, BOTH_LOSE
+
 
 class BoardConfig(NamedTuple):
     """Immutable board configuration.
@@ -1075,9 +1077,13 @@ def get_game_outcome(
     p2_has_marbles = np.any(p2_marbles > 0)
 
     if board_full:
-        # Board full - last player to move wins (current player loses)
+        # Check collaboration rule - if neither player has captured any marble, both lose
+        if np.all(p1_captured == 0) and np.all(p2_captured == 0):
+            return BOTH_LOSE
+
+        # Normal full board - last player to move wins (current player loses)
         current_player = int(global_state[config.cur_player])
-        return -1 if current_player == config.player_1 else 1
+        return PLAYER_2_WIN if current_player == config.player_1 else PLAYER_1_WIN
 
     if not p1_has_marbles and not p2_has_marbles:
         # Both out of marbles - compare captures

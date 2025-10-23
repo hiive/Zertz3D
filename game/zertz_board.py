@@ -2,7 +2,7 @@ import numpy as np
 
 from game.zertz_position import ZertzPosition, ZertzPositionCollection
 from game.utils.canonicalization import TransformFlags, CanonicalizationManager
-from game import stateless_logic
+from game import zertz_logic
 
 
 class ZertzBoard:
@@ -365,7 +365,7 @@ class ZertzBoard:
         This allows delegation to pure stateless functions.
         BoardConfig should be cached if performance becomes an issue.
         """
-        return stateless_logic.BoardConfig(
+        return zertz_logic.BoardConfig(
             width=self.width,
             rings=self.rings,
             t=self.t,
@@ -404,12 +404,13 @@ class ZertzBoard:
         return (y1 + y2) // 2, (x1 + x2) // 2
 
     def get_neighbors(self, index):
-        # Return a list of (y, x) indices that are adjacent to index on the board.
-        # The neighboring index may not be within the board space so it must be checked
-        # that it is inbounds (see _is_inbounds).
-        y, x = index
-        neighbors = [(y + dy, x + dx) for dy, dx in self.DIRECTIONS]
-        return neighbors
+        """Return list of neighboring indices (delegates to zertz_logic).
+
+        The neighboring index may not be within the board space so it must be checked
+        that it is inbounds (see _is_inbounds).
+        """
+        config = self._get_config()
+        return zertz_logic.get_neighbors(index, config)
 
     def _is_adjacent(self, l1, l2):
         # Return True if l1 and l2 are adjacent to each other on the hexagonal board
@@ -417,27 +418,25 @@ class ZertzBoard:
 
     @staticmethod
     def get_jump_destination(start, cap):
-        # Return the landing index after capturing the marble at cap from start.
-        # The landing index may not be within the board space so it must be checked
-        # that it is inbounds (see _is_inbounds).
-        sy, sx = start
-        cy, cx = cap
-        dy = (cy - sy) * 2
-        dx = (cx - sx) * 2
-        return sy + dy, sx + dx
+        """Return landing index after jump (delegates to zertz_logic).
+
+        The landing index may not be within the board space so it must be checked
+        that it is inbounds (see _is_inbounds).
+        """
+        return zertz_logic.get_jump_destination(start, cap)
 
     def _is_inbounds(self, index):
-        # Return True if the index is in bounds for board's width
-        y, x = index
-        return 0 <= y < self.width and 0 <= x < self.width
+        """Check if index is in bounds (delegates to zertz_logic)."""
+        config = self._get_config()
+        return zertz_logic.is_inbounds(index, config)
 
     def _get_regions(self):
         """Return list of connected regions on the board.
 
-        Delegates to stateless_logic.get_regions() for zero code duplication.
+        Delegates to zertz_logic.get_regions() for zero code duplication.
         """
         config = self._get_config()
-        return stateless_logic.get_regions(self.state, config)
+        return zertz_logic.get_regions(self.state, config)
 
     def get_cur_player(self):
         return int(self.global_state[self.CUR_PLAYER])
@@ -448,36 +447,19 @@ class ZertzBoard:
         ) % self.NUM_PLAYERS
 
     def _get_supply_index(self, marble_type):
-        """Get global_state index for marble in supply."""
-        marble_to_supply_idx = {
-            "w": self.SUPPLY_W,
-            "g": self.SUPPLY_G,
-            "b": self.SUPPLY_B,
-        }
-        return marble_to_supply_idx[marble_type]
+        """Get global_state index for marble in supply (delegates to zertz_logic)."""
+        config = self._get_config()
+        return zertz_logic.get_supply_index(marble_type, config)
 
     def _get_captured_index(self, marble_type, player):
-        """Get global_state index for captured marble for given player."""
-        if player == self.PLAYER_1:
-            marble_to_cap_idx = {
-                "w": self.P1_CAP_W,
-                "g": self.P1_CAP_G,
-                "b": self.P1_CAP_B,
-            }
-        else:
-            marble_to_cap_idx = {
-                "w": self.P2_CAP_W,
-                "g": self.P2_CAP_G,
-                "b": self.P2_CAP_B,
-            }
-        return marble_to_cap_idx[marble_type]
+        """Get global_state index for captured marble (delegates to zertz_logic)."""
+        config = self._get_config()
+        return zertz_logic.get_captured_index(marble_type, player, config)
 
     def get_marble_type_at(self, index):
-        y, x = index
-        marble_type = self.LAYER_TO_MARBLE[
-            np.argmax(self.state[self.MARBLE_LAYERS, y, x]) + 1
-        ]
-        return marble_type
+        """Get marble type at position (delegates to zertz_logic)."""
+        config = self._get_config()
+        return zertz_logic.get_marble_type_at(index, self.state, config)
 
     def take_action(self, action, action_type):
         # Input: action is an index into the action space matrix
@@ -645,10 +627,10 @@ class ZertzBoard:
     def get_valid_moves(self):
         """Return valid placement and capture moves.
 
-        Delegates to stateless_logic.get_valid_actions() for zero code duplication.
+        Delegates to zertz_logic.get_valid_actions() for zero code duplication.
         """
         config = self._get_config()
-        return stateless_logic.get_valid_actions(self.state, self.global_state, config)
+        return zertz_logic.get_valid_actions(self.state, self.global_state, config)
 
     def get_placement_shape(self):
         # get shape of placement moves as a tuple
@@ -661,42 +643,42 @@ class ZertzBoard:
     def get_placement_moves(self):
         """Return valid placement moves.
 
-        Delegates to stateless_logic.get_placement_moves() for zero code duplication.
+        Delegates to zertz_logic.get_placement_moves() for zero code duplication.
         """
         config = self._get_config()
-        return stateless_logic.get_placement_moves(self.state, self.global_state, config)
+        return zertz_logic.get_placement_moves(self.state, self.global_state, config)
 
     def get_capture_moves(self):
         """Return valid capture moves.
 
-        Delegates to stateless_logic.get_capture_moves() for zero code duplication.
+        Delegates to zertz_logic.get_capture_moves() for zero code duplication.
         """
         config = self._get_config()
-        return stateless_logic.get_capture_moves(self.state, self.global_state, config)
+        return zertz_logic.get_capture_moves(self.state, self.global_state, config)
 
     def _get_open_rings(self):
         """Return indices of all empty rings on the board.
 
-        Delegates to stateless_logic.get_open_rings() for zero code duplication.
+        Delegates to zertz_logic.get_open_rings() for zero code duplication.
         """
         config = self._get_config()
-        return stateless_logic.get_open_rings(self.state, config)
+        return zertz_logic.get_open_rings(self.state, config)
 
     def _is_removable(self, index):
         """Check if ring at index can be removed.
 
-        Delegates to stateless_logic.is_removable() for zero code duplication.
+        Delegates to zertz_logic.is_removable() for zero code duplication.
         """
         config = self._get_config()
-        return stateless_logic.is_removable(index, self.state, config)
+        return zertz_logic.is_removable(index, self.state, config)
 
     def _get_removable_rings(self):
         """Return list of removable ring indices.
 
-        Delegates to stateless_logic.get_removable_rings() for zero code duplication.
+        Delegates to zertz_logic.get_removable_rings() for zero code duplication.
         """
         config = self._get_config()
-        return stateless_logic.get_removable_rings(self.state, config)
+        return zertz_logic.get_removable_rings(self.state, config)
 
     # =========================  GEOMETRIC RING REMOVAL  =========================
 

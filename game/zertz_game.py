@@ -4,25 +4,18 @@ import numpy as np
 from .zertz_board import ZertzBoard
 from .action_result import ActionResult
 from .formatters import NotationFormatter
+from .constants import (
+    PLAYER_1_WIN,
+    PLAYER_2_WIN,
+    TIE,
+    BOTH_LOSE,
+)
 from shared.render_data import RenderData
 from shared.constants import MARBLE_TYPES
 
 
 # For full rules: http://www.gipf.com/zertz/rules/rules.html
 # Class interface inspired by https://github.com/suragnair/alpha-zero-general
-
-# Game outcome constants
-PLAYER_1_WIN = 1
-PLAYER_2_WIN = -1
-TIE = 0
-# None = game not over
-
-# Game variant configurations
-STANDARD_MARBLES = {"w": 6, "g": 8, "b": 10}
-BLITZ_MARBLES = {"w": 5, "g": 7, "b": 9}
-
-STANDARD_WIN_CONDITIONS = [{"w": 3, "g": 3, "b": 3}, {"w": 4}, {"g": 5}, {"b": 6}]
-BLITZ_WIN_CONDITIONS = [{"w": 2, "g": 2, "b": 2}, {"w": 3}, {"g": 4}, {"b": 5}]
 
 
 class ZertzGame:
@@ -271,6 +264,7 @@ class ZertzGame:
             PLAYER_1_WIN (1): Player 1 won
             PLAYER_2_WIN (-1): Player 2 won
             TIE (0): Tie
+            BOTH_LOSE (-2): Both players lose (collaboration detected)
             None: Game not over
         """
         if cur_state is None:
@@ -301,6 +295,22 @@ class ZertzGame:
 
                 # Neither player met win condition → tie
                 return TIE
+
+            # Check for full board with no captures (collaboration rule)
+            if np.all(np.sum(self.board.state[self.board.BOARD_LAYERS], axis=0) != 1):
+                # Board is full - check if either player has captured any marble
+                p1_captured = self.board.global_state[self.board.P1_CAP_SLICE]
+                p2_captured = self.board.global_state[self.board.P2_CAP_SLICE]
+
+                # If NEITHER player has captured ANY marble, both lose (collaboration detected)
+                if np.all(p1_captured == 0) and np.all(p2_captured == 0):
+                    return BOTH_LOSE
+
+                # Normal full board win - last player wins
+                if self.board.last_acting_player == self.board.PLAYER_1:
+                    return PLAYER_1_WIN
+                else:
+                    return PLAYER_2_WIN
 
             # Standard win conditions
             # The winner is the player that made the previous action
@@ -350,6 +360,13 @@ class ZertzGame:
 
         # Check if board is full
         if np.all(np.sum(self.board.state[self.board.BOARD_LAYERS], axis=0) != 1):
+            # Board is full - check collaboration rule
+            p1_captured = self.board.global_state[self.board.P1_CAP_SLICE]
+            p2_captured = self.board.global_state[self.board.P2_CAP_SLICE]
+
+            if np.all(p1_captured == 0) and np.all(p2_captured == 0):
+                return "Both players lose: Board filled with no captures (collaboration detected)"
+
             return "Board completely filled with marbles"
 
         # Check if current player has no marbles

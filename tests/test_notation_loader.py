@@ -4,14 +4,14 @@ import tempfile
 import os
 import pytest
 
-from game.loaders import NotationLoader
-from game.zertz_board import ZertzBoard
-from game.zertz_game import (
+from game.constants import (
     STANDARD_MARBLES,
     BLITZ_MARBLES,
     STANDARD_WIN_CONDITIONS,
     BLITZ_WIN_CONDITIONS,
 )
+from game.loaders import NotationLoader
+from game.zertz_board import ZertzBoard
 
 
 class TestNotationLoader:

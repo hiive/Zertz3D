@@ -9,13 +9,13 @@ import hashlib
 from typing import Callable
 import numpy as np
 
-from game.zertz_game import (
-    ZertzGame,
+from game.constants import (
     STANDARD_MARBLES,
     BLITZ_MARBLES,
     STANDARD_WIN_CONDITIONS,
     BLITZ_WIN_CONDITIONS,
 )
+from game.zertz_game import ZertzGame
 from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer, HumanZertzPlayer
 from game.players.mcts_zertz_player import MCTSZertzPlayer
 

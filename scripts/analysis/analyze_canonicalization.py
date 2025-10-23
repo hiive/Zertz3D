@@ -14,8 +14,19 @@ import numpy as np
 from PIL import Image
 import tempfile
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+# Add project root to Python path to support running from any directory
+def find_project_root(start_path: Path) -> Path:
+    """Find project root by searching for pyproject.toml."""
+    current = start_path.resolve()
+    while current != current.parent:
+        if (current / 'pyproject.toml').exists():
+            return current
+        current = current.parent
+    raise RuntimeError("Could not find project root (pyproject.toml not found)")
+
+project_root = find_project_root(Path(__file__).parent)
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from game.utils.diagram import execute_notation_sequence, DiagramRenderer
 from game.loaders import NotationLoader

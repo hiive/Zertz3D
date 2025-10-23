@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from game import stateless_logic  # noqa: E402
+from game import zertz_logic  # noqa: E402
 from game.zertz_board import ZertzBoard  # noqa: E402
 
 
@@ -39,7 +39,7 @@ def test_transform_action_put_matches_canonicalizer(transform):
     rem_y, rem_x = board.str_to_index("E5")
     action = ("PUT", (marble_idx, put_y * width + put_x, rem_y * width + rem_x))
 
-    new_action = stateless_logic.transform_action(action, transform, config)
+    new_action = zertz_logic.transform_action(action, transform, config)
 
     mask = np.zeros((3, width * width, width * width + 1), dtype=int)
     mask[marble_idx, put_y * width + put_x, rem_y * width + rem_x] = 1
@@ -70,7 +70,7 @@ def test_transform_action_cap_matches_canonicalizer(transform):
     y, x = board.str_to_index("D4")
     action = ("CAP", (direction, y, x))
 
-    new_action = stateless_logic.transform_action(action, transform, config)
+    new_action = zertz_logic.transform_action(action, transform, config)
 
     mask = np.zeros((6, width, width), dtype=int)
     mask[direction, y, x] = 1
@@ -86,9 +86,9 @@ def test_transform_action_with_translation():
 
     width = config.width
     action_put = ("PUT", (1, 3 * width + 3, 3 * width + 4))
-    translated_put = stateless_logic.transform_action(action_put, "T-1,1", config)
+    translated_put = zertz_logic.transform_action(action_put, "T-1,1", config)
     assert translated_put == ("PUT", (1, 2 * width + 4, 2 * width + 5))
 
     action_cap = ("CAP", (0, 3, 3))
-    translated_cap = stateless_logic.transform_action(action_cap, "T2,-1", config)
+    translated_cap = zertz_logic.transform_action(action_cap, "T2,-1", config)
     assert translated_cap == ("CAP", (0, 5, 2))

@@ -753,7 +753,7 @@ class TestBlitzWinConditions:
 
     def test_blitz_player1_win_2_of_each(self):
         """Test that Player 1 wins with 2 of each color in Blitz mode."""
-        from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
+        from game.constants import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
         game = ZertzGame(
             rings=ZertzBoard.SMALL_BOARD_37,
@@ -805,7 +805,7 @@ class TestBlitzWinConditions:
 
     def test_blitz_player2_win_3_white(self):
         """Test that Player 2 wins with 3 white marbles in Blitz mode."""
-        from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
+        from game.constants import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
         game = ZertzGame(
             rings=ZertzBoard.SMALL_BOARD_37,
@@ -856,7 +856,7 @@ class TestBlitzWinConditions:
 
     def test_blitz_player1_win_4_grey(self):
         """Test that Player 1 wins with 4 grey marbles in Blitz mode."""
-        from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
+        from game.constants import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
         game = ZertzGame(
             rings=ZertzBoard.SMALL_BOARD_37,
@@ -905,7 +905,7 @@ class TestBlitzWinConditions:
 
     def test_blitz_player2_win_5_black(self):
         """Test that Player 2 wins with 5 black marbles in Blitz mode."""
-        from game.zertz_game import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
+        from game.constants import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES
 
         game = ZertzGame(
             rings=ZertzBoard.SMALL_BOARD_37,

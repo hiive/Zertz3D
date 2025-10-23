@@ -6,14 +6,14 @@ and variant detection.
 
 from typing import Callable
 
-from game.formatters import TranscriptFormatter
-from game.zertz_board import ZertzBoard
-from game.zertz_game import (
+from game.constants import (
     BLITZ_MARBLES,
     BLITZ_WIN_CONDITIONS,
     STANDARD_MARBLES,
     STANDARD_WIN_CONDITIONS,
 )
+from game.formatters import TranscriptFormatter
+from game.zertz_board import ZertzBoard
 
 
 class TranscriptLoader:
