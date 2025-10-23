@@ -665,4 +665,6 @@ policy = PolicyHead(combined)
 - unit test to verify MCTS is actually being the right player at each level.
 - Tree visualizer.
 - Need visual details in graphical mode (which player and what they are thinking)
-- 
+- ✅ What happens if no edge rings can be removed after placement? How is that notated?
+- ✅ Check tournament rule (BOTH_LOSE when board full with zero captures)
+- ✅ Verify loop detection (is it possible?!) and consecutive passing.
