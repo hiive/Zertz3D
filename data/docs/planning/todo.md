@@ -1,5 +1,27 @@
 # Zertz3D TODO and Improvement Suggestions
 
+## Recently Completed (2025-10-22)
+
+### ✅ Blitz Mode Python-Rust Parity
+- **Critical Fix**: Restored parity between Python and Rust backends for blitz mode support
+- **Problem**: Rust backend supported blitz mode, but Python wasn't passing the mode parameter
+- **Changes**:
+  - **Rust Backend** (`rust/src/`):
+    - Added `blitz` parameter to `MCTSSearch.search()` and `MCTSSearch.search_parallel()` (mcts.rs:108,217)
+    - Updated `BoardConfig::new()` to accept `blitz` parameter and use `BoardConfig::blitz()` when appropriate (board.rs:155-178)
+    - Both methods now conditionally create `BoardConfig::blitz()` or `BoardConfig::standard()` based on parameter
+  - **Python Interface** (`game/players/`):
+    - Added `_is_blitz_mode()` helper method to detect mode from win conditions (mcts_zertz_player.py:141-145)
+    - Updated `_rust_search()` to detect and pass `blitz=True/False` to Rust search functions (mcts_zertz_player.py:165,177)
+    - Mode detection: compares `self.game.win_con` against `BLITZ_WIN_CONDITIONS` constant
+- **Testing**:
+  - Created comprehensive test suite: `tests/test_blitz_mode_parity.py` (12 tests)
+  - Tests cover both Python and Rust backends
+  - Verifies mode detection, MCTS search, and parallel search for both standard and blitz modes
+  - All tests passing (Python: 4 tests, Rust: 6 tests, Constants: 2 tests)
+- **Impact**: Critical parity requirement restored - both backends now correctly use blitz win conditions (2-of-each vs 3-of-each)
+- **Files**: rust/src/mcts.rs, rust/src/board.rs, game/players/mcts_zertz_player.py, tests/test_blitz_mode_parity.py
+
 ## Recently Completed (2025-01-22)
 
 ### ✅ Rust MCTS Code Duplication Elimination
