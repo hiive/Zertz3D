@@ -175,6 +175,9 @@ class ActionVisualizationSequencer:
         if not placement_positions:
             return
 
+        # Get the selected position (the one that will actually be placed)
+        selected_ring = self.pending_action_dict["dst"]
+
         # Handle both enriched (list-of-dicts) and legacy (list-of-strings) formats
 
         # Enriched format with scores - highlight each position with its score
@@ -186,16 +189,36 @@ class ActionVisualizationSequencer:
             if self.highlight_choices == 'heatmap' and score < self.min_threshold:
                 continue
 
-            # Interpolate material based on score
-            material_mod = self._interpolate_material(
-                score,
-                DARK_GREEN_MATERIAL_MOD, # MAGENTA_MATERIAL_MOD
-                WHITE_MATERIAL_MOD,  # DARK_GREEN_MATERIAL_MOD,
-            )
+            # The selected position gets EXTENDED duration and transitions to FULL color
+            # Other positions fade out after the first phase
+            is_selected = (pos_str == selected_ring)
+
+            if is_selected:
+                # Selected position: show score-based color, then blend to full color
+                # Material starts at score-based color, ends at DARK_GREEN
+                material_mod = self._interpolate_material(
+                    score,
+                    DARK_GREEN_MATERIAL_MOD,  # MAX: full color for high scores
+                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
+                )
+                # Extended duration to cover both phases
+                duration = (
+                    self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS] +
+                    self.highlight_durations[self.PHASE_SELECTED_PLACEMENT]
+                )
+            else:
+                # Non-selected positions: just show score-based color then fade out
+                material_mod = self._interpolate_material(
+                    score,
+                    DARK_GREEN_MATERIAL_MOD,  # MAX: full color for high scores
+                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
+                )
+                duration = self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS]
+
             self.renderer.queue_highlight(
                 rings=[pos_str],
                 material_mod=material_mod,
-                duration=self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS],
+                duration=duration,
                 defer=self.start_delay,
             )
 
@@ -211,6 +234,9 @@ class ActionVisualizationSequencer:
         if not removal_positions:
             return
 
+        # Get the selected removal position (the one that will actually be removed)
+        selected_removal = self.pending_action_dict.get("remove")
+
         # Handle both enriched (list-of-dicts) and legacy (list-of-strings) formats
 
         # Enriched format with scores - highlight each position with its score
@@ -222,15 +248,34 @@ class ActionVisualizationSequencer:
             if self.highlight_choices == 'heatmap' and score < self.min_threshold:
                 continue
 
-            # Interpolate material based on score
-            material_mod = self._interpolate_material(
-                score,
-                DARK_RED_MATERIAL_MOD, # CYAN_MATERIAL_MOD
-                WHITE_MATERIAL_MOD,  # DARK_RED_MATERIAL_MOD,
-            )
+            # The selected position gets EXTENDED duration and stays highlighted
+            # Other positions fade out after the first phase
+            is_selected = (pos_str == selected_removal)
+
+            if is_selected:
+                # Selected position: show score-based color during extended duration
+                material_mod = self._interpolate_material(
+                    score,
+                    DARK_RED_MATERIAL_MOD,  # MAX: full color for high scores
+                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
+                )
+                # Extended duration to cover both phases
+                duration = (
+                    self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS] +
+                    self.highlight_durations[self.PHASE_SELECTED_REMOVAL]
+                )
+            else:
+                # Non-selected positions: just show score-based color then fade out
+                material_mod = self._interpolate_material(
+                    score,
+                    DARK_RED_MATERIAL_MOD,  # MAX: full color for high scores
+                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
+                )
+                duration = self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS]
+
             self.renderer.queue_highlight(
                 rings=[pos_str],
-                duration=self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS],
+                duration=duration,
                 material_mod=material_mod,
                 defer=defer,
             )
@@ -278,10 +323,11 @@ class ActionVisualizationSequencer:
             highlight_rings = [src_str] + list(destinations)
 
             # Interpolate material based on score
+            # High scores → DARK_BLUE, low scores → WHITE (pale blue)
             material_mod = self._interpolate_material(
                 score,
-                DARK_BLUE_MATERIAL_MOD, # OLIVE_MATERIAL_MOD
-                WHITE_MATERIAL_MOD,  # DARK_BLUE_MATERIAL_MOD,
+                DARK_BLUE_MATERIAL_MOD,  # MAX: full color for high scores
+                WHITE_MATERIAL_MOD,  # MIN: pale for low scores
             )
             self.renderer.queue_highlight(
                 highlight_rings,
@@ -293,14 +339,13 @@ class ActionVisualizationSequencer:
             defer_time += capture_duration
 
     def _on_placement_highlights_done(self):
-        """Handle completion of placement highlights phase."""
-        action_dict = self.pending_action_dict
+        """Handle completion of placement highlights phase.
 
-        # Queue highlight for selected placement ring only
-        selected_ring = action_dict["dst"]
-        self.renderer.queue_highlight(
-            [selected_ring], self.highlight_durations[self.PHASE_SELECTED_PLACEMENT]
-        )
+        The selected ring's extended-duration highlight continues through this phase,
+        so no additional highlighting is needed here.
+        """
+        # No need to queue another highlight - the selected position's
+        # extended-duration highlight from _queue_placement_highlights() is still active
         self.phase = self.PHASE_SELECTED_PLACEMENT
 
     def _on_selected_placement_done(self, task):
@@ -322,17 +367,13 @@ class ActionVisualizationSequencer:
         self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
 
     def _on_removal_highlights_done(self):
-        """Handle completion of removal highlights phase."""
-        action_dict = self.pending_action_dict
+        """Handle completion of removal highlights phase.
 
-        # Queue highlight for selected removal ring only
-        selected_removal = action_dict["remove"]
-        if selected_removal:  # Only if a ring is being removed
-            self.renderer.queue_highlight(
-                [selected_removal],
-                self.highlight_durations[self.PHASE_SELECTED_REMOVAL],
-                material_mod=DARK_RED_MATERIAL_MOD,
-            )
+        The selected ring's extended-duration highlight continues through this phase,
+        so no additional highlighting is needed here.
+        """
+        # No need to queue another highlight - the selected position's
+        # extended-duration highlight from _queue_removal_highlights() is still active
         self.phase = self.PHASE_SELECTED_REMOVAL
 
     def _on_selected_removal_done(self, task):
