@@ -62,7 +62,7 @@ class ZertzGameController:
         log_notation_to_screen=False,
         partial_replay=False,
         max_games=None,
-        highlight_choices=False,
+        highlight_choices: str | None = None,
         show_coords=False,
         blitz=False,
         move_duration=0.666,
@@ -246,7 +246,7 @@ class ZertzGameController:
         self.interaction_manager.update_hover_feedback(player)
 
     def _update_context_highlights(self, player, placement_mask, capture_mask):
-        if not self.highlight_choices or not self.renderer:
+        if self.highlight_choices is None or not self.renderer:
             return
 
         self.renderer.clear_highlight_context()
@@ -278,7 +278,7 @@ class ZertzGameController:
         placement_mask, capture_mask = self.session.game.get_valid_actions()
         self._resolve_player_context(player, placement_mask, capture_mask)
 
-        if self.highlight_choices and self.renderer:
+        if self.highlight_choices is not None and self.renderer:
             self._update_context_highlights(player, placement_mask, capture_mask)
 
         try:
@@ -301,14 +301,20 @@ class ZertzGameController:
             else:
                 raise
 
+        # Get action scores from player (for heat-map highlighting)
+        # Player returns dict mapping action tuples to normalized scores [0.0, 1.0]
+        action_scores = None
+        if self.highlight_choices is not None and hasattr(player, 'get_last_action_scores'):
+            action_scores = player.get_last_action_scores()
+
         # Clear context highlights once an action is chosen
-        if self.highlight_choices and self.renderer:
+        if self.highlight_choices is not None and self.renderer:
             self.renderer.clear_highlight_context()
         player.clear_context()
         self.interaction_manager.clear_hover_feedback()
 
         # Display valid moves if enabled (text-only)
-        if self.highlight_choices:
+        if self.highlight_choices is not None:
             self._display_valid_moves(player)
 
         # Convert action to string
@@ -321,7 +327,7 @@ class ZertzGameController:
 
         # Get render data BEFORE executing action (so board state is pre-action)
         # This encapsulates all data transformations in the game layer (Recommendation 1)
-        render_data = self.session.game.get_render_data(ax, ay, self.highlight_choices)
+        render_data = self.session.game.get_render_data(ax, ay, self.highlight_choices, action_scores)
 
         # Execute action FIRST to get action_result
         action_result = self.session.game.take_action(ax, ay)

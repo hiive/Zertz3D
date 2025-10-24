@@ -664,7 +664,112 @@ class ZertzGame:
 
         return removable_positions
 
-    def get_render_data(self, action_type, action, show_highlights=False):
+    def _enrich_placements_with_scores(self, placement_positions, placement_array, action_scores):
+        """Enrich placement position list with scores from action_scores dict.
+
+        Args:
+            placement_positions: List of position strings ['A1', 'B2', ...]
+            placement_array: Placement array (3, width², width²+1) for action tuple reconstruction
+            action_scores: Dict mapping action tuples to scores {('PUT', (0, 5, 37)): 0.8, ...}
+
+        Returns:
+            List of dicts with position and score: [{'pos': 'A1', 'score': 0.8}, ...]
+        """
+        enriched = []
+        width = self.board.width
+
+        for pos_str in placement_positions:
+            # Convert position string to y, x
+            y, x = self.board.str_to_index(pos_str)
+            dst_flat = y * width + x
+
+            # Find the best score for any marble type and removal at this destination
+            # Valid actions not explored by MCTS get score 0.0
+            best_score = 0.0
+            for marble_type in range(3):  # w=0, g=1, b=2
+                for rem_flat in range(width * width + 1):  # All removals + no-removal
+                    if placement_array[marble_type, dst_flat, rem_flat]:
+                        action_key = ('PUT', (marble_type, dst_flat, rem_flat))
+                        score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
+                        best_score = max(best_score, score)
+
+            enriched.append({'pos': pos_str, 'score': best_score})
+
+        return enriched
+
+    def _enrich_captures_with_scores(self, capture_moves, action_scores):
+        """Enrich capture move dicts with scores from action_scores dict.
+
+        Args:
+            capture_moves: List of capture dicts [{'action': 'CAP', 'src': 'C4', ...}, ...]
+            action_scores: Dict mapping action tuples to scores {('CAP', (2, 3, 4)): 0.9, ...}
+
+        Returns:
+            List of dicts with score added: [{'action': 'CAP', ..., 'score': 0.9}, ...]
+        """
+        enriched = []
+        width = self.board.width
+
+        for cap_dict in capture_moves:
+            # Reconstruct action tuple from dict
+            src_y, src_x = self.board.str_to_index(cap_dict['src'])
+            dst_y, dst_x = self.board.str_to_index(cap_dict['dst'])
+
+            # Find direction from src to dst via captured marble
+            cap_y, cap_x = self.board.str_to_index(cap_dict['cap'])
+            direction = None
+            for dir_idx, (dy, dx) in enumerate(self.board.DIRECTIONS):
+                if (src_y + dy, src_x + dx) == (cap_y, cap_x):
+                    direction = dir_idx
+                    break
+
+            if direction is not None:
+                action_key = ('CAP', (direction, src_y, src_x))
+                score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
+            else:
+                score = 0.0  # Fallback
+
+            # Add score to dict
+            enriched_dict = dict(cap_dict)  # Copy
+            enriched_dict['score'] = score
+            enriched.append(enriched_dict)
+
+        return enriched
+
+    def _enrich_removals_with_scores(self, removal_positions, placement_array, action_type, action, action_scores):
+        """Enrich removal position list with scores from action_scores dict.
+
+        Args:
+            removal_positions: List of position strings ['A1', 'B2', ...]
+            placement_array: Placement array for action tuple reconstruction
+            action_type: Action type (should be 'PUT')
+            action: Action tuple (marble_idx, dst, rem)
+            action_scores: Dict mapping action tuples to scores
+
+        Returns:
+            List of dicts with position and score: [{'pos': 'A1', 'score': 0.7}, ...]
+        """
+        if action_type != 'PUT':
+            return []
+
+        enriched = []
+        marble_idx, dst_flat, _ = action
+        width = self.board.width
+
+        for pos_str in removal_positions:
+            # Convert position string to flat index
+            y, x = self.board.str_to_index(pos_str)
+            rem_flat = y * width + x
+
+            # Lookup score for this specific (marble, dst, removal) tuple
+            action_key = ('PUT', (marble_idx, dst_flat, rem_flat))
+            score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
+
+            enriched.append({'pos': pos_str, 'score': score})
+
+        return enriched
+
+    def get_render_data(self, action_type, action, highlight_choices=None, action_scores=None):
         """Get all rendering data for an action in one call.
 
         This method encapsulates all data transformations needed by the renderer,
@@ -674,7 +779,10 @@ class ZertzGame:
         Args:
             action_type: Action type ('PUT', 'CAP', or 'PASS')
             action: Action tuple (or None for PASS)
-            show_highlights: Whether to include highlight data for valid moves
+            highlight_choices: Highlight mode - None (no highlights), 'uniform', or 'heatmap'
+            action_scores: Optional dict mapping action tuples to scores [0.0, 1.0]
+                Format: {('PUT', (0, 5, 37)): 0.8, ('CAP', (2, 3, 4)): 1.0, ...}
+                Required for 'heatmap' mode, optional for 'uniform' mode
 
         Returns:
             RenderData: Value object containing action_dict and optional highlight data
@@ -685,7 +793,7 @@ class ZertzGame:
         _, action_dict = self.action_to_str(action_type, action)
 
         # If highlights not requested, return minimal data
-        if not show_highlights:
+        if highlight_choices is None:
             return RenderData(action_dict)
 
         # Get valid actions for highlighting (before the action is executed)
@@ -697,6 +805,18 @@ class ZertzGame:
         removal_positions = self.get_removal_positions(
             placement_array, action_type, action
         )
+
+        # Enrich with scores if provided
+        if action_scores:
+            placement_positions = self._enrich_placements_with_scores(
+                placement_positions, placement_array, action_scores
+            )
+            capture_moves = self._enrich_captures_with_scores(
+                capture_moves, action_scores
+            )
+            removal_positions = self._enrich_removals_with_scores(
+                removal_positions, placement_array, action_type, action, action_scores
+            )
 
         return RenderData(
             action_dict=action_dict,

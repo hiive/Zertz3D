@@ -29,15 +29,15 @@ from renderer.panda3d.models import BasePiece, SkyBox, make_marble
 from shared.constants import MARBLE_TYPES, SUPPLY_CONTEXT_MAP
 from shared.render_data import RenderData
 from shared.materials_modifiers import (
-    PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
-    REMOVABLE_HIGHLIGHT_MATERIAL_MOD,
-    CAPTURE_HIGHLIGHT_MATERIAL_MOD,
-    SELECTED_CAPTURE_MATERIAL_MOD,
-    CAPTURE_FLASH_MATERIAL_MOD,
-    HOVER_PRIMARY_MATERIAL_MOD,
-    HOVER_SECONDARY_MATERIAL_MOD,
-    HOVER_SUPPLY_MATERIAL_MOD,
-    HOVER_CAPTURED_MATERIAL_MOD,
+    DARK_GREEN_MATERIAL_MOD,
+    DARK_RED_MATERIAL_MOD,
+    DARK_BLUE_MATERIAL_MOD,
+    CORNFLOWER_BLUE_MATERIAL_MOD,
+    BRIGHT_YELLOW_MATERIAL_MOD,
+    GOLD_MATERIAL_MOD,
+    ORANGE_MATERIAL_MOD,
+    LIGHT_BLUE_MATERIAL_MOD,
+    PURPLE_MATERIAL_MOD,
 )
 
 
@@ -72,18 +72,18 @@ class PandaRenderer(ShowBase):
     MARBLE_ORDER = tuple(MARBLE_TYPES)
     SUPPLY_HIGHLIGHT_CONTEXTS = dict(SUPPLY_CONTEXT_MAP)
     CONTEXT_STYLES = {
-        "placement": PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
-        "removal": REMOVABLE_HIGHLIGHT_MATERIAL_MOD,
-        "capture_sources": CAPTURE_HIGHLIGHT_MATERIAL_MOD,
-        "capture_destinations": SELECTED_CAPTURE_MATERIAL_MOD,
+        "placement": DARK_GREEN_MATERIAL_MOD,
+        "removal": DARK_RED_MATERIAL_MOD,
+        "capture_sources": DARK_BLUE_MATERIAL_MOD,
+        "capture_destinations": CORNFLOWER_BLUE_MATERIAL_MOD,
         # Supply marbles use green (placement color) for consistent visual language
-        SUPPLY_HIGHLIGHT_CONTEXTS["w"]: PLACEMENT_HIGHLIGHT_MATERIAL_MOD, # SUPPLY_HIGHLIGHT_WHITE_MATERIAL_MOD
-        SUPPLY_HIGHLIGHT_CONTEXTS["g"]: PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
-        SUPPLY_HIGHLIGHT_CONTEXTS["b"]: PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
-        "hover_primary": HOVER_PRIMARY_MATERIAL_MOD,
-        "hover_secondary": HOVER_SECONDARY_MATERIAL_MOD,
-        "hover_supply": HOVER_SUPPLY_MATERIAL_MOD,
-        "hover_captured": HOVER_CAPTURED_MATERIAL_MOD,
+        SUPPLY_HIGHLIGHT_CONTEXTS["w"]: DARK_GREEN_MATERIAL_MOD,
+        SUPPLY_HIGHLIGHT_CONTEXTS["g"]: DARK_GREEN_MATERIAL_MOD,
+        SUPPLY_HIGHLIGHT_CONTEXTS["b"]: DARK_GREEN_MATERIAL_MOD,
+        "hover_primary": GOLD_MATERIAL_MOD,
+        "hover_secondary": ORANGE_MATERIAL_MOD,
+        "hover_supply": LIGHT_BLUE_MATERIAL_MOD,
+        "hover_captured": PURPLE_MATERIAL_MOD,
     }
 
     # Board positioning
@@ -105,7 +105,7 @@ class PandaRenderer(ShowBase):
         black_marbles=10,
         rings=37,
         show_coords=False,
-        highlight_choices=False,
+        highlight_choices: str | None = None,
         update_callback=None,
         move_duration=0.666,
         start_delay=0.0,
@@ -219,15 +219,10 @@ class PandaRenderer(ShowBase):
         # Calculate geometric center and position board_node
         self._position_board_node()
 
-        self.marble_supply = None
-        self.marbles_in_play = None
+        # Store marble counts for reset
         self.white_marbles = white_marbles
         self.black_marbles = black_marbles
         self.grey_marbles = grey_marbles
-        self._build_marble_supply()
-
-        self._build_players_marble_supply()
-        self._update_capture_marble_colliders()
 
         # Setup camera after board is built so we can center on it
         self._setup_camera()
@@ -240,14 +235,12 @@ class PandaRenderer(ShowBase):
         if self.update_callback is not None:
             self._setup_game_loop()
 
-        # Initialize highlight state machine if highlight_choices is enabled
-        self.action_visualization_sequencer = (
-            ActionVisualizationSequencer(self) if self.highlight_choices else None
-        )
-
-        if self.show_coords or True: # todo - temp - add flag
+        if self.show_coords:
             # Create player turn indicator
             self._create_player_indicator()
+
+        # Initialize resettable state (marbles, pools, sequencer)
+        self._initialize_game_state()
 
     def attach_update_loop(
         self, update_fn: Callable[[], bool], interval: float
@@ -752,6 +745,43 @@ class PandaRenderer(ShowBase):
         world_point = self.render.getRelativePoint(self.board_node, local_point)
         return (world_point.x, world_point.y, world_point.z)
 
+    def _initialize_game_state(self):
+        """Initialize or reset the resettable game state.
+
+        This method handles:
+        - Building marble supply pools
+        - Building player capture pools
+        - Repositioning supply marbles
+        - Creating action visualization sequencer
+        - Resetting action context
+
+        Called from __init__() for initial setup and reset_board() for resets.
+        """
+        # Initialize marble supply (creates marbles if needed)
+        self.marble_supply = None
+        self.marbles_in_play = None
+        self._build_marble_supply()
+
+        # Build player capture pools
+        self._build_players_marble_supply()
+
+        # Update capture marble colliders
+        self._update_capture_marble_colliders()
+
+        # Reposition supply marbles (important for resets after board rotation)
+        self._reposition_supply_marbles()
+
+        # Initialize or recreate action visualization sequencer
+        if self.highlight_choices is not None:
+            self.action_visualization_sequencer = ActionVisualizationSequencer(
+                self, self.highlight_choices
+            )
+        else:
+            self.action_visualization_sequencer = None
+
+        # Reset action context
+        self._action_context = None
+
     def _update_world_to_board_destinations(self):
         """Update animation destinations for world→board transitions as board rotates."""
         for marble_id, info in list(self._world_to_board_animations.items()):
@@ -945,7 +975,7 @@ class PandaRenderer(ShowBase):
             capture_animation_defer = action_duration
 
             # Apply yellow flash only if highlight_choices is enabled
-            if self.highlight_choices:
+            if self.highlight_choices is not None:
                 # Use the marble's captured key to reference it in the highlighting system
                 marble_key = self._captured_key(captured_marble)
 
@@ -953,7 +983,7 @@ class PandaRenderer(ShowBase):
                 self.queue_highlight(
                     [marble_key],
                     self.CAPTURE_FLASH_DURATION,
-                    material_mod=CAPTURE_FLASH_MATERIAL_MOD,
+                    material_mod=BRIGHT_YELLOW_MATERIAL_MOD,
                     defer=action_duration,
                 )
 
@@ -1209,32 +1239,28 @@ class PandaRenderer(ShowBase):
             base_piece.model.clearColorScale()
             base_piece.model.clearTransparency()
 
-        # 4. Return marbles to supply pools and clear their visual state
+        # 4. Remove all marble models from the scene
+        # Remove marbles in play
         for color, marbles in self.marbles_in_play.items():
-            for marble, _ in marbles:  # Ignore stored position - will be recalculated
-                self.marble_supply[color].append(marble)
-                self._marble_registry[id(marble)] = marble
-                marble.model.clearMaterial()  # Clear any highlight materials
-                # Reparent to world space (marbles on board are parented to board_node)
-                marble.model.reparentTo(self.render)
+            for marble, _ in marbles:
+                self._marble_registry.pop(id(marble), None)
+                marble.model.removeNode()
 
-        # 5. Clear marbles_in_play dict (important - this accumulates otherwise!)
-        self.marbles_in_play = self._make_marble_dict()
+        # Remove marbles from capture pools
+        if self.capture_pools:
+            for player_n, player_pool in self.capture_pools.items():
+                for color, marbles in player_pool.items():
+                    for marble in marbles:
+                        self._marble_registry.pop(id(marble), None)
+                        marble.model.removeNode()
 
-        # 6. Clear pos_to_marble dict (CRITICAL - stale entries prevent highlights!)
+        # 5. Clear pos_to_marble dict (CRITICAL - stale entries prevent highlights!)
         self.pos_to_marble.clear()
 
-        # 7. Rebuild player pools
-        self._build_players_marble_supply()
-
-        # 8. Reposition all supply marbles to correct locations
-        # This recalculates positions accounting for any board rotation
-        self._reposition_supply_marbles()
-
-        # 9. Recreate highlight state machine
-        if self.highlight_choices:
-            self.action_visualization_sequencer = ActionVisualizationSequencer(self)
-        self._action_context = None
+        # 6. Reinitialize game state (marbles, pools, sequencer)
+        # This will call _build_marble_supply() which removes any remaining marbles
+        # and creates fresh ones
+        self._initialize_game_state()
 
     def is_busy(self):
         """Check if renderer is busy with highlights or animations.
@@ -1270,7 +1296,7 @@ class PandaRenderer(ShowBase):
             player, render_data, action_result, task_delay_time, on_complete
         )
 
-        if self.highlight_choices and self.action_visualization_sequencer:
+        if self.highlight_choices is not None and self.action_visualization_sequencer:
             # Start highlighting - pass render_data and action_result to state machine
             self.action_visualization_sequencer.start(
                 player, render_data, task_delay_time
@@ -1526,7 +1552,7 @@ class PandaRenderer(ShowBase):
         # Get default material/style from context
         default_mod = self.CONTEXT_STYLES.get(
             context,
-            PLACEMENT_HIGHLIGHT_MATERIAL_MOD,  # Default to Material object
+            DARK_GREEN_MATERIAL_MOD,  # Default to dark green (placement color)
         )
         return material_mod or default_mod
 

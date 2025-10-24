@@ -23,6 +23,14 @@ class ZertzPlayer:
     def get_action(self):
         raise NotImplementedError
 
+    def get_last_action_scores(self):
+        """Get normalized scores for all legal actions from last search.
+
+        Returns:
+            Dict mapping action tuples to normalized scores [0.0, 1.0]
+        """
+        raise NotImplementedError
+
     #
     # Lifecycle hooks
     #
@@ -517,6 +525,36 @@ class RandomZertzPlayer(ZertzPlayer):
         ip = np.random.randint(a1.size)
         action = ax, (a1[ip], a2[ip], a3[ip])
         return action
+
+    def get_last_action_scores(self):
+        """Random player treats all moves equally (uniform scores).
+
+        Returns:
+            Dict mapping action tuples to uniform score of 1.0
+        """
+        p_actions, c_actions = self.game.get_valid_actions()
+
+        c1, c2, c3 = c_actions.nonzero()
+        p1, p2, p3 = p_actions.nonzero()
+
+        action_scores = {}
+
+        # Collect all valid actions with uniform score
+        if c1.size > 0:
+            # Captures available
+            for i in range(c1.size):
+                action = ("CAP", (int(c1[i]), int(c2[i]), int(c3[i])))
+                action_scores[action] = 1.0
+        elif p1.size > 0:
+            # Placements available
+            for i in range(p1.size):
+                action = ("PUT", (int(p1[i]), int(p2[i]), int(p3[i])))
+                action_scores[action] = 1.0
+        else:
+            # Must pass
+            action_scores[("PASS", None)] = 1.0
+
+        return action_scores
 
 
 class ReplayZertzPlayer(ZertzPlayer):

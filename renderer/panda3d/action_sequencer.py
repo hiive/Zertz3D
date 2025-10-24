@@ -2,12 +2,13 @@
 
 from shared.render_data import RenderData
 from shared.materials_modifiers import (
-    PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
-    REMOVABLE_HIGHLIGHT_MATERIAL_MOD,
-    CAPTURE_HIGHLIGHT_MATERIAL_MOD,
-    SELECTED_CAPTURE_MATERIAL_MOD,
-    # ISOLATION_HIGHLIGHT_MATERIAL_MOD,
+    DARK_GREEN_MATERIAL_MOD,
+    DARK_RED_MATERIAL_MOD,
+    DARK_BLUE_MATERIAL_MOD,
+    CORNFLOWER_BLUE_MATERIAL_MOD,
+    WHITE_MATERIAL_MOD
 )
+from renderer.panda3d.material_modifier import MaterialModifier
 
 
 class ActionVisualizationSequencer:
@@ -23,22 +24,29 @@ class ActionVisualizationSequencer:
     PHASE_ANIMATING = "animating"  # Waiting for final move animations to complete
 
     # Highlight and animation durations (seconds)
-    ISOLATION_HIGHLIGHT_DURATION = 0.5  # Yellow flash for isolated region captures
+    DEFAULT_HIGHLIGHT_DURATION = 1.0  # Yellow flash for isolated region captures
 
-    def __init__(self, renderer):
+    # Heat-map configuration
+    MIN_VISIBILITY_THRESHOLD = 0.1  # Minimum normalized score to show highlight (default: 0.1)
+
+    def __init__(self, renderer, highlight_choices: str | None = None, min_threshold: float = 0.1):
         """Initialize the state machine.
 
         Args:
             renderer: PandaRenderer instance
+            highlight_choices: Highlight mode ('uniform' or 'heatmap')
+            min_threshold: Minimum normalized score threshold for heat-map visibility (default: 0.1)
         """
         self.renderer = renderer
+        self.highlight_choices = highlight_choices
+        self.min_threshold = min_threshold
         self.highlight_durations = {
-            self.PHASE_PLACEMENT_HIGHLIGHTS: 0.5,
-            self.PHASE_SELECTED_PLACEMENT: 0.5,
-            self.PHASE_REMOVAL_HIGHLIGHTS: 0.5,
-            self.PHASE_SELECTED_REMOVAL: 0.5,
-            self.PHASE_CAPTURE_HIGHLIGHTS: 0.5,
-            self.PHASE_SELECTED_CAPTURE: 0.5,
+            self.PHASE_PLACEMENT_HIGHLIGHTS: self.DEFAULT_HIGHLIGHT_DURATION,
+            self.PHASE_SELECTED_PLACEMENT: self.DEFAULT_HIGHLIGHT_DURATION,
+            self.PHASE_REMOVAL_HIGHLIGHTS: self.DEFAULT_HIGHLIGHT_DURATION,
+            self.PHASE_SELECTED_REMOVAL: self.DEFAULT_HIGHLIGHT_DURATION,
+            self.PHASE_CAPTURE_HIGHLIGHTS: self.DEFAULT_HIGHLIGHT_DURATION,
+            self.PHASE_SELECTED_CAPTURE: self.DEFAULT_HIGHLIGHT_DURATION,
         }
 
         # State tracking
@@ -58,6 +66,36 @@ class ActionVisualizationSequencer:
     def is_active(self):
         """Check if the state machine is currently active."""
         return self.phase is not None
+
+    def _interpolate_material(self, score: float, max_mod: MaterialModifier, min_mod: MaterialModifier) -> MaterialModifier:
+        """Interpolate between MIN and MAX material modifiers based on normalized score.
+
+        In uniform mode, all scores are treated as maximum (returns max_mod).
+        In heatmap mode, interpolates between min_mod and max_mod based on score.
+
+        Args:
+            score: Normalized score in range [0.0, 1.0]
+            max_mod: Material modifier for maximum score (1.0)
+            min_mod: Material modifier for minimum visible score (min_threshold)
+
+        Returns:
+            MaterialModifier interpolated for the given score
+        """
+        if self.highlight_choices == 'uniform':
+            # Uniform mode: all actions get maximum highlight
+            return max_mod
+
+        # Heat-map mode: interpolate based on score
+        # Scores below threshold are not shown (caller responsibility)
+        # Map score range [min_threshold, 1.0] to blend_ratio [0.0, 1.0]
+        if score >= 1.0:
+            return max_mod
+        elif score <= self.min_threshold:
+            return min_mod
+        else:
+            # Linear interpolation from min_mod (at min_threshold) to max_mod (at 1.0)
+            blend_ratio = (score - self.min_threshold) / (1.0 - self.min_threshold)
+            return MaterialModifier.blend_mods(min_mod, max_mod, blend_ratio)
 
     def start(self, player, render_data, task_delay_time):
         """Start the highlighting sequence for an action.
@@ -130,12 +168,33 @@ class ActionVisualizationSequencer:
         """Queue highlights for all valid placement positions.
 
         Args:
-            placement_positions: List of position strings (pre-converted by controller)
+            placement_positions: List of dicts with position and score
+                Format: [{'pos': 'A1', 'score': 0.8}, {'pos': 'B2', 'score': 1.0}, ...]
+                OR legacy format: ['A1', 'B2', ...] (treated as uniform)
         """
-        if placement_positions:
+        if not placement_positions:
+            return
+
+        # Handle both enriched (list-of-dicts) and legacy (list-of-strings) formats
+
+        # Enriched format with scores - highlight each position with its score
+        for pos_dict in placement_positions:
+            pos_str = pos_dict['pos']
+            score = pos_dict.get('score', 1.0)
+
+            # Skip positions below visibility threshold in heatmap mode
+            if self.highlight_choices == 'heatmap' and score < self.min_threshold:
+                continue
+
+            # Interpolate material based on score
+            material_mod = self._interpolate_material(
+                score,
+                DARK_GREEN_MATERIAL_MOD, # MAGENTA_MATERIAL_MOD
+                WHITE_MATERIAL_MOD,  # DARK_GREEN_MATERIAL_MOD,
+            )
             self.renderer.queue_highlight(
-                rings=placement_positions,
-                material_mod=PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
+                rings=[pos_str],
+                material_mod=material_mod,
                 duration=self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS],
                 defer=self.start_delay,
             )
@@ -144,16 +203,38 @@ class ActionVisualizationSequencer:
         """Queue highlights for all valid removal positions for this action.
 
         Args:
-            removal_positions: List of position strings (pre-converted by controller)
+            removal_positions: List of dicts with position and score
+                Format: [{'pos': 'A1', 'score': 0.7}, {'pos': 'B2', 'score': 0.5}, ...]
+                OR legacy format: ['A1', 'B2', ...] (treated as uniform)
             defer: Delay before starting the highlight (seconds)
         """
-        if removal_positions:
+        if not removal_positions:
+            return
+
+        # Handle both enriched (list-of-dicts) and legacy (list-of-strings) formats
+
+        # Enriched format with scores - highlight each position with its score
+        for pos_dict in removal_positions:
+            pos_str = pos_dict['pos']
+            score = pos_dict.get('score', 1.0)
+
+            # Skip positions below visibility threshold in heatmap mode
+            if self.highlight_choices == 'heatmap' and score < self.min_threshold:
+                continue
+
+            # Interpolate material based on score
+            material_mod = self._interpolate_material(
+                score,
+                DARK_RED_MATERIAL_MOD, # CYAN_MATERIAL_MOD
+                WHITE_MATERIAL_MOD,  # DARK_RED_MATERIAL_MOD,
+            )
             self.renderer.queue_highlight(
-                rings=removal_positions,
+                rings=[pos_str],
                 duration=self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS],
-                material_mod=REMOVABLE_HIGHLIGHT_MATERIAL_MOD,
+                material_mod=material_mod,
                 defer=defer,
             )
+
 
     def _queue_capture_highlights(self, capture_moves):
         """Queue highlights for all valid capture moves, grouped by source marble.
@@ -161,33 +242,51 @@ class ActionVisualizationSequencer:
         If only one capture is available, skip highlighting (will auto-advance to selected_capture phase).
 
         Args:
-            capture_moves: List of capture move dicts (pre-converted by controller)
+            capture_moves: List of capture move dicts with scores
+                Format: [{'action': 'CAP', 'src': 'C4', 'dst': 'E6', ..., 'score': 0.9}, ...]
+                OR legacy format: [{'action': 'CAP', 'src': 'C4', 'dst': 'E6', ...}, ...] (no scores)
         """
         # Skip highlighting if only one capture available
         if capture_moves and len(capture_moves) == 1:
             return
 
-        # Group captures by source position
-        captures_by_source = {}  # {src_str: [dst_str1, dst_str2, ...]}
+        # Group captures by source position and collect best score for each source
+        captures_by_source = {}  # {src_str: (destinations_set, best_score)}
         for action_dict in capture_moves:
             src_str = action_dict["src"]
             dst_str = action_dict["dst"]
+            score = action_dict.get("score", 1.0)  # Default to 1.0 if no score
 
             if src_str not in captures_by_source:
-                captures_by_source[src_str] = set()
+                captures_by_source[src_str] = (set(), 0.0)
+
+            destinations, best_score = captures_by_source[src_str]
             if dst_str:
-                captures_by_source[src_str].add(dst_str)
+                destinations.add(dst_str)
+            best_score = max(best_score, score)
+            captures_by_source[src_str] = (destinations, best_score)
 
         # Queue highlights sequentially - each group displays one after another
         capture_duration = self.highlight_durations[self.PHASE_CAPTURE_HIGHLIGHTS]
         defer_time = 0
-        for src_str, destinations in captures_by_source.items():
+        for src_str, (destinations, score) in captures_by_source.items():
+            # Skip this source if below visibility threshold in heatmap mode
+            if self.highlight_choices == 'heatmap' and score < self.min_threshold:
+                continue
+
             # Highlight the source marble and all its possible destinations
             highlight_rings = [src_str] + list(destinations)
+
+            # Interpolate material based on score
+            material_mod = self._interpolate_material(
+                score,
+                DARK_BLUE_MATERIAL_MOD, # OLIVE_MATERIAL_MOD
+                WHITE_MATERIAL_MOD,  # DARK_BLUE_MATERIAL_MOD,
+            )
             self.renderer.queue_highlight(
                 highlight_rings,
                 capture_duration,
-                material_mod=CAPTURE_HIGHLIGHT_MATERIAL_MOD,
+                material_mod=material_mod,
                 defer=defer_time,
             )
             # Next group starts when this one ends
@@ -232,7 +331,7 @@ class ActionVisualizationSequencer:
             self.renderer.queue_highlight(
                 [selected_removal],
                 self.highlight_durations[self.PHASE_SELECTED_REMOVAL],
-                material_mod=REMOVABLE_HIGHLIGHT_MATERIAL_MOD,
+                material_mod=DARK_RED_MATERIAL_MOD,
             )
         self.phase = self.PHASE_SELECTED_REMOVAL
 
@@ -258,7 +357,7 @@ class ActionVisualizationSequencer:
         self.renderer.queue_highlight(
             selected_rings,
             self.highlight_durations[self.PHASE_SELECTED_CAPTURE],
-            material_mod=SELECTED_CAPTURE_MATERIAL_MOD,
+            material_mod=CORNFLOWER_BLUE_MATERIAL_MOD,
         )
         self.phase = self.PHASE_SELECTED_CAPTURE
 

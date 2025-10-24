@@ -7,7 +7,7 @@ from queue import SimpleQueue, Empty
 from renderer.panda3d.material_modifier import MaterialModifier
 from renderer.panda3d.material_manager import MaterialManager
 from renderer.panda3d.entity_resolver import EntityResolver
-from shared.materials_modifiers import PLACEMENT_HIGHLIGHT_MATERIAL_MOD
+from shared.materials_modifiers import DARK_GREEN_MATERIAL_MOD
 
 
 class HighlightingManager:
@@ -55,12 +55,12 @@ class HighlightingManager:
         Args:
             rings: List of position strings (e.g., ['A1', 'B2', 'C3'])
             duration: How long to show highlight in seconds
-            material_mod: MaterialModifier object (defaults to PLACEMENT_HIGHLIGHT_MATERIAL_MOD)
+            material_mod: MaterialModifier object (defaults to DARK_GREEN_MATERIAL_MOD)
             defer: Delay before starting (seconds)
         """
         # Use default material if none provided
         if material_mod is None:
-            material_mod = PLACEMENT_HIGHLIGHT_MATERIAL_MOD
+            material_mod = DARK_GREEN_MATERIAL_MOD
 
         self.queue_animation(
             anim_type="highlight",
@@ -142,7 +142,7 @@ class HighlightingManager:
             # Update highlight blend (pulsing effect)
             original_materials = anim_item.get("original_materials", {})
             target_material_mod = anim_item.get(
-                "target_material_mod", PLACEMENT_HIGHLIGHT_MATERIAL_MOD
+                "target_material_mod", DARK_GREEN_MATERIAL_MOD
             )
             duration = anim_item["duration"]
             start_time = anim_item["start_time"]
@@ -195,7 +195,7 @@ class HighlightingManager:
         highlight_info["original_materials"] = original_materials
 
         material_mod = highlight_info.get(
-            "material_mod", PLACEMENT_HIGHLIGHT_MATERIAL_MOD
+            "material_mod", DARK_GREEN_MATERIAL_MOD
         )
         highlight_info["target_material_mod"] = material_mod
 
@@ -249,13 +249,13 @@ class HighlightingManager:
             "entities": list(positions),
             "duration": 0.0,
             "start_time": 0.0,
-            "material_mod": material_mod or PLACEMENT_HIGHLIGHT_MATERIAL_MOD,
+            "material_mod": material_mod or DARK_GREEN_MATERIAL_MOD,
         }
         self._context_highlights[context] = highlight_info
         self._apply_highlight(highlight_info)
 
         # For persistent context highlights, apply the material immediately (no pulsing)
-        material_mod = highlight_info.get("material_mod", PLACEMENT_HIGHLIGHT_MATERIAL_MOD)
+        material_mod = highlight_info.get("material_mod", DARK_GREEN_MATERIAL_MOD)
         original_materials = highlight_info.get("original_materials", {})
 
         for pos_str, (saved_material, entity_type) in original_materials.items():

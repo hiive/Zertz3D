@@ -43,8 +43,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--highlight-choices",
-        action="store_true",
-        help="Highlight valid moves and actions before each turn",
+        choices=["uniform", "heatmap"],
+        default=None,
+        metavar="MODE",
+        help="Highlight valid moves before each turn: 'uniform' (all equal) or 'heatmap' (proportional to AI score)",
     )
     parser.add_argument(
         "--show-coords",

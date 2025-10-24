@@ -668,3 +668,4 @@ policy = PolicyHead(combined)
 - ✅ What happens if no edge rings can be removed after placement? How is that notated?
 - ✅ Check tournament rule (BOTH_LOSE when board full with zero captures)
 - ✅ Verify loop detection (is it possible?!) and consecutive passing.
+- Add flag for player moves like --show-coords

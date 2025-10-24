@@ -221,7 +221,7 @@ class TestRenderData:
     """Test get_render_data method."""
 
     def test_get_render_data_without_highlights(self):
-        """Test get_render_data with show_highlights=False."""
+        """Test get_render_data with highlight_choices=None."""
         game = ZertzGame(rings=37)
 
         placement, _ = game.get_valid_actions()
@@ -229,7 +229,7 @@ class TestRenderData:
         assert len(valid_actions) > 0
         action = tuple(valid_actions[0])
 
-        render_data = game.get_render_data("PUT", action, show_highlights=False)
+        render_data = game.get_render_data("PUT", action, highlight_choices=None)
 
         assert isinstance(render_data, RenderData)
         assert render_data.action_dict is not None
@@ -239,10 +239,10 @@ class TestRenderData:
         assert not render_data.has_highlights()
         assert render_data.placement_positions == []
         assert render_data.capture_moves == []
-        assert render_data.removal_positions == {}
+        assert render_data.removal_positions == []
 
     def test_get_render_data_with_highlights(self):
-        """Test get_render_data with show_highlights=True."""
+        """Test get_render_data with highlight_choices='uniform'."""
         game = ZertzGame(rings=37)
 
         placement, _ = game.get_valid_actions()
@@ -250,7 +250,7 @@ class TestRenderData:
         assert len(valid_actions) > 0
         action = tuple(valid_actions[0])
 
-        render_data = game.get_render_data("PUT", action, show_highlights=True)
+        render_data = game.get_render_data("PUT", action, highlight_choices='uniform')
 
         assert isinstance(render_data, RenderData)
         assert render_data.action_dict is not None
@@ -267,7 +267,7 @@ class TestRenderData:
         """Test get_render_data for PASS action."""
         game = ZertzGame(rings=37)
 
-        render_data = game.get_render_data("PASS", None, show_highlights=False)
+        render_data = game.get_render_data("PASS", None, highlight_choices=None)
 
         assert isinstance(render_data, RenderData)
         assert render_data.action_dict["action"] == "PASS"

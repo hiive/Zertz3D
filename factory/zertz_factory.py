@@ -31,7 +31,7 @@ class ZertzFactory:
         partial_replay: bool = False,
         headless: bool = False,
         max_games: int | None = None,
-        highlight_choices: bool = False,
+        highlight_choices: str | None = None,
         show_coords: bool = False,
         blitz: bool = False,
         move_duration: float = 0.666,

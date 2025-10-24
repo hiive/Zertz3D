@@ -120,7 +120,7 @@ class MCTSZertzPlayer(ZertzPlayer):
         c1, c2, c3 = capture_mask.nonzero()
         if c1.size == 1:
             # Exactly one capture - mandatory move, no decision needed
-            return ("CAP", (c1[0], c2[0], c3[0]))
+            return ("CAP", (int(c1[0]), int(c2[0]), int(c3[0])))
         elif c1.size > 1:
             # Multiple captures available - need MCTS to decide
             pass
@@ -129,7 +129,7 @@ class MCTSZertzPlayer(ZertzPlayer):
             p1, p2, p3 = placement_mask.nonzero()
             if p1.size == 1:
                 # Exactly one placement - forced move, no decision needed
-                return ("PUT", (p1[0], p2[0], p3[0]))
+                return ("PUT", (int(p1[0]), int(p2[0]), int(p3[0])))
             elif p1.size == 0:
                 # No moves available - must pass
                 return ("PASS", None)
@@ -142,6 +142,58 @@ class MCTSZertzPlayer(ZertzPlayer):
             action = self._python_search()
 
         return action
+
+    def get_last_action_scores(self):
+        """Get normalized scores for all legal actions from last search.
+
+        Returns:
+            Dict mapping action tuples to normalized scores [0.0, 1.0]
+        """
+        if self.backend == Backend.RUST:
+            # Get statistics from Rust backend
+            child_stats = self.rust_mcts.last_child_statistics()
+
+            # Convert to dictionary with action tuples as keys
+            action_scores = {}
+            for action_type, action_data, score in child_stats:
+                action = (action_type, action_data)
+                action_scores[action] = score
+
+            return action_scores
+        else:
+            # Python backend stubbed - return uniform scores
+            return self._get_uniform_scores()
+
+    def _get_uniform_scores(self):
+        """Get uniform scores for all legal actions (fallback for Python backend).
+
+        NOTE: This is a planned parity break. The Python backend returns uniform scores
+        as a stub, while the Rust backend returns actual MCTS visit-based scores.
+        This is intentional for now since the Rust backend is the primary target.
+        """
+        p_actions, c_actions = self.game.get_valid_actions()
+
+        c1, c2, c3 = c_actions.nonzero()
+        p1, p2, p3 = p_actions.nonzero()
+
+        action_scores = {}
+
+        # Collect all valid actions with uniform score
+        if c1.size > 0:
+            # Captures available
+            for i in range(c1.size):
+                action = ("CAP", (int(c1[i]), int(c2[i]), int(c3[i])))
+                action_scores[action] = 1.0
+        elif p1.size > 0:
+            # Placements available
+            for i in range(p1.size):
+                action = ("PUT", (int(p1[i]), int(p2[i]), int(p3[i])))
+                action_scores[action] = 1.0
+        else:
+            # Must pass
+            action_scores[("PASS", None)] = 1.0
+
+        return action_scores
 
     def _is_blitz_mode(self):
         """Detect if the game is in blitz mode by checking win conditions."""

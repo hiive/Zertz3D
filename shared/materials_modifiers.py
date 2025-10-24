@@ -11,29 +11,48 @@ The material defines WHAT is highlighted (placement, capture, hover, etc.)
 The API call determines HOW it's displayed (pulsing vs static).
 """
 
-# Formerly: PLACEMENT_HIGHLIGHT_MATERIAL_MOD
+# Heat-map materials: MAX (highest likelihood) and MIN (lowest visible likelihood)
+# Used for interpolating colors based on action scores
+
+# Placement highlights (green spectrum)
 DARK_GREEN_MATERIAL_MOD = MaterialModifier(
     highlight_color=(0.0, 0.4, 0.0, 1),  # Dark green base
     emission_color=(0.0, 0.08, 0.0, 1),  # Subtle green glow
 )
 
-# Formerly: REMOVABLE_HIGHLIGHT_MATERIAL_MOD
+CYAN_MATERIAL_MOD = MaterialModifier(
+    highlight_color=(0.0, 0.4, 0.4, 1),  # Cyan/turquoise - distinct from green MAX
+    emission_color=(0.0, 0.08, 0.08, 1),   # Cyan glow
+)
+
+# Removal highlights (red spectrum)
 DARK_RED_MATERIAL_MOD = MaterialModifier(
     highlight_color=(0.4, 0.0, 0.0, 1),  # Dark red base
     emission_color=(0.08, 0.0, 0.0, 1),  # Subtle red glow
 )
 
-# Formerly: CAPTURE_HIGHLIGHT_MATERIAL_MOD
+MAGENTA_MATERIAL_MOD = MaterialModifier(
+    highlight_color=(0.5, 0.0, 0.35, 1),  # Magenta/purple - distinct from red MAX
+    emission_color=(0.12, 0.0, 0.08, 1),   # Magenta glow
+)
+
+# Capture highlights (blue spectrum)
 DARK_BLUE_MATERIAL_MOD = MaterialModifier(
     highlight_color=(0.0, 0.0, 0.4, 1),  # Dark blue base
     emission_color=(0.0, 0.0, 0.08, 1),  # Subtle blue glow
 )
 
-# Formerly: SELECTED_CAPTURE_MATERIAL_MOD
+OLIVE_MATERIAL_MOD = MaterialModifier(
+    highlight_color=(0.5, 0.5, 0.0, 1),  # Yellow/olive - distinct from blue MAX
+    emission_color=(0.12, 0.12, 0.0, 1),   # Yellow glow
+)
+
+# Selected capture highlight (bright blue - no MIN variant needed, always max)
 CORNFLOWER_BLUE_MATERIAL_MOD = MaterialModifier(
     highlight_color=(0.39, 0.58, 0.93, 1),  # Cornflower blue
     emission_color=(0.08, 0.12, 0.19, 1),   # Cornflower blue glow
 )
+
 
 # Formerly: CAPTURE_FLASH_MATERIAL_MOD
 BRIGHT_YELLOW_MATERIAL_MOD = MaterialModifier(
@@ -76,16 +95,6 @@ DARK_GRAY_MATERIAL_MOD = MaterialModifier(
     highlight_color=(0.35, 0.35, 0.35, 1.0), emission_color=(0.08, 0.08, 0.08, 1.0)
 )
 
-# Aliases for backward compatibility (deprecated - use color-based names)
-PLACEMENT_HIGHLIGHT_MATERIAL_MOD = DARK_GREEN_MATERIAL_MOD
-REMOVABLE_HIGHLIGHT_MATERIAL_MOD = DARK_RED_MATERIAL_MOD
-CAPTURE_HIGHLIGHT_MATERIAL_MOD = DARK_BLUE_MATERIAL_MOD
-SELECTED_CAPTURE_MATERIAL_MOD = CORNFLOWER_BLUE_MATERIAL_MOD
-CAPTURE_FLASH_MATERIAL_MOD = BRIGHT_YELLOW_MATERIAL_MOD
-HOVER_PRIMARY_MATERIAL_MOD = GOLD_MATERIAL_MOD
-HOVER_SECONDARY_MATERIAL_MOD = ORANGE_MATERIAL_MOD
-HOVER_SUPPLY_MATERIAL_MOD = LIGHT_BLUE_MATERIAL_MOD
-HOVER_CAPTURED_MATERIAL_MOD = PURPLE_MATERIAL_MOD
-SUPPLY_HIGHLIGHT_WHITE_MATERIAL_MOD = LIGHT_GRAY_MATERIAL_MOD
-SUPPLY_HIGHLIGHT_GREY_MATERIAL_MOD = MEDIUM_GRAY_MATERIAL_MOD
-SUPPLY_HIGHLIGHT_BLACK_MATERIAL_MOD = DARK_GRAY_MATERIAL_MOD
+WHITE_MATERIAL_MOD = MaterialModifier(
+    highlight_color=(1.0, 1.0, 1.0, 1.0), emission_color=(0.2, 0.2, 0.2, 1.0)
+)

@@ -43,7 +43,7 @@ class TestGameControllerHeadless:
             rings=37,
             seed=seed,
             max_games=1,
-            highlight_choices=False,
+            highlight_choices=None,
             show_coords=False,
             log_to_screen=True,  # Enable screen output
             renderer_or_factory=None,  # Headless mode
@@ -105,7 +105,7 @@ class TestGameControllerHeadless:
             rings=37,
             seed=seed,
             max_games=2,  # Allow 2 games, should stop after 2
-            highlight_choices=False,
+            highlight_choices=None,
             log_to_screen=True,  # Enable screen output
             renderer_or_factory=None,
         )
@@ -138,7 +138,7 @@ class TestGameControllerHeadless:
             rings=37,
             seed=seed,
             max_games=1,
-            highlight_choices=False,
+            highlight_choices=None,
             log_to_screen=True,  # Enable screen output
             renderer_or_factory=None,
         )
@@ -168,7 +168,7 @@ class TestGameControllerHeadless:
             rings=37,
             seed=seed,
             max_games=3,
-            highlight_choices=False,
+            highlight_choices=None,
             renderer_or_factory=None,
             log_to_file=False,
         )
@@ -187,7 +187,7 @@ class TestGameControllerHeadless:
     def test_completion_queue_uses_action_processor(self):
         """Ensure completion queue delegates to action processor helper."""
         controller = ZertzGameController(
-            rings=37, highlight_choices=False, renderer_or_factory=None
+            rings=37, highlight_choices=None, renderer_or_factory=None
         )
         processor = Mock()
         controller.action_processor = processor
