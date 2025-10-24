@@ -12,23 +12,35 @@ class MCTSTree:
     """Stateless MCTS tree using pure functions for game logic."""
 
     @staticmethod
-    def ucb1_score(child, parent, exploration_constant):
-        """Calculate UCB1 score for child node selection.
+    def ucb1_score(child, parent, exploration_constant, fpu_reduction=None):
+        """Calculate UCB1 score for child node selection with optional FPU.
 
         UCB1 balances exploitation (high average value) with exploration
         (less-visited nodes). The exploration_constant (typically √2 ≈ 1.41)
         controls the exploration/exploitation trade-off.
 
+        First Play Urgency (FPU): For unvisited nodes, estimates value as
+        parent_value - fpu_reduction instead of giving infinite urgency.
+
         Args:
             child: Child node to score
             parent: Parent node
             exploration_constant: Exploration parameter (typically 1.41)
+            fpu_reduction: FPU reduction parameter (None = standard UCB1)
 
         Returns:
             UCB1 score (higher is better)
         """
         if child.visits == 0:
-            return float('inf')  # Prioritize unvisited nodes
+            if fpu_reduction is not None:
+                # FPU: estimate using parent value with reduction
+                parent_avg_value = parent.value / parent.visits if parent.visits > 0 else 0
+                estimated_q = -(parent_avg_value - fpu_reduction)
+                exploration = exploration_constant * math.sqrt(parent.visits)
+                return estimated_q + exploration
+            else:
+                # Standard behavior: unvisited nodes have infinite urgency
+                return float('inf')
 
         # Exploitation term: average value from parent's perspective
         # Note: child.value is from child's player perspective (due to flipping in backprop)
@@ -42,29 +54,38 @@ class MCTSTree:
 
         return exploitation + exploration
 
-    def select(self, node, exploration_constant=1.41):
+    def select(self, node, exploration_constant=1.41, fpu_reduction=None,
+               widening_constant=None):
         """Selection phase: traverse tree using UCB1 until reaching expandable node.
 
         Args:
             node: Starting node (typically root)
             exploration_constant: UCB1 exploration parameter
+            fpu_reduction: FPU reduction parameter (None = standard UCB1)
+            widening_constant: Progressive widening constant (None = disabled, 10.0 = moderate)
 
         Returns:
             Node to expand (either has untried actions or is terminal)
         """
-        while not node.is_terminal() and node.is_fully_expanded():
+        while not node.is_terminal() and node.is_fully_expanded(widening_constant):
+            # Add virtual loss to discourage thread collision
+            # Reserved for Python 3.13+ multithreading.
+            # node.add_virtual_loss()
+
             # Select best child using UCB1
             best_score = -float('inf')
             best_child = None
 
             for child in node.children.values():
-                score = self.ucb1_score(child, node, exploration_constant)
+                score = self.ucb1_score(child, node, exploration_constant, fpu_reduction)
                 if score > best_score:
                     best_score = score
                     best_child = child
 
             node = best_child
-
+        # Add virtual loss to final selected node
+        # Reserved for Python 3.13+ multithreading.
+        # node.add_virtual_loss()
         return node
 
     @staticmethod
@@ -122,6 +143,11 @@ class MCTSTree:
         )
 
         node.children[action] = child
+
+        # Add virtual loss to newly expanded child
+        # Reserved for Python 3.13+ multithreading.
+        # child.add_virtual_loss()
+
         return child
 
     def simulate(self, node, max_depth=None):
@@ -316,6 +342,10 @@ class MCTSTree:
             transposition_table: TranspositionTable to update (optional)
         """
         while node is not None:
+            # Remove virtual loss before adding real value
+            # Reserved for Python 3.13+ multithreading.
+            # node.remove_virtual_loss()
+
             node.visits = node.visits + 1
             node.value = node.value + result
 
@@ -333,7 +363,8 @@ class MCTSTree:
 
     def search(self, game, iterations, exploration_constant=1.41,
                max_simulation_depth=None, transposition_table=None,
-               use_transposition_lookups=True, time_limit=None, verbose=False):
+               use_transposition_lookups=True, time_limit=None, verbose=False,
+               fpu_reduction=None, progressive_widening=False, widening_constant=10.0):
         """Run MCTS search from current game state.
 
         Args:
@@ -345,6 +376,8 @@ class MCTSTree:
             use_transposition_lookups: Use cached statistics to initialize nodes (default: True)
             time_limit: Maximum search time in seconds (None = no limit)
             verbose: Print search statistics
+            fpu_reduction: FPU reduction parameter (None = standard UCB1, e.g. 0.2 for FPU)
+            widening_constant: Progressive widening constant (None = disabled, 10.0 = moderate)
 
         Returns:
             Best action found, or None if no legal actions
@@ -380,7 +413,7 @@ class MCTSTree:
                 break
 
             # Selection
-            node = self.select(root, exploration_constant)
+            node = self.select(root, exploration_constant, fpu_reduction, widening_constant)
 
             # Expansion
             if not node.is_terminal():
@@ -434,7 +467,7 @@ class MCTSTree:
     def search_parallel(self, game, iterations, exploration_constant=1.41,
                        max_simulation_depth=None, transposition_table=None,
                        use_transposition_lookups=True, time_limit=None, verbose=False,
-                       num_threads=16):
+                       num_threads=16, fpu_reduction=None):
         """Run parallel MCTS search from current game state using multiple threads.
 
         Uses a thread pool to run simulations in parallel. Selection, expansion,
@@ -450,6 +483,8 @@ class MCTSTree:
             time_limit: Maximum search time in seconds (None = no limit)
             verbose: Print search statistics
             num_threads: Number of worker threads (default: 16)
+            fpu_reduction: FPU reduction parameter (None = standard UCB1, e.g. 0.2 for FPU)
+            widening_constant: Progressive widening constant (None = disabled, 10.0 = moderate)
 
         Returns:
             Best action found, or None if no legal actions
@@ -493,7 +528,7 @@ class MCTSTree:
                     return False
 
                 # Selection
-                node = self.select(root, exploration_constant)
+                node = self.select(root, exploration_constant, fpu_reduction, widening_constant)
 
                 # Expansion
                 if not node.is_terminal():
@@ -563,7 +598,7 @@ class MCTSTree:
     def search_multiprocess(self, game, iterations, exploration_constant=1.41,
                            max_simulation_depth=None, transposition_table=None,
                            use_transposition_lookups=True, time_limit=None, verbose=False,
-                           num_processes=16):
+                           num_processes=16, fpu_reduction=None):
         """Run parallel MCTS search using multiprocessing (bypasses GIL).
 
         Uses root parallelization: Each process runs independent MCTS search,
@@ -582,6 +617,8 @@ class MCTSTree:
             time_limit: Maximum search time in seconds (None = no limit)
             verbose: Print search statistics
             num_processes: Number of worker processes (default: 16)
+            fpu_reduction: FPU reduction parameter (None = standard UCB1, e.g. 0.2 for FPU)
+            widening_constant: Progressive widening constant (None = disabled, 10.0 = moderate)
 
         Returns:
             Best action found, or None if no legal actions
@@ -614,7 +651,9 @@ class MCTSTree:
                 max_simulation_depth,
                 i,  # process_id for seeding RNG
                 use_transposition_table,
-                use_transposition_lookups
+                use_transposition_lookups,
+                fpu_reduction,
+                widening_constant
             ))
 
         # Run MCTS in parallel processes
@@ -673,14 +712,14 @@ def _mcts_worker(args):
     Args:
         args: Tuple of (board_state, global_state, rings, iterations,
                        exploration_constant, max_simulation_depth, process_id,
-                       use_transposition_table, use_transposition_lookups)
+                       use_transposition_table, use_transposition_lookups, fpu_reduction, widening_constant)
 
     Returns:
         Dict mapping actions to (visits, value) tuples
     """
     (board_state, global_state, rings, iterations, exploration_constant,
      max_simulation_depth, process_id, use_transposition_table,
-     use_transposition_lookups) = args
+     use_transposition_lookups, fpu_reduction) = args
 
     # Seed RNG uniquely for this process
     import random
@@ -718,7 +757,7 @@ def _mcts_worker(args):
     # Run iterations
     for _ in range(iterations):
         # Selection
-        node = mcts.select(root, exploration_constant)
+        node = mcts.select(root, exploration_constant, fpu_reduction, widening_constant)
 
         # Expansion (with local table)
         if not node.is_terminal():

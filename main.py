@@ -13,8 +13,9 @@ def main() -> None:
     parser.add_argument(
         "--rings",
         type=int,
+        choices=[37, 48, 61],
         default=37,
-        help="Number of rings on the board (default: 37, ignored if --replay is used)",
+        help="Board size: 37, 48, or 61 rings (default: 37)"
     )
     parser.add_argument(
         "--seed",

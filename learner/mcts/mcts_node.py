@@ -1,6 +1,12 @@
 import numpy as np
 import math
 
+# Virtual loss constants for parallel MCTS
+# Virtual loss temporarily inflates visit counts and adds pessimistic values
+# to discouraIt'sge multiple threads from exploring the same path simultaneously
+VIRTUAL_LOSS = 3
+VIRTUAL_LOSS_VALUE = -3.0  # Pessimistic value
+
 
 class MCTSNode:
     """Stateless node in the MCTS search tree.
@@ -77,38 +83,53 @@ class MCTSNode:
         else:
             self._value = value
 
-    def is_fully_expanded(self, progressive_widening=True, widening_constant=10.0):
+    def count_legal_actions(self):
+        """Count the number of legal actions from this state.
+
+        Matches Rust implementation for consistency.
+        """
+        from game import zertz_logic
+
+        p_actions, c_actions = zertz_logic.get_valid_actions(
+            self.board_state, self.global_state, self.config
+        )
+
+        placement_count = np.count_nonzero(p_actions)
+        capture_count = np.count_nonzero(c_actions)
+        total = placement_count + capture_count
+
+        # At least 1 for PASS if no other actions
+        return max(total, 1)
+
+    def is_fully_expanded(self, widening_constant=None):
         """Check if node should be expanded further.
 
-        With progressive widening enabled, limits children based on parent visits:
-        max_children = widening_constant * sqrt(parent_visits)
+        With progressive widening enabled (widening_constant is not None), limits
+        children based on parent visits: max_children = widening_constant * sqrt(parent_visits)
 
         This focuses search on promising moves instead of trying every legal move.
         With large branching factors (Zertz has 100+ moves early game), this is
         essential to get enough visits per move to distinguish good from bad.
 
         Args:
-            progressive_widening: Enable progressive widening (default: True)
-            widening_constant: Controls branching factor (default: 10.0, moderate setting)
+            widening_constant: Controls branching factor (None = disabled, 10.0 = moderate)
 
         Returns:
             True if no more children should be added
         """
-        if self.untried_actions is None:
-            self._populate_untried_actions()
+        children_count = len(self.children)
+        legal_actions = self.count_legal_actions()
 
-        if not progressive_widening:
+        if widening_constant is None:
             # Standard MCTS: expand until all actions tried
-            return len(self.untried_actions) == 0
+            return children_count == legal_actions
 
         # Progressive widening: limit children based on visit count
         # max_children grows with sqrt(visits), focusing search
         max_children = int(widening_constant * math.sqrt(self.visits + 1))
+        max_children = min(max_children, legal_actions)
 
-        # Don't create more children than we have untried actions
-        max_children = min(max_children, len(self.untried_actions) + len(self.children))
-
-        return len(self.children) >= max_children
+        return children_count >= max_children
 
     def is_terminal(self):
         """Check if this is a terminal game state.
@@ -181,3 +202,30 @@ class MCTSNode:
         # Random selection
         idx = np.random.randint(len(self.untried_actions))
         return self.untried_actions.pop(idx)
+
+    def add_virtual_loss(self):
+        """Add virtual loss to discourage thread collision.
+
+        Virtual loss temporarily inflates visit count and adds pessimistic value
+        to make this path less attractive to other threads during parallel search.
+        Must be paired with remove_virtual_loss() after backpropagation.
+
+        NOTE: Currently not used in Python implementation due to multiprocessing
+        (separate memory spaces). Reserved for future use with Python 3.13+ free-threaded
+        mode or Python 3.14+ where true shared-memory multithreading becomes practical.
+        Included for API parity with Rust implementation.
+        """
+        self.visits = self.visits + VIRTUAL_LOSS
+        self.value = self.value + VIRTUAL_LOSS_VALUE
+
+    def remove_virtual_loss(self):
+        """Remove virtual loss after backpropagation.
+
+        Removes the temporary inflation added by add_virtual_loss().
+        Should be called before adding the real simulation value.
+
+        NOTE: Currently not used in Python implementation. See add_virtual_loss()
+        docstring for details.
+        """
+        self.visits = self.visits - VIRTUAL_LOSS
+        self.value = self.value - VIRTUAL_LOSS_VALUE

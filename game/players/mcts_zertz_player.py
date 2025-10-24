@@ -21,10 +21,11 @@ class MCTSZertzPlayer(ZertzPlayer):
     """
 
     def __init__(self, game, n, iterations=1000, exploration_constant=1.41,
-                 max_simulation_depth=None, use_transposition_table=True,
-                 use_transposition_lookups=True, time_limit=None, verbose=False,
-                 clear_table_each_move=True, parallel='multiprocess', num_workers=16,
-                 backend='auto', rng_seed=None):
+                 max_simulation_depth=None, fpu_reduction=None,
+                 use_transposition_table=True, use_transposition_lookups=True,
+                 time_limit=None, verbose=False, clear_table_each_move=True,
+                 parallel='multiprocess', num_workers=16, backend='auto',
+                 rng_seed=None, widening_constant=None):
         """Initialize MCTS player.
 
         Args:
@@ -33,6 +34,7 @@ class MCTSZertzPlayer(ZertzPlayer):
             iterations: MCTS iterations per move (default: 1000)
             exploration_constant: UCB1 exploration (default: √2 ≈ 1.41)
             max_simulation_depth: Max rollout depth (None = play to end)
+            fpu_reduction: First Play Urgency reduction (None = disabled, 0.2 = moderate)
             use_transposition_table: Enable symmetry caching (serial/thread: shared table, multiprocess: per-process tables)
             use_transposition_lookups: Use cached stats to initialize nodes
             time_limit: Max search time per move in seconds (None = no limit)
@@ -42,12 +44,15 @@ class MCTSZertzPlayer(ZertzPlayer):
             num_workers: Number of threads/processes for parallel search (default: 16)
             backend: Backend to use: 'python', 'rust', or 'auto' (default: auto-detect)
             rng_seed: Optional integer seed used to initialize randomness for reproducible runs
+            widening_constant: Progressive widening constant (None = disabled, e.g. 10.0 = moderate)
         """
         super().__init__(game, n)
 
         self.iterations = iterations
         self.exploration_constant = exploration_constant
         self.max_simulation_depth = max_simulation_depth
+        self.fpu_reduction = fpu_reduction
+        self.widening_constant = widening_constant
         self.use_transposition_table = use_transposition_table
         self.use_transposition_lookups = use_transposition_lookups
         self.time_limit = time_limit
@@ -83,8 +88,8 @@ class MCTSZertzPlayer(ZertzPlayer):
             # Create Rust MCTS searcher
             self.rust_mcts = hiivelabs_zertz_mcts.MCTSSearch(
                 exploration_constant=exploration_constant,
-                progressive_widening=True,
-                widening_constant=10.0,
+                widening_constant=widening_constant,
+                fpu_reduction=fpu_reduction,
                 use_transposition_table=use_transposition_table,
                 use_transposition_lookups=use_transposition_lookups,
             )
@@ -219,6 +224,8 @@ class MCTSZertzPlayer(ZertzPlayer):
                 iterations=self.iterations,
                 exploration_constant=self.exploration_constant,
                 max_simulation_depth=self.max_simulation_depth,
+                fpu_reduction=self.fpu_reduction,
+                widening_constant=self.widening_constant,
                 transposition_table=self.transposition_table,  # Creates per-process tables
                 use_transposition_lookups=self.use_transposition_lookups,
                 time_limit=self.time_limit,
@@ -231,6 +238,8 @@ class MCTSZertzPlayer(ZertzPlayer):
                 iterations=self.iterations,
                 exploration_constant=self.exploration_constant,
                 max_simulation_depth=self.max_simulation_depth,
+                fpu_reduction=self.fpu_reduction,
+                widening_constant=self.widening_constant,
                 transposition_table=self.transposition_table,
                 use_transposition_lookups=self.use_transposition_lookups,
                 time_limit=self.time_limit,
@@ -243,6 +252,8 @@ class MCTSZertzPlayer(ZertzPlayer):
                 iterations=self.iterations,
                 exploration_constant=self.exploration_constant,
                 max_simulation_depth=self.max_simulation_depth,
+                fpu_reduction=self.fpu_reduction,
+                widening_constant=self.widening_constant,
                 transposition_table=self.transposition_table,
                 use_transposition_lookups=self.use_transposition_lookups,
                 time_limit=self.time_limit,
