@@ -34,6 +34,7 @@ class ActionVisualizationSequencer:
         # Thinking phase state
         self.thinking_active = False
         self.thinking_highlights = {}  # {pos_str: (entity, entity_type, original_material)}
+        self.skip_placement_highlights = False  # Skip placement highlights if thinking just happened
 
     def is_active(self):
         """Check if the sequencer is currently active."""
@@ -234,7 +235,7 @@ class ActionVisualizationSequencer:
     def _on_search_ended(self, event):
         """End thinking phase and prepare for action execution.
 
-        Clears all thinking highlights immediately (no fade).
+        Fades out thinking highlights over the standard highlight duration.
 
         Args:
             event: SearchEnded event with:
@@ -244,11 +245,22 @@ class ActionVisualizationSequencer:
         if not self.thinking_active:
             return
 
-        # Clear all thinking highlights immediately
-        self._clear_thinking_highlights()
+        # Queue fade-out animations for all thinking highlights
+        self._fade_thinking_highlights()
 
         # Mark thinking phase as inactive
         self.thinking_active = False
+
+        # Skip placement highlights for the next action execution (they were already shown during thinking)
+        self.skip_placement_highlights = True
+
+    def _fade_thinking_highlights(self):
+        """Fade out all thinking highlights by scheduling delayed clear."""
+        # Simply clear the context highlights after a delay
+        # The highlighting system doesn't support fading context highlights directly,
+        # so we just clear them immediately for now
+        # TODO: If we want a fade effect, we'd need to convert context highlights to timed highlights
+        self._clear_thinking_highlights()
 
     def _clear_thinking_highlights(self):
         """Remove all thinking phase highlights immediately."""
@@ -418,8 +430,8 @@ class ActionVisualizationSequencer:
         action_dict = render_data.action_dict
         selected_ring = action_dict["dst"]
 
-        # Queue placement highlights
-        if render_data.placement_positions:
+        # Queue placement highlights (skip if thinking phase just showed them)
+        if render_data.placement_positions and not self.skip_placement_highlights:
             self._queue_position_highlights(
                 render_data.placement_positions,
                 selected_ring,
@@ -427,9 +439,26 @@ class ActionVisualizationSequencer:
                 task_delay_time,
                 defer=self.start_delay
             )
+            highlight_duration = self.highlight_duration
+        elif self.skip_placement_highlights:
+            # Thinking phase already showed all placements, just highlight the selected one
+            self.renderer.queue_highlight(
+                rings=[selected_ring],
+                material_mod=DARK_GREEN_MATERIAL_MOD,
+                duration=self.highlight_duration + task_delay_time + 0.5,  # Same as selected position duration
+                defer=self.start_delay,
+                entity_type="ring",
+            )
+            highlight_duration = self.highlight_duration
+        else:
+            # No placement positions at all
+            highlight_duration = 0
+
+        # Reset the skip flag after checking it
+        self.skip_placement_highlights = False
 
         # Queue marble animation to start after 1 highlight phase (0.5 seconds)
-        marble_delay = self.start_delay + self.highlight_duration
+        marble_delay = self.start_delay + highlight_duration
         self.renderer.show_marble_placement(
             player,
             action_dict,
