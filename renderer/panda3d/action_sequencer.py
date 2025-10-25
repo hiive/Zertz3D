@@ -6,7 +6,6 @@ from shared.materials_modifiers import (
     DARK_RED_MATERIAL_MOD,
     DARK_BLUE_MATERIAL_MOD,
     CORNFLOWER_BLUE_MATERIAL_MOD,
-    WHITE_MATERIAL_MOD
 )
 from renderer.panda3d.material_modifier import MaterialModifier
 
@@ -67,35 +66,101 @@ class ActionVisualizationSequencer:
         """Check if the state machine is currently active."""
         return self.phase is not None
 
-    def _interpolate_material(self, score: float, max_mod: MaterialModifier, min_mod: MaterialModifier) -> MaterialModifier:
-        """Interpolate between MIN and MAX material modifiers based on normalized score.
+    def _queue_position_highlights(
+        self,
+        positions,
+        selected_position,
+        material_mod,
+        phase_highlights,
+        phase_selected,
+        animation_delay,
+        defer=0
+    ):
+        """Common logic for queuing highlights on positions (placements or removals).
 
-        In uniform mode, all scores are treated as maximum (returns max_mod).
-        In heatmap mode, interpolates between min_mod and max_mod based on score.
+        All positions stay highlighted through both phases to provide visual context,
+        fading after the animation completes. Selected position stays visible slightly longer.
+
+        Args:
+            positions: List of dicts with position and score
+            selected_position: The position that will be selected (stays visible longer)
+            material_mod: Base material modifier for the highlight color
+            phase_highlights: Phase constant for "all options" highlights
+            phase_selected: Phase constant for "selected" highlight
+            animation_delay: Time for the marble/ring animation to complete
+            defer: Delay before starting highlights (seconds)
+        """
+        if not positions:
+            return
+
+        for pos_dict in positions:
+            pos_str = pos_dict['pos']
+            score = pos_dict.get('score', 1.0)
+
+            # Skip positions below visibility threshold in heatmap mode
+            if self.highlight_choices == 'heatmap' and score < self.min_threshold:
+                continue
+
+            # Use color with alpha based on score
+            interpolated_material = self._interpolate_material(score, material_mod)
+
+            # Check if this is the selected position
+            is_selected = (pos_str == selected_position)
+
+            # Highlights last through: "all options" + "selected" + animation
+            # Selected position gets extra time to fade after others
+            base_duration = (
+                self.highlight_durations[phase_highlights] +
+                self.highlight_durations[phase_selected] +
+                animation_delay
+            )
+            duration = base_duration + (0.5 if is_selected else 0.0)
+
+            self.renderer.queue_highlight(
+                rings=[pos_str],
+                material_mod=interpolated_material,
+                duration=duration,
+                defer=defer,
+                entity_type="ring",  # Force highlight on rings only, not marbles
+            )
+
+    def _interpolate_material(self, score: float, base_mod: MaterialModifier) -> MaterialModifier:
+        """Create material modifier with alpha based on normalized score.
+
+        In uniform mode, all scores use full alpha (1.0).
+        In heatmap mode, alpha scales from 0.2 (minimum) to 1.0 (maximum) using: 0.2 + 0.8 * score
+        This ensures all valid options are visible while maintaining score differentiation.
 
         Args:
             score: Normalized score in range [0.0, 1.0]
-            max_mod: Material modifier for maximum score (1.0)
-            min_mod: Material modifier for minimum visible score (min_threshold)
+            base_mod: Base material modifier (color will be used, alpha will be set by score)
 
         Returns:
-            MaterialModifier interpolated for the given score
+            MaterialModifier with alpha set according to score
         """
         if self.highlight_choices == 'uniform':
-            # Uniform mode: all actions get maximum highlight
-            return max_mod
+            # Uniform mode: all actions get maximum alpha
+            return base_mod
 
-        # Heat-map mode: interpolate based on score
-        # Scores below threshold are not shown (caller responsibility)
-        # Map score range [min_threshold, 1.0] to blend_ratio [0.0, 1.0]
-        if score >= 1.0:
-            return max_mod
-        elif score <= self.min_threshold:
-            return min_mod
-        else:
-            # Linear interpolation from min_mod (at min_threshold) to max_mod (at 1.0)
-            blend_ratio = (score - self.min_threshold) / (1.0 - self.min_threshold)
-            return MaterialModifier.blend_mods(min_mod, max_mod, blend_ratio)
+        # Heat-map mode: scale score to alpha range [0.2, 1.0]
+        # This ensures all options are visible (min 20% opacity) while showing score differences
+        alpha = 0.2 + 0.8 * score
+
+        # Create new material with same colors but modified alpha
+        return MaterialModifier(
+            highlight_color=(
+                base_mod.highlight_color[0],
+                base_mod.highlight_color[1],
+                base_mod.highlight_color[2],
+                alpha
+            ),
+            emission_color=(
+                base_mod.emission_color[0],
+                base_mod.emission_color[1],
+                base_mod.emission_color[2],
+                alpha
+            )
+        )
 
     def start(self, player, render_data, task_delay_time):
         """Start the highlighting sequence for an action.
@@ -115,8 +180,42 @@ class ActionVisualizationSequencer:
 
         action_type = render_data.action_dict["action"]
         if action_type == "PUT":
-            # Queue placement highlights and start the sequence
+            # Queue placement highlights
             self._queue_placement_highlights(render_data.placement_positions)
+
+            # Queue marble animation to start after both highlight phases
+            marble_delay = (
+                self.start_delay +
+                self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS] +
+                self.highlight_durations[self.PHASE_SELECTED_PLACEMENT]
+            )
+            self.renderer.show_marble_placement(
+                player,
+                render_data.action_dict,
+                task_delay_time,
+                delay=marble_delay
+            )
+
+            # Queue removal highlights to start after marble animation completes
+            if self.removal_positions:
+                removal_defer = marble_delay + task_delay_time
+                self._queue_removal_highlights(
+                    self.removal_positions,
+                    defer=removal_defer
+                )
+
+                # Queue ring removal to start after removal highlights complete
+                ring_removal_delay = (
+                    removal_defer +
+                    self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS] +
+                    self.highlight_durations[self.PHASE_SELECTED_REMOVAL]
+                )
+                self.renderer.show_ring_removal(
+                    render_data.action_dict,
+                    task_delay_time,
+                    delay=ring_removal_delay
+                )
+
             self.phase = self.PHASE_PLACEMENT_HIGHLIGHTS
         elif action_type == "CAP":
             # Queue capture highlights and start the sequence
@@ -172,55 +271,16 @@ class ActionVisualizationSequencer:
                 Format: [{'pos': 'A1', 'score': 0.8}, {'pos': 'B2', 'score': 1.0}, ...]
                 OR legacy format: ['A1', 'B2', ...] (treated as uniform)
         """
-        if not placement_positions:
-            return
-
-        # Get the selected position (the one that will actually be placed)
         selected_ring = self.pending_action_dict["dst"]
-
-        # Handle both enriched (list-of-dicts) and legacy (list-of-strings) formats
-
-        # Enriched format with scores - highlight each position with its score
-        for pos_dict in placement_positions:
-            pos_str = pos_dict['pos']
-            score = pos_dict.get('score', 1.0)
-
-            # Skip positions below visibility threshold in heatmap mode
-            if self.highlight_choices == 'heatmap' and score < self.min_threshold:
-                continue
-
-            # The selected position gets EXTENDED duration and transitions to FULL color
-            # Other positions fade out after the first phase
-            is_selected = (pos_str == selected_ring)
-
-            if is_selected:
-                # Selected position: show score-based color, then blend to full color
-                # Material starts at score-based color, ends at DARK_GREEN
-                material_mod = self._interpolate_material(
-                    score,
-                    DARK_GREEN_MATERIAL_MOD,  # MAX: full color for high scores
-                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
-                )
-                # Extended duration to cover both phases
-                duration = (
-                    self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS] +
-                    self.highlight_durations[self.PHASE_SELECTED_PLACEMENT]
-                )
-            else:
-                # Non-selected positions: just show score-based color then fade out
-                material_mod = self._interpolate_material(
-                    score,
-                    DARK_GREEN_MATERIAL_MOD,  # MAX: full color for high scores
-                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
-                )
-                duration = self.highlight_durations[self.PHASE_PLACEMENT_HIGHLIGHTS]
-
-            self.renderer.queue_highlight(
-                rings=[pos_str],
-                material_mod=material_mod,
-                duration=duration,
-                defer=self.start_delay,
-            )
+        self._queue_position_highlights(
+            placement_positions,
+            selected_ring,
+            DARK_GREEN_MATERIAL_MOD,
+            self.PHASE_PLACEMENT_HIGHLIGHTS,
+            self.PHASE_SELECTED_PLACEMENT,
+            self.task_delay_time,
+            defer=self.start_delay
+        )
 
     def _queue_removal_highlights(self, removal_positions, defer=0):
         """Queue highlights for all valid removal positions for this action.
@@ -231,54 +291,16 @@ class ActionVisualizationSequencer:
                 OR legacy format: ['A1', 'B2', ...] (treated as uniform)
             defer: Delay before starting the highlight (seconds)
         """
-        if not removal_positions:
-            return
-
-        # Get the selected removal position (the one that will actually be removed)
         selected_removal = self.pending_action_dict.get("remove")
-
-        # Handle both enriched (list-of-dicts) and legacy (list-of-strings) formats
-
-        # Enriched format with scores - highlight each position with its score
-        for pos_dict in removal_positions:
-            pos_str = pos_dict['pos']
-            score = pos_dict.get('score', 1.0)
-
-            # Skip positions below visibility threshold in heatmap mode
-            if self.highlight_choices == 'heatmap' and score < self.min_threshold:
-                continue
-
-            # The selected position gets EXTENDED duration and stays highlighted
-            # Other positions fade out after the first phase
-            is_selected = (pos_str == selected_removal)
-
-            if is_selected:
-                # Selected position: show score-based color during extended duration
-                material_mod = self._interpolate_material(
-                    score,
-                    DARK_RED_MATERIAL_MOD,  # MAX: full color for high scores
-                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
-                )
-                # Extended duration to cover both phases
-                duration = (
-                    self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS] +
-                    self.highlight_durations[self.PHASE_SELECTED_REMOVAL]
-                )
-            else:
-                # Non-selected positions: just show score-based color then fade out
-                material_mod = self._interpolate_material(
-                    score,
-                    DARK_RED_MATERIAL_MOD,  # MAX: full color for high scores
-                    WHITE_MATERIAL_MOD,  # MIN: pale for low scores
-                )
-                duration = self.highlight_durations[self.PHASE_REMOVAL_HIGHLIGHTS]
-
-            self.renderer.queue_highlight(
-                rings=[pos_str],
-                duration=duration,
-                material_mod=material_mod,
-                defer=defer,
-            )
+        self._queue_position_highlights(
+            removal_positions,
+            selected_removal,
+            DARK_RED_MATERIAL_MOD,
+            self.PHASE_REMOVAL_HIGHLIGHTS,
+            self.PHASE_SELECTED_REMOVAL,
+            self.task_delay_time,
+            defer=defer
+        )
 
 
     def _queue_capture_highlights(self, capture_moves):
@@ -322,13 +344,8 @@ class ActionVisualizationSequencer:
             # Highlight the source marble and all its possible destinations
             highlight_rings = [src_str] + list(destinations)
 
-            # Interpolate material based on score
-            # High scores → DARK_BLUE, low scores → WHITE (pale blue)
-            material_mod = self._interpolate_material(
-                score,
-                DARK_BLUE_MATERIAL_MOD,  # MAX: full color for high scores
-                WHITE_MATERIAL_MOD,  # MIN: pale for low scores
-            )
+            # Use blue color with alpha based on score
+            material_mod = self._interpolate_material(score, DARK_BLUE_MATERIAL_MOD)
             self.renderer.queue_highlight(
                 highlight_rings,
                 capture_duration,
@@ -341,49 +358,39 @@ class ActionVisualizationSequencer:
     def _on_placement_highlights_done(self):
         """Handle completion of placement highlights phase.
 
-        The selected ring's extended-duration highlight continues through this phase,
-        so no additional highlighting is needed here.
+        All animations (marble placement, removal highlights, ring removal) are already queued.
+        Just advance to next phase to continue waiting for animations to complete.
         """
-        # No need to queue another highlight - the selected position's
-        # extended-duration highlight from _queue_placement_highlights() is still active
         self.phase = self.PHASE_SELECTED_PLACEMENT
 
     def _on_selected_placement_done(self, task):
-        """Handle completion of selected placement highlight phase."""
-        player = self.pending_player
-        action_dict = self.pending_action_dict
+        """Handle completion of selected placement highlight phase.
 
-        # Animate marble placement (action already executed by controller)
-        self.renderer.show_marble_placement(player, action_dict, self.task_delay_time)
-
-        # Queue removal highlights AFTER marble placement animation completes
-        # task_delay_time already contains the animation duration from controller
+        All animations (marble placement, removal highlights, ring removal) are already queued.
+        Just advance to next phase to continue waiting for animations to complete.
+        """
+        # Check if there are removal positions - if so, wait for removal highlights
         if self.removal_positions:
-            self._queue_removal_highlights(
-                self.removal_positions, defer=self.task_delay_time
-            )
-
-        # Move to removal highlights phase
-        self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
+            self.phase = self.PHASE_REMOVAL_HIGHLIGHTS
+        else:
+            # No removal, so we're done (just waiting for animations to finish)
+            self.phase = self.PHASE_ANIMATING
 
     def _on_removal_highlights_done(self):
         """Handle completion of removal highlights phase.
 
-        The selected ring's extended-duration highlight continues through this phase,
-        so no additional highlighting is needed here.
+        All animations (ring removal) are already queued.
+        Just advance to next phase to continue waiting for animations to complete.
         """
-        # No need to queue another highlight - the selected position's
-        # extended-duration highlight from _queue_removal_highlights() is still active
         self.phase = self.PHASE_SELECTED_REMOVAL
 
     def _on_selected_removal_done(self, task):
-        """Handle completion of selected removal highlight phase."""
-        action_dict = self.pending_action_dict
+        """Handle completion of selected removal highlight phase.
 
-        # Now animate ring removal only (marble was already placed)
-        self.renderer.show_ring_removal(action_dict, self.task_delay_time)
-
-        # Wait for final move animations to complete
+        All animations (ring removal) are already queued.
+        Just advance to final phase to wait for animations to complete.
+        """
+        # Ring removal was already queued in start(), so just move to final phase
         self.phase = self.PHASE_ANIMATING
 
     def _on_capture_highlights_done(self):

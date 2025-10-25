@@ -49,6 +49,7 @@ class HighlightingManager:
         duration,
         material_mod=None,
         defer=0,
+        entity_type=None,
     ):
         """Add a highlight to the queue.
 
@@ -57,6 +58,8 @@ class HighlightingManager:
             duration: How long to show highlight in seconds
             material_mod: MaterialModifier object (defaults to DARK_GREEN_MATERIAL_MOD)
             defer: Delay before starting (seconds)
+            entity_type: Optional entity type to force ('ring', 'marble', etc.)
+                        If None, uses auto-discovery
         """
         # Use default material if none provided
         if material_mod is None:
@@ -68,6 +71,7 @@ class HighlightingManager:
             entities=rings,
             duration=duration,
             material_mod=material_mod,
+            entity_type=entity_type,
         )
 
     def is_active(self):
@@ -176,16 +180,23 @@ class HighlightingManager:
         Args:
             highlight_info: Dict with 'entities', 'duration', 'material_mod',
                           'start_time', 'end_time' (timing already set by update loop)
+                          Optional 'entity_type' to force a specific entity type
         """
 
         entities_list = highlight_info.get("entities", [])
+        forced_entity_type = highlight_info.get("entity_type")
 
         # Store original materials and what type was highlighted
         original_materials = {}
 
         for pos_str in entities_list:
-            # Discover entity and its type from position string
-            entity, entity_type = EntityResolver.discover(self.renderer, pos_str)
+            # Use forced entity type if provided, otherwise discover
+            if forced_entity_type:
+                entity = EntityResolver.resolve(self.renderer, pos_str, forced_entity_type)
+                entity_type = forced_entity_type
+            else:
+                entity, entity_type = EntityResolver.discover(self.renderer, pos_str)
+
             if entity is not None:
                 # Save original material properties for blending
                 saved_material = MaterialManager.save_material(entity)

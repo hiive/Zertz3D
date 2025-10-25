@@ -1314,6 +1314,7 @@ class PandaRenderer(ShowBase):
         duration,
         material_mod=None,
         defer=0,
+        entity_type=None,
     ):
         """Add a highlight to the queue.
 
@@ -1322,9 +1323,10 @@ class PandaRenderer(ShowBase):
             duration: How long to show highlight in seconds
             material_mod: Material object (defaults to PLACEMENT_HIGHLIGHT_MATERIAL)
             defer: Delay before starting (seconds)
+            entity_type: Optional entity type to force ('ring', 'marble', etc.)
         """
         # Delegate to highlighting_manager
-        self.highlighting_manager.queue_highlight(rings, duration, material_mod, defer)
+        self.highlighting_manager.queue_highlight(rings, duration, material_mod, defer, entity_type)
 
     def is_animation_active(self):
         """Check if any animations (move/freeze/highlight) are active or queued."""

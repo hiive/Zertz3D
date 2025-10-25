@@ -286,11 +286,11 @@ def random_search(
     """
     Perform random search over hyperparameter space.
 
-    Samples random configurations from:
-    - exploration_constant: uniform[0.7, 2.5] (focused around √2 ≈ 1.41)
-    - fpu_reduction: 40% None, 60% uniform[0.05, 0.5]
-    - max_simulation_depth: None (full game)
-    - widening_constant: 40% None, 60% uniform[4.0, 20.0]
+    IMPROVED FOCUSED SEARCH - Based on overnight tuning showing 70% win rate:
+    - exploration_constant: uniform[1.0, 2.5] (wider range, overnight showed 1.187-2.391 all competitive)
+    - fpu_reduction: 70% enabled with uniform[0.05, 0.50] (wider range, overnight showed 0.085-0.487 work)
+    - max_simulation_depth: NOW EXPLORED! 30% chance of limited depth [15, 20, 25, 30, 40]
+    - widening_constant: 60% enabled with uniform[5.0, 20.0] (overnight showed 8-19 range)
     """
     rng = np.random.RandomState(seed)
     results = []
@@ -300,21 +300,27 @@ def random_search(
         print(f"Each config: {games_per_config} games, {iterations} iterations/move\n")
 
     for sample_num in range(num_samples):
-        # Sample hyperparameters with refined ranges
-        # Exploration: focus on reasonable values around √2 ≈ 1.41
-        exploration = rng.uniform(0.7, 2.5)
+        # Sample hyperparameters - IMPROVED FOCUSED search with BROADER ranges
+        # Top overnight performers: exploration 1.187-2.391, FPU 0.085-0.487, widening 8-19
 
-        # FPU reduction: 40% None, 60% in reasonable range
-        use_fpu = rng.rand() < 0.6
-        fpu = rng.uniform(0.05, 0.5) if use_fpu else None
+        # Exploration: broader range [1.0, 2.5] based on overnight results
+        exploration = rng.uniform(1.0, 2.5)
 
-        # Max depth: full game (could explore limited depth in future)
-        depth = None
+        # FPU reduction: 70% enabled, WIDER range [0.05, 0.50] to capture overnight diversity
+        use_fpu = rng.rand() < 0.70
+        fpu = rng.uniform(0.05, 0.50) if use_fpu else None
 
-        # Progressive widening: 40% None, 60% with refined range
-        # Lower values (3-8) = aggressive widening, higher (8-20) = conservative
-        use_widening = rng.rand() < 0.6
-        widening = rng.uniform(4.0, 20.0) if use_widening else None
+        # Max depth: NOW EXPLORED! 30% chance of limited depth for speed/exploration tradeoff
+        use_depth_limit = rng.rand() < 0.30
+        if use_depth_limit:
+            # Try various depths: 15, 20, 25, 30, 40 moves
+            depth = rng.choice([15, 20, 25, 30, 40])
+        else:
+            depth = None  # Full game
+
+        # Progressive widening: 60% enabled, range [5.0, 20.0] based on overnight
+        use_widening = rng.rand() < 0.60
+        widening = rng.uniform(5.0, 20.0) if use_widening else None
 
         hyperparams = MCTSHyperparams(
             exploration_constant=exploration,
