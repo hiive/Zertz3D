@@ -31,9 +31,246 @@ class ActionVisualizationSequencer:
         self.active = False  # Whether sequencer is currently active
         self.start_delay = renderer.start_delay
 
+        # Thinking phase state
+        self.thinking_active = False
+        self.thinking_highlights = {}  # {pos_str: (entity, entity_type, original_material)}
+
     def is_active(self):
         """Check if the sequencer is currently active."""
         return self.active
+
+    def on_mcts_event(self, event: dict):
+        """Handle MCTS search events for thinking visualization.
+
+        Args:
+            event: Event dict from Rust MCTS with keys:
+                - 'event': 'SearchStarted' | 'SearchProgress' | 'SearchEnded'
+                - Additional data depending on event type
+        """
+        event_type = event['event']
+
+        if event_type == 'SearchStarted':
+            self._on_search_started(event)
+        elif event_type == 'SearchProgress':
+            self._on_search_progress(event)
+        elif event_type == 'SearchEnded':
+            self._on_search_ended(event)
+
+    def _on_search_started(self, event):
+        """Start thinking phase visualization.
+
+        Minimal setup - clears previous highlights and marks phase as active.
+        Highlights will be applied by the first SearchProgress event.
+
+        Args:
+            event: SearchStarted event with:
+                - 'total_iterations': total number of MCTS iterations
+        """
+        # Skip if renderer window isn't open yet (first move before rendering starts)
+        if not hasattr(self.renderer, 'win') or not self.renderer.win:
+            return
+
+        # Clear ALL highlights from previous action execution phase
+        # This includes queued and active highlights from placement/removal/capture
+        self.renderer.highlighting_manager.clear()
+
+        # Also clear ALL context highlights (including previous thinking highlights)
+        self.renderer.highlighting_manager.clear_context_highlights(None)
+
+        # Mark thinking phase as active - that's all we need to do
+        # SearchProgress will handle the actual highlighting
+        self.thinking_active = True
+        self.thinking_highlights = {}
+
+    def _on_search_progress(self, event):
+        """Update thinking phase highlights based on current MCTS scores.
+
+        Directly modifies materials on active thinking highlights (no fade animations).
+
+        Args:
+            event: SearchProgress event with:
+                - 'iteration': current iteration number
+                - 'action_stats': list of (action_type, action_data, score) tuples
+                    Same format as get_last_action_scores():
+                    [('PUT', (marble_type, dst_flat, rem_flat), 0.8), ...]
+        """
+        if not self.thinking_active:
+            return
+
+        # Let Panda3D render a frame to keep the visualization responsive
+        # This is critical - without this, the entire app freezes during MCTS search
+        # We only need to render graphics - taskMgr is already running (that's how we got here)
+        if hasattr(self.renderer, 'graphicsEngine') and self.renderer.graphicsEngine:
+            # Render a frame to update the display
+            self.renderer.graphicsEngine.renderFrame()
+        # Convert action_stats list to dict for enrichment methods
+        action_stats = event.get('action_stats', [])
+        iteration = event.get('iteration', 0)
+
+        # Apply an overall brightness multiplier based on search progress
+        # Early iterations should be very dim, later iterations brighter
+        # This shows increasing confidence as the search progresses
+        total_iterations = event.get('total_iterations', 50000)
+        progress = min(1.0, iteration / min(5000, total_iterations * 0.5))  # Ramp up over first half or 5000 iters
+        overall_brightness = progress # 0.05 + (0.95 * progress)  # Scale from 5% to 100% brightness
+
+        action_scores = {(action_type, action_data): score
+                        for action_type, action_data, score in action_stats}
+
+        # We need access to the game to use enrichment methods
+        # The renderer should have a reference to the game through the board
+        # For now, we'll calculate position scores directly from action_scores
+
+        # Extract placement, removal, and capture scores by position
+        placement_scores = {}  # {pos_str: max_score}
+        removal_scores = {}    # {pos_str: max_score}
+
+        width = event.get('board_width', 7)
+
+        # Process action scores to extract position-level scores
+        if hasattr(self.renderer, 'pos_array') and self.renderer.pos_array is not None:
+            pos_array = self.renderer.pos_array
+
+            for (action_type, action_data), score in action_scores.items():
+                if action_type == 'PUT' and action_data:
+                    marble_type, dst_flat, rem_flat = action_data
+
+                    # Convert dst_flat to position string
+                    dst_pos = self._flat_to_pos_str(dst_flat, width, pos_array)
+                    if dst_pos:
+                        placement_scores[dst_pos] = max(placement_scores.get(dst_pos, 0.0), score)
+
+                    # Convert rem_flat to position string (if not "no removal")
+                    if rem_flat < width * width:
+                        rem_pos = self._flat_to_pos_str(rem_flat, width, pos_array)
+                        if rem_pos:
+                            removal_scores[rem_pos] = max(removal_scores.get(rem_pos, 0.0), score)
+
+        # Update highlight materials based on scores
+        # We need to update the context highlights with new brightness
+
+        # Recalculate which positions are both placement AND removal
+        all_placement = set(placement_scores.keys())
+        all_removal = set(removal_scores.keys())
+        both_positions = all_placement & all_removal
+        only_placement = all_placement - both_positions
+        only_removal = all_removal - both_positions
+
+        # print(f"[DEBUG Progress] Converted {len(placement_scores)} placement, {len(removal_scores)} removal positions")
+
+        # Update highlights by applying individual materials per position based on scores
+        # We need to call set_context_highlights separately for each position to get different brightnesses
+
+        # Clear existing highlights first
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_placement")
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_removal")
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_both")
+
+        # Apply individual placement highlights with per-position scores
+        if only_placement:
+            for pos_str in only_placement:
+                score = placement_scores.get(pos_str, 0.5) * overall_brightness
+                material_mod = self._interpolate_material(score, DARK_GREEN_MATERIAL_MOD)
+                # Each position gets its own context subkey to avoid clearing others
+                self.renderer.highlighting_manager.set_context_highlights(
+                    f"thinking_placement_{pos_str}",
+                    [pos_str],
+                    material_mod,
+                )
+            # print(f"[DEBUG Progress] Applied {len(only_placement)} green highlights with individual scores")
+
+        # Apply individual removal highlights
+        if only_removal:
+            for pos_str in only_removal:
+                score = removal_scores.get(pos_str, 0.5) * overall_brightness
+                material_mod = self._interpolate_material(score, DARK_RED_MATERIAL_MOD)
+                self.renderer.highlighting_manager.set_context_highlights(
+                    f"thinking_removal_{pos_str}",
+                    [pos_str],
+                    material_mod,
+                )
+            # print(f"[DEBUG Progress] Applied {len(only_removal)} red highlights with individual scores")
+
+        # Apply individual "both" highlights with additive color blending
+        if both_positions:
+            for pos_str in both_positions:
+                placement_score = placement_scores.get(pos_str, 0.0) * overall_brightness
+                removal_score = removal_scores.get(pos_str, 0.0) * overall_brightness
+
+                # Get the individual color contributions
+                green_material = self._interpolate_material(placement_score, DARK_GREEN_MATERIAL_MOD)
+                red_material = self._interpolate_material(removal_score, DARK_RED_MATERIAL_MOD)
+
+                # Additively blend the colors (green + red = yellow when both are bright)
+                blended_material = MaterialModifier(
+                    highlight_color=(
+                        green_material.highlight_color[0] + red_material.highlight_color[0],
+                        green_material.highlight_color[1] + red_material.highlight_color[1],
+                        green_material.highlight_color[2] + red_material.highlight_color[2],
+                        1.0
+                    ),
+                    emission_color=(
+                        green_material.emission_color[0] + red_material.emission_color[0],
+                        green_material.emission_color[1] + red_material.emission_color[1],
+                        green_material.emission_color[2] + red_material.emission_color[2],
+                        1.0
+                    )
+                )
+
+                self.renderer.highlighting_manager.set_context_highlights(
+                    f"thinking_both_{pos_str}",
+                    [pos_str],
+                    blended_material,
+                )
+            # print(f"[DEBUG Progress] Applied {len(both_positions)} blended highlights with individual scores")
+
+        # Track highlighted positions for cleanup
+        self.thinking_highlights = {
+            'placement': only_placement,
+            'removal': only_removal,
+            'both': both_positions,
+        }
+
+    def _on_search_ended(self, event):
+        """End thinking phase and prepare for action execution.
+
+        Clears all thinking highlights immediately (no fade).
+
+        Args:
+            event: SearchEnded event with:
+                - 'total_iterations': final iteration count
+                - 'total_time_ms': total search time
+        """
+        if not self.thinking_active:
+            return
+
+        # Clear all thinking highlights immediately
+        self._clear_thinking_highlights()
+
+        # Mark thinking phase as inactive
+        self.thinking_active = False
+
+    def _clear_thinking_highlights(self):
+        """Remove all thinking phase highlights immediately."""
+        # Clear all thinking context highlights (both old bulk and new individual)
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_placement")
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_removal")
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_both")
+
+        # Also clear all individual position highlights
+        if 'placement' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['placement']:
+                self.renderer.highlighting_manager.clear_context_highlights(f"thinking_placement_{pos_str}")
+
+        if 'removal' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['removal']:
+                self.renderer.highlighting_manager.clear_context_highlights(f"thinking_removal_{pos_str}")
+
+        if 'both' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['both']:
+                self.renderer.highlighting_manager.clear_context_highlights(f"thinking_both_{pos_str}")
+
+        self.thinking_highlights.clear()
 
     def _queue_position_highlights(
         self,
@@ -81,6 +318,25 @@ class ActionVisualizationSequencer:
                 entity_type="ring",  # Force highlight on rings only, not marbles
             )
 
+    def _flat_to_pos_str(self, flat_idx: int, width: int, pos_array) -> str | None:
+        """Convert flat index to position string.
+
+        Args:
+            flat_idx: Flat index (y * width + x)
+            width: Board width
+            pos_array: Renderer's pos_array (2D array of position strings)
+
+        Returns:
+            Position string (e.g., 'B5') or None if invalid
+        """
+        try:
+            y = flat_idx // width
+            x = flat_idx % width
+            pos_str = str(pos_array[y][x])
+            return pos_str if pos_str and pos_str != '' else None
+        except:
+            return None
+
     def _interpolate_material(self, score: float, base_mod: MaterialModifier) -> MaterialModifier:
         """Create material modifier with alpha based on normalized score.
 
@@ -105,7 +361,6 @@ class ActionVisualizationSequencer:
         # Heat-map mode: use exponential scaling to exaggerate differences
         # score^3 makes low scores much dimmer while keeping high scores bright
         # Examples: 0.5^3=0.125, 0.7^3=0.343, 0.9^3=0.729, 1.0^3=1.0
-        # score = Random().uniform(0., 1.)
         brightness = score #** 3
 
         # Scale RGB values by brightness (alpha stays at 1.0 for full opacity)

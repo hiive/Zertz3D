@@ -63,12 +63,12 @@ class TuningResult:
         """Convert to dictionary for JSON serialization."""
         return {
             "hyperparams": self.hyperparams.to_dict(),
-            "win_rate": self.win_rate,
-            "games_played": self.games_played,
-            "wins": self.wins,
-            "losses": self.losses,
-            "ties": self.ties,
-            "mean_time_per_game": self.mean_time_per_game,
+            "win_rate": float(self.win_rate),
+            "games_played": int(self.games_played),
+            "wins": int(self.wins),
+            "losses": int(self.losses),
+            "ties": int(self.ties),
+            "mean_time_per_game": float(self.mean_time_per_game),
         }
 
 

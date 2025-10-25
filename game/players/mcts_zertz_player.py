@@ -25,7 +25,8 @@ class MCTSZertzPlayer(ZertzPlayer):
                  use_transposition_table=True, use_transposition_lookups=True,
                  time_limit=None, verbose=False, clear_table_each_move=True,
                  parallel='multiprocess', num_workers=16, backend='auto',
-                 rng_seed=None, widening_constant=None):
+                 rng_seed=None, widening_constant=None, progress_callback=None,
+                 progress_interval_ms=100):
         """Initialize MCTS player.
 
         Args:
@@ -45,6 +46,8 @@ class MCTSZertzPlayer(ZertzPlayer):
             backend: Backend to use: 'python', 'rust', or 'auto' (default: auto-detect)
             rng_seed: Optional integer seed used to initialize randomness for reproducible runs
             widening_constant: Progressive widening constant (None = disabled, e.g. 10.0 = moderate)
+            progress_callback: Optional callback for MCTS search progress (Rust backend only)
+            progress_interval_ms: Interval in milliseconds for progress updates (default: 100ms)
         """
         super().__init__(game, n)
 
@@ -67,6 +70,8 @@ class MCTSZertzPlayer(ZertzPlayer):
         self._python_rng_state = None
         self._python_random_state = None
         self._rust_seed_initialized = False
+        self.progress_callback = progress_callback
+        self.progress_interval_ms = progress_interval_ms
 
         if rng_seed is not None:
             python_rng = np.random.RandomState(rng_seed)
@@ -232,6 +237,8 @@ class MCTSZertzPlayer(ZertzPlayer):
             clear_table=self.clear_table_each_move,
             verbose=self.verbose,
             blitz=is_blitz,
+            progress_callback=self.progress_callback,
+            progress_interval_ms=self.progress_interval_ms if self.progress_callback else None,
         )
 
         # Run search (serial or parallel)

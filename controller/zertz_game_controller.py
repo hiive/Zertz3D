@@ -158,6 +158,9 @@ class ZertzGameController:
                 self.interaction_manager.handle_renderer_hover
             )
 
+        # Wire up MCTS thinking visualization callback
+        self._setup_mcts_callback()
+
         self.action_processor = ActionProcessor(self.renderer)
         self._game_loop = GameLoop(self, self.renderer, self.move_duration)
 
@@ -180,6 +183,27 @@ class ZertzGameController:
         if self.track_statistics:
             self.total_start_time = time.time()
             self.current_game_start_time = time.time()
+
+    def _setup_mcts_callback(self):
+        """Wire up MCTS thinking visualization callback to action_sequencer."""
+        if not self.renderer or not hasattr(self.renderer, 'action_visualization_sequencer'):
+            return
+
+        if not self.renderer.action_visualization_sequencer:
+            return
+
+        # Create callback that routes MCTS events to the action sequencer
+        def mcts_callback(event):
+            self.renderer.action_visualization_sequencer.on_mcts_event(event)
+
+        # Apply callback to any MCTS players
+        from game.players.mcts_zertz_player import MCTSZertzPlayer
+
+        if isinstance(self.session.player1, MCTSZertzPlayer):
+            self.session.player1.progress_callback = mcts_callback
+
+        if isinstance(self.session.player2, MCTSZertzPlayer):
+            self.session.player2.progress_callback = mcts_callback
 
     def _close_log_file(self):
         """Close the current log file and append final game state."""
@@ -209,6 +233,9 @@ class ZertzGameController:
 
         # Reset game session (creates new game instance and players)
         self.session.reset_game()
+
+        # Wire up MCTS callback for new players
+        self._setup_mcts_callback()
 
         # Reset renderer if present
         if self.renderer is not None:
