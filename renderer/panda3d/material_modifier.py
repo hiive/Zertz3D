@@ -50,6 +50,7 @@ class MaterialModifier:
         emission_color: Iterable[float],
         other: "MaterialModifier",
         blend_ratio: float,
+        blend_mask: Tuple[bool, bool, bool, bool] = (True, True, True, True),
     ) -> "MaterialModifier":
         return MaterialModifier.blend_vectors_with_vectors(
             highlight_color,
@@ -57,6 +58,7 @@ class MaterialModifier:
             other.highlight_color,
             other.emission_color,
             blend_ratio,
+            blend_mask,
         )
 
     @classmethod
@@ -67,10 +69,30 @@ class MaterialModifier:
         other_highlight_color: Iterable[float],
         other_emission_color: Iterable[float],
         blend_ratio: float,
+        blend_mask: Tuple[bool, bool, bool, bool] = (True, True, True, True),
     ) -> "MaterialModifier":
+        """Blend two color vectors with optional per-channel masking.
+
+        Args:
+            this_highlight_color: Source highlight color (RGBA)
+            this_emission_color: Source emission color (RGBA)
+            other_highlight_color: Target highlight color (RGBA)
+            other_emission_color: Target emission color (RGBA)
+            blend_ratio: Blend factor (0.0 = source, 1.0 = target)
+            blend_mask: Per-channel blend mask (R, G, B, A). True = blend, False = use target
+                       Default: (True, True, True, True) - blend all channels
+
+        Returns:
+            MaterialModifier with blended colors
+        """
         def _convert(t, o):
-            for i in range(len(t)):
-                yield t[i] + (o[i] - t[i]) * blend_ratio
+            for i in range(4):
+                if blend_mask[i]:
+                    # Blend this channel
+                    yield t[i] + (o[i] - t[i]) * blend_ratio
+                else:
+                    # Don't blend, use target value directly
+                    yield o[i]
 
         new_highlight_color = tuple(
             _convert(this_highlight_color, other_highlight_color)  # noqa

@@ -1,5 +1,5 @@
 # shellcheck disable=SC2164
-git submodule update --init --recursive rust
-git submodule update --remote
+#git submodule update --init --recursive rust
+#git submodule update --remote
 (cd rust && uv pip uninstall hiivelabs-zertz-mcts)
 bash -c 'source "$HOME/.cargo/env" && unset CONDA_PREFIX && (cd rust && cargo test && uv run python -m maturin develop --release)'

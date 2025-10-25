@@ -33,7 +33,6 @@ from shared.materials_modifiers import (
     DARK_RED_MATERIAL_MOD,
     DARK_BLUE_MATERIAL_MOD,
     CORNFLOWER_BLUE_MATERIAL_MOD,
-    BRIGHT_YELLOW_MATERIAL_MOD,
     GOLD_MATERIAL_MOD,
     ORANGE_MATERIAL_MOD,
     LIGHT_BLUE_MATERIAL_MOD,
@@ -57,7 +56,6 @@ class PandaRenderer(ShowBase):
     CAPTURE_POOL_MEMBER_OFFSET_X = 0.9 * BASE_SCALE_FACTOR
 
     # Animation timing
-    CAPTURE_FLASH_DURATION = 0.3  # Duration of yellow flash before capture
 
     # Shadow configuration
     SHADOW_MAP_RESOLUTION = 2048  # Resolution for shadow maps (higher = better quality, more VRAM)
@@ -922,96 +920,6 @@ class PandaRenderer(ShowBase):
         a_node.hide(BitMask32(1))
         self.render.setLight(a_node)
 
-    def _animate_marble_to_capture_pool(
-        self, captured_marble, src_pos_str, src_coords, player, marble_color, action_duration
-    ):
-        """Animate a captured marble moving to player's capture pool.
-
-        Args:
-            captured_marble: The marble entity to animate
-            src_pos_str: Source position string (e.g., 'D4') for flash highlight
-            src_coords: Source coordinates (where the marble is coming from)
-            player: Player capturing the marble
-            marble_color: Color of the captured marble ('w', 'g', or 'b')
-            action_duration: Animation duration (0 for instant positioning)
-        """
-        # Add to player's captured marbles
-        captured_marbles = self.capture_pools[player.n][marble_color]
-        captured_count = sum(
-            [len(k) for k in self.capture_pools[player.n].values()]
-        )
-        captured_marbles.append(captured_marble)
-
-        # Store current scale before configure (marble is at BOARD_MARBLE_SCALE)
-        current_scale = captured_marble.model.getScale()[0]  # Get current scale (uniform)
-
-        # Configure marble's metadata (tags, collision masks, etc.) which also sets target scale
-        captured_marble.configure_as_captured_marble(
-            player.n,
-            self._captured_key(captured_marble),
-            self.CAPTURED_MARBLE_SCALE
-        )
-        self._update_capture_marble_colliders()
-
-        # Clamp captured count if needed
-        if captured_count >= len(self.capture_pool_coords[player.n]):
-            if captured_count > len(self.capture_pool_coords[player.n]):
-                logger.error(
-                    f"Captured marbles count ({captured_count}) exceeds available coords ({len(self.capture_pool_coords[player.n])}) for player {player.n}"
-                )
-            captured_count = len(self.capture_pool_coords[player.n]) - 1
-
-        capture_pool_coords = self.capture_pool_coords[player.n][captured_count]
-
-        # Either instantly position or animate to capture pool
-        if action_duration == 0:
-            captured_marble.set_pos(capture_pool_coords)
-            captured_marble.set_scale(self.CAPTURED_MARBLE_SCALE)
-        else:
-            # Restore original scale so animation can interpolate from current → target
-            captured_marble.set_scale(current_scale)
-
-            # Wait for capturing marble to complete its jump before moving captured marble
-            capture_animation_defer = action_duration
-
-            # Apply yellow flash only if highlight_choices is enabled
-            if self.highlight_choices is not None:
-                # Use the marble's captured key to reference it in the highlighting system
-                marble_key = self._captured_key(captured_marble)
-
-                # Queue the flash highlight to start when capturing marble lands
-                self.queue_highlight(
-                    [marble_key],
-                    self.CAPTURE_FLASH_DURATION,
-                    material_mod=BRIGHT_YELLOW_MATERIAL_MOD,
-                    defer=action_duration,
-                )
-
-                # Defer the capture animation so it starts after the flash
-                capture_animation_defer = action_duration + self.CAPTURE_FLASH_DURATION
-
-            # Track this marble for reparenting when animation starts
-            # For now, get placeholder source coordinates (will be updated at animation start)
-            src_coords_local = captured_marble.get_pos()  # Current board-local position
-            src_coords_world_placeholder = self._board_local_to_world(src_coords_local)
-
-            # Queue animation - the src coordinates will be corrected when animation starts
-            self.animation_manager.queue_animation(
-                anim_type="move",
-                entity=captured_marble,
-                src=src_coords_world_placeholder,
-                dst=capture_pool_coords,
-                scale=self.CAPTURED_MARBLE_SCALE,
-                duration=action_duration,
-                defer=capture_animation_defer,
-            )
-
-            # Track this animation for reparenting at start time
-            self._board_to_world_animations[id(captured_marble)] = {
-                'marble': captured_marble,
-                'reparented': False,
-            }
-
     def show_isolated_removal(self, player, pos, marble_color, action_duration=0):
         """Animate removal of an isolated ring (with or without marble).
 
@@ -1042,8 +950,15 @@ class PandaRenderer(ShowBase):
             captured_marble = self.pos_to_marble.pop(pos)
             src_coords = captured_marble.get_pos()
 
-            self._animate_marble_to_capture_pool(
-                captured_marble, pos, src_coords, player, marble_color, action_duration
+            # For isolated removal, immediate animation
+            self._animate_captured_marble(
+                captured_marble,
+                pos,
+                src_coords,
+                player,
+                marble_color,
+                action_duration,
+                animation_defer=0.0,  # Start immediately
             )
 
     def show_marble_placement(self, player, action_dict, action_duration=0., delay=0.):
@@ -1120,6 +1035,161 @@ class PandaRenderer(ShowBase):
                 'dst_local': dst_coords_local,
             }
 
+    def _show_capture_action(self, player, render_data, action_duration=0.0):
+        """Execute a capture action with timing from render_data.
+
+        Args:
+            player: Player making the capture
+            render_data: RenderData with action_dict and timing info
+            action_duration: Base animation duration
+        """
+        action_dict = render_data.action_dict
+        timing = render_data.timing
+
+        # Extract positions
+        src_pos = action_dict["src"]
+        dst_pos = action_dict["dst"]
+        cap_pos = action_dict["cap"]
+        captured_marble_color = action_dict["capture"]
+
+        # Get coordinates
+        src_coords = self.pos_to_coords[src_pos]
+        dst_coords = self.pos_to_coords[dst_pos]
+        cap_coords = self.pos_to_coords[cap_pos]
+
+        # Move marbles in board state
+        capturing_marble = self.pos_to_marble.pop(src_pos)
+        captured_marble = self.pos_to_marble.pop(cap_pos)
+        self.pos_to_marble[dst_pos] = capturing_marble
+        capturing_marble.configure_as_board_marble(
+            dst_pos, self.BOARD_MARBLE_SCALE, f"board:{dst_pos}"
+        )
+
+        # Convert to board-local coordinates
+        src_coords_local = self._world_to_board_local(src_coords)
+        dst_coords_local = self._world_to_board_local(dst_coords)
+
+        # Get timing from render_data
+        capturing_defer = timing.get('capturing_marble_defer', 0.0)
+        captured_defer = timing.get('captured_marble_defer', 0.0)
+
+        # Animate capturing marble
+        if action_duration == 0:
+            capturing_marble.set_pos(dst_coords_local)
+        else:
+            self.animation_manager.queue_animation(
+                anim_type="move",
+                entity=capturing_marble,
+                src=src_coords_local,
+                dst=dst_coords_local,
+                scale=self.BOARD_MARBLE_SCALE,
+                duration=action_duration,
+                defer=capturing_defer,
+            )
+
+        # Configure and animate captured marble (flash handled by sequencer)
+        self._animate_captured_marble(
+            captured_marble,
+            cap_pos,
+            cap_coords,
+            player,
+            captured_marble_color,
+            action_duration,
+            captured_defer,
+        )
+
+    def _animate_captured_marble(
+        self,
+        captured_marble,
+        src_pos_str: str,
+        src_coords,
+        player,
+        marble_color: str,
+        action_duration: float,
+        animation_defer: float,
+    ):
+        """Animate a captured marble to player's pool.
+
+        Note: Yellow flash highlighting is handled by action_sequencer, not this method.
+
+        Args:
+            captured_marble: The marble entity
+            src_pos_str: Source position for reference (unused, kept for compatibility)
+            src_coords: Source coordinates (unused, kept for compatibility)
+            player: Capturing player
+            marble_color: Marble color ('w', 'g', or 'b')
+            action_duration: Animation duration
+            animation_defer: When captured marble starts moving to pool
+        """
+        # Add to player's captured marbles
+        captured_marbles = self.capture_pools[player.n][marble_color]
+        captured_count = sum([len(k) for k in self.capture_pools[player.n].values()])
+        captured_marbles.append(captured_marble)
+
+        # Store current scale before configure
+        current_scale = captured_marble.model.getScale()[0]
+
+        # Configure marble metadata
+        captured_key = self._captured_key(captured_marble)
+        captured_marble.configure_as_captured_marble(
+            player.n, captured_key, self.CAPTURED_MARBLE_SCALE
+        )
+        self._update_capture_marble_colliders()
+
+        # Clamp captured count
+        if captured_count >= len(self.capture_pool_coords[player.n]):
+            if captured_count > len(self.capture_pool_coords[player.n]):
+                logger.error(
+                    f"Captured marbles count ({captured_count}) exceeds available coords"
+                )
+            captured_count = len(self.capture_pool_coords[player.n]) - 1
+
+        capture_pool_coords = self.capture_pool_coords[player.n][captured_count]
+
+        # Either instant or animated
+        if action_duration == 0:
+            captured_marble.set_pos(capture_pool_coords)
+            captured_marble.set_scale(self.CAPTURED_MARBLE_SCALE)
+        else:
+            # Restore original scale for interpolation
+            captured_marble.set_scale(current_scale)
+
+            # Get placeholder coordinates for reparenting
+            src_coords_local = captured_marble.get_pos()
+            src_coords_world_placeholder = self._board_local_to_world(src_coords_local)
+
+            # Queue animation
+            self.animation_manager.queue_animation(
+                anim_type="move",
+                entity=captured_marble,
+                src=src_coords_world_placeholder,
+                dst=capture_pool_coords,
+                scale=self.CAPTURED_MARBLE_SCALE,
+                duration=action_duration,
+                defer=animation_defer,
+            )
+
+            # Track for reparenting
+            self._board_to_world_animations[id(captured_marble)] = {
+                "marble": captured_marble,
+                "reparented": False,
+            }
+
+    def _show_placement_remove_action(self, player, render_data, action_duration=0.0):
+        """Execute a PUT action (placement + optional ring removal).
+
+        Args:
+            player: Player making the placement
+            render_data: RenderData with action_dict and optional timing info
+            action_duration: Base animation duration
+        """
+        action_dict = render_data.action_dict
+
+        # Call the split methods (duration already scaled by controller)
+        self.show_marble_placement(player, action_dict, action_duration, self.start_delay)
+        self.show_ring_removal(action_dict, action_duration, self.start_delay)
+        self.start_delay = 0
+
     def show_ring_removal(self, action_dict, action_duration=0., delay=0.):
         """Remove a ring from the board (PUT action only).
 
@@ -1151,11 +1221,11 @@ class PandaRenderer(ShowBase):
                 self.removed_bases.append((base_piece, base_pos))
 
     def show_action(self, player, render_data, action_duration=0.0):
-        """Visualize an action without highlights.
+        """Visualize an action with optional timing from render_data.
 
         Args:
             player: Player making the move
-            render_data: RenderData value object containing action_dict
+            render_data: RenderData value object containing action_dict and optional timing
             action_duration: Animation duration
         """
         # Extract data from value objects
@@ -1170,52 +1240,25 @@ class PandaRenderer(ShowBase):
         if action == "PASS":
             return
 
-        # action_dict['marble']
-        dst = action_dict["dst"]
-        dst_coords = self.pos_to_coords[dst]
-
         if action == "PUT":
-            # Call the split methods (duration already scaled by controller)
-            self.show_marble_placement(player, action_dict, action_duration, self.start_delay)
-            self.show_ring_removal(action_dict, action_duration, self.start_delay)
-            self.start_delay = 0
+            self._show_placement_remove_action(player, render_data, action_duration)
         elif action == "CAP":
-            src = action_dict["src"]
-            src_coords = self.pos_to_coords[src]
-            cap = action_dict["cap"]
-            cap_coords = self.pos_to_coords[cap]
-            captured_marble_color = action_dict["capture"]
-            action_marble = self.pos_to_marble.pop(src)
-            captured_marble = self.pos_to_marble.pop(cap)
-            self.pos_to_marble[dst] = action_marble
-            action_marble.configure_as_board_marble(dst, self.BOARD_MARBLE_SCALE, f"board:{dst}")
-
-            # Convert world coordinates to board-local coordinates for marbles parented to board_node
-            src_coords_local = self._world_to_board_local(src_coords)
-            dst_coords_local = self._world_to_board_local(dst_coords)
-
-            if action_duration == 0:
-                action_marble.set_pos(dst_coords_local)
+            # Use timing-aware method if timing is present, otherwise use default timing
+            if render_data.timing:
+                self._show_capture_action(player, render_data, action_duration)
             else:
-                self.animation_manager.queue_animation(
-                    anim_type="move",
-                    entity=action_marble,
-                    src=src_coords_local,
-                    dst=dst_coords_local,
-                    scale=self.BOARD_MARBLE_SCALE,
-                    duration=action_duration,
-                    defer=0,
+                # Create default timing (old behavior)
+                default_timing_render_data = RenderData(
+                    action_dict,
+                    timing={
+                        'capturing_marble_defer': self.start_delay,
+                        'captured_marble_defer': self.start_delay + 2 * action_duration,
+                        'flash_captured_marble': False,
+                        'flash_defer': 0.0,
+                        'flash_duration': 0.5,
+                    }
                 )
-
-            # Animate captured marble to player's pool
-            self._animate_marble_to_capture_pool(
-                captured_marble,
-                cap,
-                cap_coords,
-                player,
-                captured_marble_color,
-                action_duration,
-            )
+                self._show_capture_action(player, default_timing_render_data, action_duration)
 
     def reset_board(self):
         # 1. Clear animations FIRST (before resetting visuals)
@@ -1297,7 +1340,7 @@ class PandaRenderer(ShowBase):
         )
 
         if self.highlight_choices is not None and self.action_visualization_sequencer:
-            # Start highlighting - pass render_data and action_result to state machine
+            # Start highlighting - pass render_data and action_result to sequencer
             self.action_visualization_sequencer.start(
                 player, render_data, task_delay_time
             )
@@ -1313,7 +1356,7 @@ class PandaRenderer(ShowBase):
         rings,
         duration,
         material_mod=None,
-        defer=0,
+        defer=0.,
         entity_type=None,
     ):
         """Add a highlight to the queue.

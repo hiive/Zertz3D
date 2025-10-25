@@ -277,7 +277,6 @@ class MCTSZertzPlayer(ZertzPlayer):
                 exploration_constant=self.exploration_constant,
                 max_simulation_depth=self.max_simulation_depth,
                 fpu_reduction=self.fpu_reduction,
-                widening_constant=self.widening_constant,
                 transposition_table=self.transposition_table,  # Creates per-process tables
                 use_transposition_lookups=self.use_transposition_lookups,
                 time_limit=self.time_limit,

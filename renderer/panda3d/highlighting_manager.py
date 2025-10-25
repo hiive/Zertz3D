@@ -30,7 +30,7 @@ class HighlightingManager:
         self._animation_id_counter = 0  # For generating unique IDs
         self._context_highlights: dict[str, dict] = {}
 
-    def queue_animation(self, anim_type="highlight", defer=0, **kwargs):
+    def _queue_animation(self, anim_type="highlight", defer=0, **kwargs):
         """Add a highlight animation to the queue.
 
         Args:
@@ -39,7 +39,6 @@ class HighlightingManager:
             **kwargs: Type-specific parameters
                 For 'highlight': entities (or rings), duration, material_mod
         """
-        # TODO: Remove this method - only used internally by queue_highlight()
         anim_item = {"type": anim_type, "defer": defer, **kwargs}
         self.animation_queue.put(anim_item)
 
@@ -65,7 +64,7 @@ class HighlightingManager:
         if material_mod is None:
             material_mod = DARK_GREEN_MATERIAL_MOD
 
-        self.queue_animation(
+        self._queue_animation(
             anim_type="highlight",
             defer=defer,
             entities=rings,
@@ -132,6 +131,12 @@ class HighlightingManager:
                 if task.time >= anim_item["start_time"]:
                     self._apply_highlight(anim_item)
 
+            # Check if this highlight found no entities to highlight
+            # Remove it immediately to avoid blocking the animation system
+            if "original_materials" in anim_item and len(anim_item["original_materials"]) == 0:
+                to_remove.append(anim_item)
+                continue
+
             # Check if animation hasn't started yet
             if task.time < anim_item["start_time"]:
                 continue
@@ -157,16 +162,14 @@ class HighlightingManager:
             pulse_factor = math.sin((elapsed_time / duration) * math.pi)
 
             # Update material for each entity in the highlight
-            for pos_str, (saved_material, entity_type) in original_materials.items():
-                entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
-                if entity is not None:
-                    # Update material colors in-place for pulsing effect (efficient!)
-                    MaterialManager.update_material_colors_inplace(
-                        entity,
-                        saved_material,
-                        target_material_mod,
-                        pulse_factor,
-                    )
+            for key, (saved_material, entity, entity_type, pos_str) in original_materials.items():
+                # Update material colors in-place for pulsing effect (efficient!)
+                MaterialManager.update_material_colors_inplace(
+                    entity,
+                    saved_material,
+                    target_material_mod,
+                    pulse_factor,
+                )
 
         # Remove completed highlight animations
         for anim_item in to_remove:
@@ -190,40 +193,61 @@ class HighlightingManager:
         original_materials = {}
 
         for pos_str in entities_list:
-            # Use forced entity type if provided, otherwise discover
-            if forced_entity_type:
-                entity = EntityResolver.resolve(self.renderer, pos_str, forced_entity_type)
-                entity_type = forced_entity_type
-            else:
-                entity, entity_type = EntityResolver.discover(self.renderer, pos_str)
+            # Use forced entity type if provided, otherwise discover all entities
+            entities = EntityResolver(self.renderer, pos_str, forced_entity_type)
 
-            if entity is not None:
+            # Highlight all entities found at this position
+            for entity, entity_type in entities:
+                # Use position+type as key to allow multiple entities per position
+                key = f"{pos_str}:{entity_type}"
                 # Save original material properties for blending
                 saved_material = MaterialManager.save_material(entity)
-                original_materials[pos_str] = (saved_material, entity_type)
+                original_materials[key] = (saved_material, entity, entity_type, pos_str)
 
         # Store original materials and target colors for later blending
         highlight_info["original_materials"] = original_materials
+
+        # If no entities were found, mark this highlight as completed immediately
+        # This prevents empty highlights from blocking the animation system
+        if not original_materials:
+            return
 
         material_mod = highlight_info.get(
             "material_mod", DARK_GREEN_MATERIAL_MOD
         )
         highlight_info["target_material_mod"] = material_mod
 
-        # Apply a NEW highlight material to each entity (we'll modify it in-place during pulsing)
-        for pos_str, (saved_material, entity_type) in original_materials.items():
-            entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
-            if entity is not None:
-                # Extract metallic/roughness from saved material
-                _, _, metallic, roughness = MaterialManager.get_material_properties(saved_material)
+        # Apply a zero-alpha version of the highlight material to each entity
+        # This will be our starting point for pulsing: 0 → score → 0
+        for key, (saved_material, entity, entity_type, pos_str) in original_materials.items():
+            # Extract metallic/roughness from saved material
+            _, _, metallic, roughness = MaterialManager.get_material_properties(saved_material)
 
-                # Create and apply a new material that we'll modify in-place during pulsing
-                MaterialManager.apply_material(
-                    entity,
-                    material_mod,
-                    metallic,
-                    roughness,
+            # Create a zero-alpha version of the target material for the pulse start
+            # This makes highlights pulse from invisible → score-based brightness → invisible
+            from renderer.panda3d.material_modifier import MaterialModifier
+            zero_alpha_material = MaterialModifier(
+                highlight_color=(
+                    material_mod.highlight_color[0],
+                    material_mod.highlight_color[1],
+                    material_mod.highlight_color[2],
+                    0.0  # Start invisible
+                ),
+                emission_color=(
+                    material_mod.emission_color[0],
+                    material_mod.emission_color[1],
+                    material_mod.emission_color[2],
+                    0.0  # Start invisible
                 )
+            )
+
+            # Apply the zero-alpha material (will pulse up to target's score-based alpha)
+            MaterialManager.apply_material(
+                entity,
+                zero_alpha_material,
+                metallic,
+                roughness,
+            )
 
     def _clear_highlight(self, highlight_info):
         """Clear a highlight and restore original materials.
@@ -233,11 +257,9 @@ class HighlightingManager:
         """
         original_materials = highlight_info.get("original_materials", {})
 
-        for pos_str, (saved_material, entity_type) in original_materials.items():
-            entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
-            if entity is not None:
-                # Restore original material
-                MaterialManager.restore_material(entity, saved_material)
+        for key, (saved_material, entity, entity_type, pos_str) in original_materials.items():
+            # Restore original material
+            MaterialManager.restore_material(entity, saved_material)
 
     def set_context_highlights(
         self,
@@ -269,14 +291,12 @@ class HighlightingManager:
         material_mod = highlight_info.get("material_mod", DARK_GREEN_MATERIAL_MOD)
         original_materials = highlight_info.get("original_materials", {})
 
-        for pos_str, (saved_material, entity_type) in original_materials.items():
-            entity = EntityResolver.resolve(self.renderer, pos_str, entity_type)
-            if entity is not None:
-                # Extract metallic/roughness from saved material
-                _, _, metallic, roughness = MaterialManager.get_material_properties(saved_material)
+        for key, (saved_material, entity, entity_type, pos_str) in original_materials.items():
+            # Extract metallic/roughness from saved material
+            _, _, metallic, roughness = MaterialManager.get_material_properties(saved_material)
 
-                # Apply highlight material (full intensity, no pulsing)
-                MaterialManager.apply_material(entity, material_mod, metallic, roughness)
+            # Apply highlight material (full intensity, no pulsing)
+            MaterialManager.apply_material(entity, material_mod, metallic, roughness)
 
     def clear_context_highlights(self, context: str | None = None) -> None:
         """Clear context highlights for a specific context or all contexts.

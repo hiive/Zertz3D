@@ -43,6 +43,7 @@ class RenderData:
         placement_positions=None,
         capture_moves=None,
         removal_positions=None,
+        timing=None,
     ):
         """Initialize render data.
 
@@ -51,6 +52,14 @@ class RenderData:
             placement_positions: List of placement position dicts or strings (default: empty list)
             capture_moves: List of capture move dicts (default: empty list)
             removal_positions: List of removal position dicts or strings (default: empty list)
+            timing: Optional dict with timing/flash info for action sequencer:
+                For CAP actions: {
+                    'capturing_marble_defer': float,  # Delay before capturing marble jumps
+                    'captured_marble_defer': float,   # Delay before captured marble moves to pool
+                    'flash_captured_marble': bool,    # Whether to flash captured marble yellow
+                    'flash_defer': float,              # When yellow flash starts
+                    'flash_duration': float,           # How long flash lasts
+                }
         """
         self.action_dict = action_dict
         self.placement_positions = (
@@ -60,6 +69,7 @@ class RenderData:
         self.removal_positions = (
             removal_positions if removal_positions is not None else []
         )
+        self.timing = timing if timing is not None else {}
 
     def __repr__(self):
         """String representation for debugging."""

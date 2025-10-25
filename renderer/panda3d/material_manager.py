@@ -139,12 +139,14 @@ class MaterialManager:
         # Extract original colors from saved material
         original_color, original_emission, _, _ = MaterialManager.get_material_properties(saved_material)
 
-        # Blend colors
+        # Blend all channels (RGBA) for pulsing effect
+        # Alpha pulses from original material's alpha → target's score-based alpha → original alpha
         blended_material_mod = MaterialModifier.blend_vectors_with_mod(
             original_color,
             original_emission,
             target_material_mod,
             blend_factor,
+            blend_mask=(True, True, True, True),  # Blend all channels including alpha
         )
 
         blended_color = LVector4(*blended_material_mod.highlight_color)
