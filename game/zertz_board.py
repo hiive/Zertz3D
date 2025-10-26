@@ -437,11 +437,11 @@ class ZertzBoard:
         )
 
         if action_type == "PUT":
-            return self.take_placement_action(action)
+            return self._take_placement_action(action)
         elif action_type == "CAP":
-            return self.take_capture_action(action)
+            return self._take_capture_action(action)
 
-    def take_placement_action(self, action):
+    def _take_placement_action(self, action):
         """Execute a placement action (delegates to stateless Rust implementation).
 
         Args:
@@ -515,9 +515,7 @@ class ZertzBoard:
             return captured_marbles if captured_marbles else None
         return None
 
-
-
-    def take_capture_action(self, action):
+    def _take_capture_action(self, action):
         # Capture actions have dimension (6 x w x w)
         # Translate the action dimensions into src_index, marble_type, cap_index and dst_index
         direction, y, x = action
@@ -601,10 +599,12 @@ class ZertzBoard:
         config = self._get_config()
         return zertz_logic.get_valid_actions(self.state, self.global_state, config)
 
+    #todo check
     def get_placement_shape(self):
         # get shape of placement moves as a tuple
         return 3, self.width**2, self.width**2 + 1
 
+    #todo check
     def get_capture_shape(self):
         # get shape of capture moves as a tuple
         return 6, self.width, self.width
@@ -625,6 +625,7 @@ class ZertzBoard:
         config = self._get_config()
         return zertz_logic.get_capture_moves(self.state, self.global_state, config)
 
+    #todo only used in test
     def _get_open_rings(self):
         """Return indices of all empty rings on the board.
 
@@ -633,14 +634,16 @@ class ZertzBoard:
         config = self._get_config()
         return zertz_logic.get_open_rings(self.state, config)
 
+    # todo unused
     def _is_removable(self, index):
         """Check if ring at index can be removed.
 
         Delegates to zertz_logic.is_removable() for zero code duplication.
         """
         config = self._get_config()
-        return zertz_logic.is_removable(index, self.state, config)
+        return zertz_logic.is_ring_removable(index, self.state, config)
 
+    # todo unused
     def _get_removable_rings(self):
         """Return list of removable ring indices.
 
@@ -648,130 +651,6 @@ class ZertzBoard:
         """
         config = self._get_config()
         return zertz_logic.get_removable_rings(self.state, config)
-
-    # ============================================================================
-    # LEGACY TRANSFORMATION SYSTEM (for ML action space symmetry)
-    # ============================================================================
-    # These methods operate on ACTION MASKS (numpy arrays) for ML training.
-    # They transform entire action space arrays to detect symmetric positions.
-    #
-    # DO NOT CONFUSE WITH: Modern axial coordinate transforms in zertz_logic.py
-    # which operate on INDIVIDUAL ACTIONS for game logic purposes.
-    #
-    # Use cases:
-    # - Legacy: Transform 3D action arrays for symmetry detection in neural nets
-    # - Modern: Transform individual action tuples for replay/notation systems
-    # ============================================================================
-
-    def _get_rotational_symmetries(self, state=None):
-        # Rotate the board 180 degrees
-        # Always copy to ensure immutability of self.state or passed state
-        state_to_rotate = np.copy(state if state is not None else self.state)
-        return np.rot90(np.rot90(state_to_rotate, axes=(1, 2)), axes=(1, 2))
-
-    def _get_mirror_symmetries(self, state=None):
-        # Flip the board while maintaining adjacency
-        # Always copy to ensure immutability of self.state or passed state
-        mirror_state = np.copy(state if state is not None else self.state)
-        layers = mirror_state.shape[0]
-        for i in range(layers):
-            mirror_state[i] = mirror_state[i].T
-        return mirror_state
-
-    def get_state_symmetries(self):
-        # Return a list of symmetrical states by mirroring and rotating the board
-        # noinspection PyListCreation
-        symmetries = []
-        symmetries.append((0, self._get_mirror_symmetries()))
-        symmetries.append((1, self._get_rotational_symmetries()))
-        symmetries.append((2, self._get_rotational_symmetries(symmetries[0][1])))
-        return symmetries
-
-    def _flat_to_2d(self, flat_index):
-        """Convert flat index to 2D board coordinates (y, x)."""
-        return flat_index // self.width, flat_index % self.width
-
-    def _2d_to_flat(self, y, x):
-        """Convert 2D board coordinates to flat index."""
-        return y * self.width + x
-
-    def _mirror_coords(self, y, x):
-        """Mirror coordinates by swapping x and y axes."""
-        return x, y
-
-    def _rotate_coords(self, y, x):
-        """Rotate coordinates 180 degrees around board center."""
-        # Universal formula that works for both odd and even widths
-        return (self.width - 1) - y, (self.width - 1) - x
-
-    def mirror_action(self, action_type, translated):
-        if action_type == "CAP":
-            # swap capture direction axes
-            temp = np.copy(translated)
-            translated[3], translated[1] = temp[1], temp[3]
-            translated[4], translated[0] = temp[0], temp[4]
-
-            # transpose location axes
-            d = translated.shape[0]
-            for i in range(d):
-                translated[i] = translated[i].T
-
-        elif action_type == "PUT":
-            temp = np.copy(translated)
-            _, put, rem = translated.shape
-            for p in range(put):
-                # Translate the put index
-                put_y, put_x = self._flat_to_2d(p)
-                new_put_y, new_put_x = self._mirror_coords(put_y, put_x)
-                new_p = self._2d_to_flat(new_put_y, new_put_x)
-                for r in range(rem - 1):
-                    # Translate the rem index
-                    rem_y, rem_x = self._flat_to_2d(r)
-                    new_rem_y, new_rem_x = self._mirror_coords(rem_y, rem_x)
-                    new_r = self._2d_to_flat(new_rem_y, new_rem_x)
-                    translated[:, new_p, new_r] = temp[:, p, r]
-
-                # The last rem index is the same
-                translated[:, new_p, rem - 1] = translated[:, new_p, rem - 1]
-
-        return translated
-
-    def rotate_action(self, action_type, translated):
-        if action_type == "CAP":
-            # swap capture direction axes
-            temp = np.copy(translated)
-            translated[3], translated[0] = temp[0], temp[3]
-            translated[4], translated[1] = temp[1], temp[4]
-            translated[5], translated[2] = temp[2], temp[5]
-
-            # rotate location axes using universal formula
-            temp = np.copy(translated)
-            _, y, x = temp.shape
-            for i in range(y):
-                new_i = (self.width - 1) - i
-                for j in range(x):
-                    new_j = (self.width - 1) - j
-                    translated[:, new_i, new_j] = temp[:, i, j]
-
-        if action_type == "PUT":
-            temp = np.copy(translated)
-            _, put, rem = translated.shape
-            for p in range(put):
-                # Translate the put index
-                put_y, put_x = self._flat_to_2d(p)
-                new_put_y, new_put_x = self._rotate_coords(put_y, put_x)
-                new_p = self._2d_to_flat(new_put_y, new_put_x)
-                for r in range(rem - 1):
-                    # Translate the rem index
-                    rem_y, rem_x = self._flat_to_2d(r)
-                    new_rem_y, new_rem_x = self._rotate_coords(rem_y, rem_x)
-                    new_r = self._2d_to_flat(new_rem_y, new_rem_x)
-                    translated[:, new_p, new_r] = temp[:, p, r]
-
-                # The last rem index is the same
-                translated[:, new_p, rem - 1] = translated[:, new_p, rem - 1]
-
-        return translated
 
     def _compute_label(self, index: tuple[int, int]) -> str:
         y, x = index
@@ -788,21 +667,17 @@ class ZertzBoard:
     def _ensure_positions_built(self) -> None:
         self.positions.ensure()
 
-    def _label_to_yx(self, index_str: str) -> tuple[int, int]:
+    def label_to_yx(self, index_str: str) -> tuple[int, int]:
         self._ensure_positions_built()
         pos = self.positions.get_by_label(index_str)
         if pos is None:
             raise ValueError(f"Coordinate '{index_str}' not found in board layout")
         return pos.yx
 
-    def _yx_to_label(self, index: tuple[int, int]) -> str:
+    def yx_to_label(self, index: tuple[int, int]) -> str:
         self._ensure_positions_built()
         pos = self.positions.get_by_yx(index)
         return pos.label if pos else ""
-
-    @property
-    def _positions(self):
-        return self.positions.by_yx
 
     @property
     def _positions_by_label(self):
@@ -817,7 +692,7 @@ class ZertzBoard:
         Convert a coordinate string like 'A1' (bottom numbering) to array indices (y, x).
         In this official layout, row numbers count upward from the bottom of the board.
         """
-        return self._label_to_yx(index_str)
+        return self.label_to_yx(index_str)
 
     def index_to_str(self, index):
         y, x = index
@@ -849,35 +724,21 @@ class ZertzBoard:
             raise ValueError(f"Axial coordinate {axial} is not on this board")
         return pos
 
-    # =========================  AXIAL COORDINATES  =========================
+    # =========================  CANONICALIZATION  =========================
 
     def _build_axial_maps(self):
+        """Ensure axial coordinate mappings are built (for canonicalization/tests)."""
         self._ensure_positions_built()
 
     @property
     def _yx_to_ax(self):
+        """Access (y,x) → (q,r) mapping (for canonicalization)."""
         return self.positions.yx_to_ax
 
     @property
     def _ax_to_yx(self):
+        """Access (q,r) → (y,x) mapping (for canonicalization)."""
         return self.positions.ax_to_yx
-
-    @staticmethod
-    def _ax_rot60(q, r, k=1):
-        """Rotate (q,r) by k * 60° counterclockwise in axial coords.
-
-        Works for both regular and doubled coordinates (for even-width boards).
-        """
-        k %= 6
-        for _ in range(k):
-            q, r = -r, q + r  # 60° CCW
-        return q, r
-
-    @staticmethod
-    def _ax_mirror_q_axis(q, r):
-        """Reflect (q,r) across the q-axis (cube: swap y and z)."""
-        # In cube coords (x=q, z=r, y=-q-r), mirror over q-axis => (x, z, y)
-        return q, -q - r
 
     def canonicalize_state(self, transforms=TransformFlags.ALL):
         """

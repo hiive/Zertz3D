@@ -203,8 +203,8 @@ class TestNotationWorkflow:
         c1_idx = board.str_to_index("C1")
         d4_y, d4_x = d4_idx
         c1_y, c1_x = c1_idx
-        d4_flat = board._2d_to_flat(d4_y, d4_x)
-        c1_flat = board._2d_to_flat(c1_y, c1_x)
+        d4_flat = d4_y * board.width + d4_x
+        c1_flat = c1_y * board.width + c1_x
 
         marble_idx = 0  # White marble
         action = (marble_idx, d4_flat, c1_flat)
@@ -263,8 +263,8 @@ class TestNotationWorkflow:
         # Prepare action: place marble at E4, remove D3 (isolates C1)
         e4_y, e4_x = e4_idx
         d3_y, d3_x = d3_idx
-        e4_flat = board._2d_to_flat(e4_y, e4_x)
-        d3_flat = board._2d_to_flat(d3_y, d3_x)
+        e4_flat = e4_y * board.width + e4_x
+        d3_flat = d3_y * board.width + d3_x
 
         action = (0, e4_flat, d3_flat)  # Use white marble
         action_str, action_dict = game.action_to_str("PUT", action)

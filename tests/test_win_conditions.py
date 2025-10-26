@@ -167,8 +167,8 @@ class TestWinConditions:
         e4_y, e4_x = e4_idx
         d3_y, d3_x = d3_idx
 
-        e4_flat = board._2d_to_flat(e4_y, e4_x)
-        d3_flat = board._2d_to_flat(d3_y, d3_x)
+        e4_flat = e4_y * board.width + e4_x
+        d3_flat = d3_y * board.width + d3_x
 
         # Use white marble for placement (index 0)
         placement_action = (0, e4_flat, d3_flat)
@@ -302,8 +302,8 @@ class TestWinConditions:
         e4_y, e4_x = e4_idx
         d3_y, d3_x = d3_idx
 
-        e4_flat = board._2d_to_flat(e4_y, e4_x)
-        d3_flat = board._2d_to_flat(d3_y, d3_x)
+        e4_flat = e4_y * board.width + e4_x
+        d3_flat = d3_y * board.width + d3_x
 
         # Use white marble for placement (index 0)
         placement_action = (0, e4_flat, d3_flat)
@@ -569,7 +569,7 @@ class TestWinConditions:
 
         # Player 1 places a marble on the last empty ring (D5)
         d5_y, d5_x = d5_idx
-        d5_flat = board._2d_to_flat(d5_y, d5_x)
+        d5_flat = d5_y * board.width + d5_x
 
         # Use black marble for placement (index 2), no removal (board is too small)
         placement_action = (2, d5_flat, board.width**2)
@@ -632,7 +632,7 @@ class TestWinConditions:
 
         # Player 2 places a marble on the last empty ring (D5)
         d5_y, d5_x = d5_idx
-        d5_flat = board._2d_to_flat(d5_y, d5_x)
+        d5_flat = d5_y * board.width + d5_x
 
         # Use gray marble for placement (index 1), no removal
         placement_action = (1, d5_flat, board.width**2)

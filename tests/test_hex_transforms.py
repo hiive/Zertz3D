@@ -279,7 +279,7 @@ class TestAllBoardSizes:
         min_dist = float("inf")
         center_pos = None
 
-        for pos in board._positions.values():
+        for pos in board.positions:
             y, x = pos.yx
             q, r = pos.axial
             dist = abs(y - center_y) + abs(x - center_x)
@@ -566,177 +566,7 @@ class TestSymmetryPatterns:
 
 
 class TestSpiralMirror:
-    # spiral tests
-    def test_mirror_transformation_with_spiral_pattern(self, small_board):
-        """
-        Test that mirror transformations produce geometrically correct reflections
-        using a spiral pattern that makes the transformation visually obvious.
-        """
-        small_board._build_axial_maps()
-
-        # Create a spiral pattern using different marble colors
-        # This creates a clockwise spiral from center outward
-        spiral_pattern = [
-            ("D4", 1),  # Center - white
-            ("E4", 2),  # Start spiral right - gray
-            ("E3", 3),  # Down-right - black
-            ("D3", 1),  # Down - white
-            ("C3", 2),  # Down-left - gray
-            ("C4", 3),  # Left - black
-            ("C5", 1),  # Up-left - white
-            ("D5", 2),  # Up - gray
-            ("E5", 3),  # Up-right - black
-            ("F4", 1),  # Right (outer ring) - white
-            ("F3", 2),  # Down-right (outer) - gray
-            ("F2", 3),  # Continue spiral - black
-        ]
-
-        # Create the base spiral pattern
-        base = np.copy(small_board.state)
-        for pos, marble_layer in spiral_pattern:
-            base[marble_layer, *small_board.str_to_index(pos)] = 1
-
-        # Test each candidate mirror transformation
-        mirror_candidates = [
-            ("current", lambda q, r: (q, -q - r)),
-            ("swap_qr", lambda q, r: (r, q)),
-            ("swap_qs", lambda q, r: (-q - r, r)),
-            ("negate_q", lambda q, r: (-q, r)),
-            ("negate_r", lambda q, r: (q, -r)),
-            ("swap_negate", lambda q, r: (-r, -q)),
-        ]
-
-        results = {}
-        for name, mirror_fn in mirror_candidates:
-            # Temporarily replace the mirror function
-            original = small_board._ax_mirror_q_axis
-            small_board._ax_mirror_q_axis = staticmethod(mirror_fn)
-
-            try:
-                # Apply the mirror transformation
-                mirrored = small_board.canonicalizer.transform_state_hex(base, mirror=True)
-
-                # Record where each marble ended up
-                pattern_after = []
-                for marble_type in [1, 2, 3]:
-                    positions = np.argwhere(mirrored[marble_type] == 1)
-                    for y, x in positions:
-                        pos_str = small_board.index_to_str((y, x))
-                        pattern_after.append((pos_str, marble_type))
-
-                # Sort for consistent comparison
-                pattern_after.sort()
-                results[name] = pattern_after
-
-                # Check if it's involutive (applying twice returns original)
-                double_mirrored = small_board.canonicalizer.transform_state_hex(
-                    mirrored, mirror=True
-                )
-                is_involutive = np.array_equal(double_mirrored, base)
-
-                # Check if it matches any rotation (it shouldn't for a true mirror)
-                matches_rotation = None
-                for k in range(6):
-                    rotated = small_board.canonicalizer.transform_state_hex(base, rot60_k=k)
-                    if np.array_equal(mirrored, rotated):
-                        matches_rotation = k * 60
-                        break
-
-                results[name] = {
-                    "pattern": pattern_after,
-                    "involutive": is_involutive,
-                    "matches_rotation": matches_rotation,
-                }
-
-            finally:
-                # Restore original function
-                small_board._ax_mirror_q_axis = original
-
-        # Verify properties of a true mirror
-        valid_mirrors = []
-        for name, result in results.items():
-            if result["involutive"] and result["matches_rotation"] is None:
-                valid_mirrors.append(name)
-
-        # At least one should be a valid mirror
-        assert len(valid_mirrors) > 0, (
-            "No candidate produces a valid mirror transformation. "
-            "All candidates either aren't involutive or match a rotation."
-        )
-
-        # The current implementation should be checked
-        current_result = results["current"]
-        if current_result["matches_rotation"] is not None:
-            pytest.fail(
-                f"Current mirror implementation is equivalent to a {current_result['matches_rotation']}° rotation, "
-                f"not a true reflection. Valid mirrors found: {valid_mirrors}"
-            )
-
-        assert current_result["involutive"], (
-            "Current mirror implementation is not involutive (applying twice doesn't return original)"
-        )
-
-    def test_mirror_produces_expected_spiral_reflection(self, small_board):
-        """
-        Test that the mirror transformation produces the expected reflection
-        of a spiral pattern through a specific axis.
-        """
-        small_board._build_axial_maps()
-
-        # Create a simple directional pattern (like an arrow pointing right)
-        arrow_pattern = [
-            ("D4", 1),  # Center
-            ("E4", 1),  # Right
-            ("F4", 1),  # Far right (arrow tip)
-            ("E5", 2),  # Upper part of arrow
-            ("E3", 2),  # Lower part of arrow
-        ]
-
-        base = np.copy(small_board.state)
-        for pos, marble_layer in arrow_pattern:
-            base[marble_layer, *small_board.str_to_index(pos)] = 1
-
-        # Apply mirror
-        mirrored = small_board.canonicalizer.transform_state_hex(base, mirror=True)
-
-        # For a vertical mirror (if that's what we have), the arrow should point left
-        # Check that F4 (rightmost) marble is now at B4 (leftmost)
-        # This is a specific expectation we can verify
-
-        # Find where the F4 marble ended up
-        original_f4 = small_board.str_to_index("F4")
-        was_marble_at_f4 = base[1, original_f4[0], original_f4[1]] == 1
-
-        if was_marble_at_f4:
-            # Find where white marbles are in the mirrored version
-            white_positions = np.argwhere(mirrored[1] == 1)
-            mirrored_positions = [
-                small_board.index_to_str(tuple(pos)) for pos in white_positions
-            ]
-
-            # Compute expected mirror target of F4 using axial transformation
-            f4_axial = small_board.position_from_label("F4").axial
-            mirrored_axial = small_board._ax_mirror_q_axis(*f4_axial)
-            expected_label = small_board.position_from_axial(mirrored_axial).label
-
-            # For a proper mirror, the pattern should be reflected
-            # The exact positions depend on which axis the mirror uses
-            # But it should NOT be the same as any rotation
-            for k in range(1, 6):  # Skip identity
-                rotated = small_board.canonicalizer.transform_state_hex(base, rot60_k=k)
-                assert not np.array_equal(mirrored, rotated), (
-                    f"Mirror result matches {k * 60}° rotation - not a true reflection!"
-                )
-
-            assert not np.array_equal(mirrored, base), (
-                "Mirror result is identical to original pattern; reflection failed"
-            )
-            assert expected_label in mirrored_positions, (
-                f"Expected mirrored arrow tip at {expected_label}, got {mirrored_positions}"
-            )
-            assert "F4" not in mirrored_positions, (
-                "Original arrow tip still present after mirror; pattern did not reflect"
-            )
+    """Tests for mirror transformation using spiral patterns to verify chirality."""
 
     def test_spiral_chirality_changes_under_mirror(self, small_board):
         """
@@ -858,7 +688,7 @@ class TestCanonicalTransform:
         Tests all board sizes (37, 48, 61 rings).
         """
         board = request.getfixturevalue(board_fixture)
-        board._build_axial_maps()
+        board._ensure_positions_built()
 
         # Create asymmetric test pattern using positions that exist on all board sizes
         base = np.copy(board.state)
@@ -1530,7 +1360,7 @@ class TestBoardSizeSymmetries:
     ):
         """Test that all transforms have inverses in the transform dictionary."""
         board = request.getfixturevalue(board_fixture)
-        board._build_axial_maps()
+        board._ensure_positions_built()
 
         transforms = dict(board.canonicalizer.get_all_symmetry_transforms())
 
@@ -1555,7 +1385,7 @@ class TestBoardSizeSymmetries:
     def test_all_transforms_are_involutive(self, request, board_fixture):
         """Test that applying any transform and its inverse returns to original."""
         board = request.getfixturevalue(board_fixture)
-        board._build_axial_maps()
+        board._ensure_positions_built()
 
         # Create asymmetric test pattern
         base = np.copy(board.state)

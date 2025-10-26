@@ -29,7 +29,7 @@ class ZertzPosition:
     @property
     def label(self) -> str:
         if self._label is None:
-            object.__setattr__(self, "_label", self.board._yx_to_label(self.yx))
+            object.__setattr__(self, "_label", self.board.yx_to_label(self.yx))
         return self._label  # type: ignore[attr-defined]
 
     @property
@@ -60,7 +60,7 @@ class ZertzPosition:
 
     @classmethod
     def from_label(cls, board: "ZertzBoard", label: str) -> "ZertzPosition":
-        y, x = board._label_to_yx(label)
+        y, x = board.label_to_yx(label)
         pos = cls.from_yx(board, (y, x))
         object.__setattr__(pos, "_label", label)
         return pos
@@ -98,8 +98,10 @@ class ZertzPositionCollection:
         self._build()
 
     def _build(self) -> None:
+        """Build position maps by delegating to Rust for axial coordinate computation."""
         board = self.board
 
+        # Determine the mask of valid positions
         if board.board_layout is not None:
             mask = board.board_layout.astype(bool)
         elif board.letter_layout is not None:
@@ -112,25 +114,16 @@ class ZertzPositionCollection:
             self._built = True
             return
 
-        c = board.width // 2
-        size = 1.0
+        # Delegate axial coordinate computation to Rust
+        from hiivelabs_zertz_mcts import build_axial_maps, BoardConfig
+
+        config = BoardConfig.standard_config(board.rings, board.t)
+        layout = mask.tolist()  # Convert numpy bool array to Python list
+        yx_to_ax_rust, ax_to_yx_rust = build_axial_maps(config, layout)
+
+        # Convert Rust maps (which use i32) to Python tuples
+        # Also compute cartesian coordinates for positions
         sqrt3 = np.sqrt(3)
-
-        records = []
-        for y, x in zip(ys, xs):
-            label = board._compute_label((y, x))
-            if not label:
-                continue
-            q = x - c
-            r = y - x
-            xc = size * sqrt3 * (q + r / 2.0)
-            yc = size * 1.5 * r
-            records.append((y, x, label, q, r, xc, yc))
-
-        xc_center = sum(rec[5] for rec in records) / len(records)
-        yc_center = sum(rec[6] for rec in records) / len(records)
-        q_center = (sqrt3 / 3.0) * xc_center - (1.0 / 3.0) * yc_center
-        r_center = (2.0 / 3.0) * yc_center
         scale = 3 if board.rings == board.MEDIUM_BOARD_48 else 1
         board._coord_scale = scale
 
@@ -142,19 +135,29 @@ class ZertzPositionCollection:
         self._yx_to_ax.clear()
         self._ax_to_yx.clear()
 
-        for y, x, label, q, r, xc, yc in records:
-            q_centered = q - q_center
-            r_centered = r - r_center
-            q_adj = round(scale * q_centered)
-            r_adj = round(scale * r_centered)
-            axial = (q_adj, r_adj)
-            cart = (xc - xc_center, yc - yc_center)
+        # Copy Rust maps to our internal dictionaries
+        for (y, x), (q, r) in yx_to_ax_rust.items():
+            label = board._compute_label((y, x))
+            if not label:
+                continue
 
+            # Compute cartesian coordinates from centered axial coordinates
+            # Note: q, r are already centered and scaled by Rust
+            q_unscaled = q / scale
+            r_unscaled = r / scale
+            xc = sqrt3 * (q_unscaled + r_unscaled / 2.0)
+            yc = 1.5 * r_unscaled
+            cart = (xc, yc)
+
+            axial = (q, r)  # Already centered and scaled by Rust
+
+            # Create position object
             pos = ZertzPosition(board, y, x)
             object.__setattr__(pos, "_label", label)
             object.__setattr__(pos, "_axial", axial)
             object.__setattr__(pos, "_cartesian", cart)
 
+            # Store in lookup dictionaries
             self._by_yx[(y, x)] = pos
             self._by_label[label] = pos
             self._by_axial[axial] = pos

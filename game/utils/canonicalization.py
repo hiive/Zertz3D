@@ -8,11 +8,8 @@ Supports D6 (37/61 rings) and D3 (48 rings) dihedral group symmetries.
 from enum import Flag, auto
 import numpy as np
 
-# Import Rust axial transform primitives
-from hiivelabs_zertz_mcts import (
-    ax_rot60 as rust_ax_rot60,
-    ax_mirror_q_axis as rust_ax_mirror_q_axis,
-)
+# Import axial coordinate utilities from Rust
+from hiivelabs_zertz_mcts import ax_rot60, ax_mirror_q_axis
 
 
 class TransformFlags(Flag):
@@ -50,50 +47,6 @@ class CanonicalizationManager:
         """
         self.board = board
 
-    # =========================  SIMPLE SYMMETRY OPERATIONS  =========================
-
-    def get_rotational_symmetries(self, state=None):
-        """Rotate the board 180 degrees.
-
-        Args:
-            state: State array to rotate (default: board.state)
-
-        Returns:
-            Rotated state array
-        """
-        # Always copy to ensure immutability of self.state or passed state
-        state_to_rotate = np.copy(state if state is not None else self.board.state)
-        return np.rot90(np.rot90(state_to_rotate, axes=(1, 2)), axes=(1, 2))
-
-    def get_mirror_symmetries(self, state=None):
-        """Flip the board while maintaining adjacency.
-
-        Args:
-            state: State array to mirror (default: board.state)
-
-        Returns:
-            Mirrored state array
-        """
-        # Always copy to ensure immutability of self.state or passed state
-        mirror_state = np.copy(state if state is not None else self.board.state)
-        layers = mirror_state.shape[0]
-        for i in range(layers):
-            mirror_state[i] = mirror_state[i].T
-        return mirror_state
-
-    def get_state_symmetries(self):
-        """Return a list of symmetrical states by mirroring and rotating the board.
-
-        Returns:
-            List of (index, state) tuples for different symmetries
-        """
-        # noinspection PyListCreation
-        symmetries = []
-        symmetries.append((0, self.get_mirror_symmetries()))
-        symmetries.append((1, self.get_rotational_symmetries()))
-        symmetries.append((2, self.get_rotational_symmetries(symmetries[0][1])))
-        return symmetries
-
     # =========================  COORDINATE TRANSFORMATIONS  =========================
 
     def flat_to_2d(self, flat_index):
@@ -104,122 +57,11 @@ class CanonicalizationManager:
         """Convert 2D board coordinates to flat index."""
         return y * self.board.width + x
 
-    def mirror_coords(self, y, x):
-        """Mirror coordinates by swapping x and y axes."""
-        return x, y
-
-    def rotate_coords(self, y, x):
-        """Rotate coordinates 180 degrees around board center."""
-        # Universal formula that works for both odd and even widths
-        return (self.board.width - 1) - y, (self.board.width - 1) - x
-
-    # =========================  ACTION TRANSFORMATIONS  =========================
-
-    def mirror_action(self, action_type, translated):
-        """Apply mirror transformation to action array.
-
-        Args:
-            action_type: "CAP" or "PUT"
-            translated: Action array to transform
-
-        Returns:
-            Mirrored action array
-        """
-        if action_type == "CAP":
-            # swap capture direction axes
-            temp = np.copy(translated)
-            translated[3], translated[1] = temp[1], temp[3]
-            translated[4], translated[0] = temp[0], temp[4]
-
-            # transpose location axes
-            d = translated.shape[0]
-            for i in range(d):
-                translated[i] = translated[i].T
-
-        elif action_type == "PUT":
-            temp = np.copy(translated)
-            _, put, rem = translated.shape
-            for p in range(put):
-                # Translate the put index
-                put_y, put_x = self.flat_to_2d(p)
-                new_put_y, new_put_x = self.mirror_coords(put_y, put_x)
-                new_p = self._2d_to_flat(new_put_y, new_put_x)
-                for r in range(rem - 1):
-                    # Translate the rem index
-                    rem_y, rem_x = self.flat_to_2d(r)
-                    new_rem_y, new_rem_x = self.mirror_coords(rem_y, rem_x)
-                    new_r = self._2d_to_flat(new_rem_y, new_rem_x)
-                    translated[:, new_p, new_r] = temp[:, p, r]
-
-                # The last rem index is the same
-                translated[:, new_p, rem - 1] = translated[:, new_p, rem - 1]
-
-        return translated
-
-    def rotate_action(self, action_type, translated):
-        """Apply rotation transformation to action array.
-
-        Args:
-            action_type: "CAP" or "PUT"
-            translated: Action array to transform
-
-        Returns:
-            Rotated action array
-        """
-        if action_type == "CAP":
-            # swap capture direction axes
-            temp = np.copy(translated)
-            translated[3], translated[0] = temp[0], temp[3]
-            translated[4], translated[1] = temp[1], temp[4]
-            translated[5], translated[2] = temp[2], temp[5]
-
-            # rotate location axes using universal formula
-            temp = np.copy(translated)
-            _, y, x = temp.shape
-            for i in range(y):
-                new_i = (self.board.width - 1) - i
-                for j in range(x):
-                    new_j = (self.board.width - 1) - j
-                    translated[:, new_i, new_j] = temp[:, i, j]
-
-        if action_type == "PUT":
-            temp = np.copy(translated)
-            _, put, rem = translated.shape
-            for p in range(put):
-                # Translate the put index
-                put_y, put_x = self.flat_to_2d(p)
-                new_put_y, new_put_x = self.rotate_coords(put_y, put_x)
-                new_p = self._2d_to_flat(new_put_y, new_put_x)
-                for r in range(rem - 1):
-                    # Translate the rem index
-                    rem_y, rem_x = self.flat_to_2d(r)
-                    new_rem_y, new_rem_x = self.rotate_coords(rem_y, rem_x)
-                    new_r = self._2d_to_flat(new_rem_y, new_rem_x)
-                    translated[:, new_p, new_r] = temp[:, p, r]
-
-                # The last rem index is the same
-                translated[:, new_p, rem - 1] = translated[:, new_p, rem - 1]
-
-        return translated
-
     # =========================  AXIAL COORDINATES  =========================
 
     def build_axial_maps(self):
         """Ensure axial coordinate mappings are built."""
         self.board._ensure_positions_built()
-
-    @staticmethod
-    def ax_rot60(q, r, k=1):
-        """Rotate (q,r) by k * 60° counterclockwise in axial coords (delegates to Rust).
-
-        Works for both regular and doubled coordinates (for even-width boards).
-        """
-        return rust_ax_rot60(q, r, k)
-
-    @staticmethod
-    def ax_mirror_q_axis(q, r):
-        """Reflect (q,r) across the q-axis (cube: swap y and z) (delegates to Rust)."""
-        return rust_ax_mirror_q_axis(q, r)
 
     def transform_state_hex(self, state, rot60_k=0, mirror=False, mirror_first=False):
         """Apply rotation and/or mirror to the whole SPATIAL state.
@@ -232,20 +74,20 @@ class CanonicalizationManager:
         """
         self.build_axial_maps()
         out = np.zeros_like(state)
-        for (y, x), (q, r) in self.board._yx_to_ax.items():
+        for (y, x), (q, r) in self.board.positions.yx_to_ax.items():
             if mirror_first:
                 # Mirror first, then rotate (for R{k}M transforms)
                 if mirror:
-                    q2, r2 = self.ax_mirror_q_axis(q, r)
+                    q2, r2 = ax_mirror_q_axis(q, r)
                 else:
                     q2, r2 = q, r
-                q2, r2 = self.ax_rot60(q2, r2, rot60_k)
+                q2, r2 = ax_rot60(q2, r2, rot60_k)
             else:
                 # Rotate first, then mirror (for MR{k} transforms)
-                q2, r2 = self.ax_rot60(q, r, rot60_k)
+                q2, r2 = ax_rot60(q, r, rot60_k)
                 if mirror:
-                    q2, r2 = self.ax_mirror_q_axis(q2, r2)
-            dst = self.board._ax_to_yx.get((q2, r2))
+                    q2, r2 = ax_mirror_q_axis(q2, r2)
+            dst = self.board.positions.ax_to_yx.get((q2, r2))
             if dst is not None:
                 y2, x2 = dst
                 out[:, y2, x2] = state[:, y, x]
@@ -1107,13 +949,13 @@ class CanonicalizationManager:
             if mirror_first:
                 # Mirror first, then rotate (for R{k}M transforms)
                 if mirror:
-                    dq, dr = self.ax_mirror_q_axis(dq, dr)
-                dq, dr = self.ax_rot60(dq, dr, rot60_k)
+                    dq, dr = ax_mirror_q_axis(dq, dr)
+                dq, dr = ax_rot60(dq, dr, rot60_k)
             else:
                 # Rotate first, then mirror (for MR{k} transforms)
-                dq, dr = self.ax_rot60(dq, dr, rot60_k)
+                dq, dr = ax_rot60(dq, dr, rot60_k)
                 if mirror:
-                    dq, dr = self.ax_mirror_q_axis(dq, dr)
+                    dq, dr = ax_mirror_q_axis(dq, dr)
             dx2 = dq
             dy2 = dr + dq
             return (dy2, dx2)
@@ -1143,31 +985,31 @@ class CanonicalizationManager:
         out = np.zeros_like(cap_mask)
         dmap = self._dir_index_map(rot60_k, mirror, mirror_first)
 
-        for (y, x), (q, r) in self.board._yx_to_ax.items():
+        for (y, x), (q, r) in self.board.positions.yx_to_ax.items():
             # Apply translation to get translated position
             y_trans, x_trans = y + dy, x + dx
 
             # Get axial coordinates of translated position
-            if (y_trans, x_trans) not in self.board._yx_to_ax:
+            if (y_trans, x_trans) not in self.board.positions.yx_to_ax:
                 continue  # Translated position is not on the board
-            q_trans, r_trans = self.board._yx_to_ax[(y_trans, x_trans)]
+            q_trans, r_trans = self.board.positions.yx_to_ax[(y_trans, x_trans)]
 
             # Apply rotation/mirror to translated axial coordinates
             if mirror_first:
                 # Mirror first, then rotate (for R{k}M transforms)
                 if mirror:
-                    q2, r2 = self.ax_mirror_q_axis(q_trans, r_trans)
+                    q2, r2 = ax_mirror_q_axis(q_trans, r_trans)
                 else:
                     q2, r2 = q_trans, r_trans
-                q2, r2 = self.ax_rot60(q2, r2, rot60_k)
+                q2, r2 = ax_rot60(q2, r2, rot60_k)
             else:
                 # Rotate first, then mirror (for MR{k} transforms)
-                q2, r2 = self.ax_rot60(q_trans, r_trans, rot60_k)
+                q2, r2 = ax_rot60(q_trans, r_trans, rot60_k)
                 if mirror:
-                    q2, r2 = self.ax_mirror_q_axis(q2, r2)
+                    q2, r2 = ax_mirror_q_axis(q2, r2)
 
             # Convert back to (y, x) coordinates
-            dst = self.board._ax_to_yx.get((q2, r2))
+            dst = self.board.positions.ax_to_yx.get((q2, r2))
             if dst is None:
                 continue
             y2, x2 = dst
@@ -1195,22 +1037,22 @@ class CanonicalizationManager:
 
         # Build flat-index permutation for valid cells
         flat_map = {}  # src_flat -> dst_flat
-        for (y, x) in self.board._yx_to_ax.keys():
+        for (y, x) in self.board.positions.yx_to_ax.keys():
             # Apply translation to get translated position
             y_trans, x_trans = y + dy, x + dx
 
             # Get axial coordinates of translated position
-            if (y_trans, x_trans) not in self.board._yx_to_ax:
+            if (y_trans, x_trans) not in self.board.positions.yx_to_ax:
                 continue  # Translated position is not on the board
-            q_trans, r_trans = self.board._yx_to_ax[(y_trans, x_trans)]
+            q_trans, r_trans = self.board.positions.yx_to_ax[(y_trans, x_trans)]
 
             # Apply rotation/mirror to translated axial coordinates
-            q2, r2 = self.ax_rot60(q_trans, r_trans, rot60_k)
+            q2, r2 = ax_rot60(q_trans, r_trans, rot60_k)
             if mirror:
-                q2, r2 = self.ax_mirror_q_axis(q2, r2)
+                q2, r2 = ax_mirror_q_axis(q2, r2)
 
             # Convert back to (y, x) coordinates
-            dst = self.board._ax_to_yx.get((q2, r2))
+            dst = self.board.positions.ax_to_yx.get((q2, r2))
             if dst is None:
                 continue
             y2, x2 = dst

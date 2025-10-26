@@ -15,7 +15,7 @@ def test_put_allows_no_removal_when_sentinel_used():
     board.global_state[board.SUPPLY_B] = 0
 
     dest = board.str_to_index("D4")
-    put_loc = board._2d_to_flat(*dest)
+    put_loc = dest[0] * board.width + dest[1]
     no_removal = board.width**2
 
     rings_before = int(np.sum(board.state[board.RING_LAYER]))
@@ -71,7 +71,7 @@ def test_no_removable_rings_after_placement():
     rings_before = int(np.sum(board.state[board.RING_LAYER]))
 
     # Place marble at center position with no removal (width² sentinel)
-    put_loc = board._2d_to_flat(*center_pos)
+    put_loc = center_pos[0] * board.width + center_pos[1]
     no_removal = board.width**2
 
     # Get the action dict that would be generated
@@ -131,7 +131,7 @@ def test_board_full_last_move_awards_previous_player():
     board.global_state[board.P2_CAP_SLICE] = 0
     board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
-    put_loc = board._2d_to_flat(*last_ring)
+    put_loc = last_ring[0] * board.width + last_ring[1]
     no_removal = board.width**2
 
     # Player 1 makes the final placement (no removable rings remain)

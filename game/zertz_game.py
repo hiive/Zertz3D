@@ -436,46 +436,6 @@ class ZertzGame:
         # Fallback
         return f"Captured w={w}, g={g}, b={b}"
 
-    def get_symmetries(self, cur_state=None):
-        # There are many symmetries in Zertz
-        # First, there are rotational symmetry in that every board position can be rotated in
-        # six different ways
-        # Second, there are mirror symmetry with every rotation being able to be flipped
-        # Third, there are translational symmetries once the board has gotten small enough that
-        # it can be shifted in one of the six directions and still be able to fit within the
-        # original space.
-        # Total board symmetries = 6 * 2 * (# of shift symmetries)
-        # Total implemented currently = 4
-        if cur_state is None:
-            symmetries = self.board.get_state_symmetries()
-        else:
-            temp_game = ZertzGame(clone=self, clone_state=cur_state)
-            symmetries = temp_game.get_symmetries()
-        return symmetries
-
-    def translate_action_symmetry(self, action_type, symmetry, actions):
-        translated = np.copy(actions)
-        if len(translated.shape) != 3:
-            if action_type == "PUT":
-                translated = translated.reshape(self.get_placement_action_shape())
-            elif action_type == "CAP":
-                translated = translated.reshape(self.get_capture_action_shape())
-        if symmetry == 0:  # mirror
-            translated = self.board.mirror_action(action_type, translated)
-        elif symmetry == 1:  # rotated
-            translated = self.board.rotate_action(action_type, translated)
-        elif symmetry == 2:  # mirror/rotated
-            translated = self.board.mirror_action(action_type, translated)
-            translated = self.board.rotate_action(action_type, translated)
-        elif symmetry == 3:  # opponent
-            pass
-        elif symmetry == 4:  # opponent mirror
-            pass
-        elif symmetry == 5:  # opponent rotated
-            pass
-        elif symmetry == 6:  # opponent mirror/rotated
-            pass
-        return translated
 
     def str_to_action(self, action_str):
         # Translate an action string [i.e. 'PUT w A1 B2' or 'CAP b C4 g C2'] to a tuple/type

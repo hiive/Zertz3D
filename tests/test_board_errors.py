@@ -34,11 +34,10 @@ class TestBoardInitializationErrors:
             ZertzBoard(rings=99)
 
     def test_supported_hex_number_without_standard_layout(self):
-        """Test that boards with valid HEX_NUMBERS but non-standard sizes work."""
-        # 19 rings is in HEX_NUMBERS (19, 5) but not a standard board
-        board = ZertzBoard(rings=19)
-        assert board.rings == 19
-        assert board.width == 5
+        """Test that boards with valid HEX_NUMBERS but non-standard sizes raise error."""
+        # We only support standard board sizes: 37, 48, and 61
+        with pytest.raises(ValueError, match="Unsupported board size: 19 rings"):
+            ZertzBoard(rings=19)
 
 
 class TestPlacementActionErrors:

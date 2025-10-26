@@ -425,7 +425,7 @@ class TestBackwardCompatibility:
             direction, y, x = capture_indices[0]
 
             # Execute capture
-            captured = board.take_capture_action((direction, y, x))
+            captured = board._take_capture_action((direction, y, x))
 
             # Should have captured a marble
             # (Either returned value or state should reflect capture)

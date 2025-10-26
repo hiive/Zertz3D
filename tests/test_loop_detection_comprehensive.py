@@ -49,8 +49,8 @@ class TestLoopDetectionWithGameStates:
         # Then repeat: P1 at D4, P2 at E4, P1 at E4, P2 at D4
 
         # First pair of moves
-        d4_flat = board._2d_to_flat(*d4_pos)
-        e4_flat = board._2d_to_flat(*e4_pos)
+        d4_flat = d4_pos[0] * board.width + d4_pos[1]
+        e4_flat = e4_pos[0] * board.width + e4_pos[1]
         no_removal = board.width**2
 
         # P1 places white at D4 (no removal)

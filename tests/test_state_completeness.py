@@ -217,29 +217,6 @@ class TestStateCompleteness:
         assert placement.shape == (3, 49, 50)  # 3 x width² x (width² + 1)
         assert capture.shape == (6, 7, 7)  # 6 x width x width
 
-    def test_get_symmetries_with_cur_state(self):
-        """Test get_symmetries with explicit cur_state parameter."""
-        game = ZertzGame(rings=37)
-
-        # Get current state
-        state = game.get_current_state()
-        cur_state = np.copy(state["spatial"])
-
-        # Get symmetries using cur_state parameter
-        symmetries = game.get_symmetries(cur_state=cur_state)
-
-        assert isinstance(symmetries, list)
-        assert len(symmetries) > 0
-
-        # Each symmetry should be a tuple (index, state_array)
-        for sym in symmetries:
-            assert isinstance(sym, tuple)
-            assert len(sym) == 2
-            sym_idx, sym_state = sym
-            assert isinstance(sym_idx, int)
-            assert isinstance(sym_state, np.ndarray)
-            assert sym_state.shape == cur_state.shape
-
     def test_get_game_ended_with_cur_state(self):
         """Test get_game_ended with explicit cur_state parameter."""
         from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
