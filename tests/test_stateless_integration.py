@@ -238,7 +238,7 @@ class TestIsolationCaptureIntegration:
 
         # Now test stateless version
         config = board._get_config()
-        state_after_stateless, global_after_stateless = \
+        state_after_stateless, global_after_stateless, captured_list = \
             zertz_logic.check_for_isolation_capture(
                 state_before, global_before, config
             )
@@ -249,6 +249,14 @@ class TestIsolationCaptureIntegration:
 
         assert np.array_equal(global_after_stateful, global_after_stateless), \
             "Global state should match after isolation capture"
+
+        # Captured list should be consistent with returned value
+        if captured_marbles is not None:
+            assert len(captured_list) > 0, \
+                "Stateless function should return captured marbles when stateful method does"
+        else:
+            assert len(captured_list) == 0, \
+                "Stateless function should return empty list when no captures occur"
 
     def test_isolation_capture_return_value_format(self, game):
         """Test that isolation capture returns correctly formatted marble list."""

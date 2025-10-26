@@ -669,3 +669,8 @@ policy = PolicyHead(combined)
 - ✅ Check tournament rule (BOTH_LOSE when board full with zero captures)
 - ✅ Verify loop detection (is it possible?!) and consecutive passing.
 - Add flag for player moves like --show-coords
+- Other optimization for mcts.
+- Move coord stuff to rust.
+- Rename rust module
+- Move zertz specific stuff into zertz subfolder in rust.
+- Module constants: PLAYER_1 and PLAYER_2 need to be used from Python

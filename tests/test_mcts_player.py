@@ -5,7 +5,6 @@ import numpy as np
 from game.zertz_game import ZertzGame
 from game.players.mcts_zertz_player import MCTSZertzPlayer
 from game.zertz_player import RandomZertzPlayer
-from learner.mcts.backend import HAS_RUST
 
 
 class TestMCTSZertzPlayer:
@@ -142,8 +141,8 @@ class TestMCTSZertzPlayer:
         # Game should end (either win or tie)
         assert game.get_game_ended() is not None or move_count >= max_moves
 
-    @pytest.mark.skipif(not HAS_RUST, reason="Rust backend not available")
-    def test_rust_backend_respects_parameters(self):
+    def test_backend_respects_parameters(self):
+        """Test that MCTS player respects all parameters."""
         game = ZertzGame(rings=37)
         player = MCTSZertzPlayer(
             game,
@@ -156,15 +155,14 @@ class TestMCTSZertzPlayer:
             clear_table_each_move=True,
             parallel='thread',
             num_workers=2,
-            backend='rust',
             verbose=False,
         )
 
         action = player.get_action()
         assert action[0] in ["PUT", "CAP", "PASS"]
 
-    @pytest.mark.skipif(not HAS_RUST, reason="Rust backend not available")
-    def test_rust_transposition_persistence(self):
+    def test_transposition_persistence(self):
+        """Test that transposition table persists across moves when configured."""
         game = ZertzGame(rings=37)
         player = MCTSZertzPlayer(
             game,
@@ -173,7 +171,6 @@ class TestMCTSZertzPlayer:
             use_transposition_table=True,
             use_transposition_lookups=True,
             clear_table_each_move=False,
-            backend='rust',
             verbose=False,
         )
 

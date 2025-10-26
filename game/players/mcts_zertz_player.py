@@ -1,15 +1,10 @@
-import random
-
 import numpy as np
 
 from game.zertz_player import ZertzPlayer
 from game.constants import BLITZ_WIN_CONDITIONS
-from learner.mcts.mcts_tree import MCTSTree
-from learner.mcts.transposition_table import TranspositionTable
-from learner.mcts.backend import get_backend, Backend, HAS_RUST
+from learner.mcts.backend import ensure_rust_backend
 
-if HAS_RUST:
-    import hiivelabs_zertz_mcts
+import hiivelabs_zertz_mcts
 
 
 class MCTSZertzPlayer(ZertzPlayer):
@@ -17,14 +12,13 @@ class MCTSZertzPlayer(ZertzPlayer):
 
     Uses Monte Carlo Tree Search with UCB1 selection and optional transposition table.
     Drop-in replacement for RandomZertzPlayer with same interface.
-    Supports both Python and Rust backends.
     """
 
     def __init__(self, game, n, iterations=1000, exploration_constant=1.41,
                  max_simulation_depth=None, fpu_reduction=None,
                  use_transposition_table=True, use_transposition_lookups=True,
                  time_limit=None, verbose=False, clear_table_each_move=True,
-                 parallel='multiprocess', num_workers=16, backend='auto',
+                 parallel='multiprocess', num_workers=16,
                  rng_seed=None, widening_constant=None, progress_callback=None,
                  progress_interval_ms=100):
         """Initialize MCTS player.
@@ -36,20 +30,22 @@ class MCTSZertzPlayer(ZertzPlayer):
             exploration_constant: UCB1 exploration (default: √2 ≈ 1.41)
             max_simulation_depth: Max rollout depth (None = play to end)
             fpu_reduction: First Play Urgency reduction (None = disabled, 0.2 = moderate)
-            use_transposition_table: Enable symmetry caching (serial/thread: shared table, multiprocess: per-process tables)
+            use_transposition_table: Enable symmetry caching
             use_transposition_lookups: Use cached stats to initialize nodes
             time_limit: Max search time per move in seconds (None = no limit)
             verbose: Print search statistics after each move
-            clear_table_each_move: Clear transposition table between moves (serial/thread mode only, multiprocess creates fresh tables)
-            parallel: Parallelization mode: False (serial), 'thread' (threaded), 'multiprocess' (default)
-            num_workers: Number of threads/processes for parallel search (default: 16)
-            backend: Backend to use: 'python', 'rust', or 'auto' (default: auto-detect)
+            clear_table_each_move: Clear transposition table between moves
+            parallel: Parallelization mode: False (serial), 'thread' (threaded), 'multiprocess' (uses thread mode)
+            num_workers: Number of threads for parallel search (default: 16)
             rng_seed: Optional integer seed used to initialize randomness for reproducible runs
             widening_constant: Progressive widening constant (None = disabled, e.g. 10.0 = moderate)
-            progress_callback: Optional callback for MCTS search progress (Rust backend only)
+            progress_callback: Optional callback for MCTS search progress
             progress_interval_ms: Interval in milliseconds for progress updates (default: 100ms)
         """
         super().__init__(game, n)
+
+        # Ensure Rust backend is available
+        ensure_rust_backend()
 
         self.iterations = iterations
         self.exploration_constant = exploration_constant
@@ -67,50 +63,28 @@ class MCTSZertzPlayer(ZertzPlayer):
         self._last_root_visits = 0
         self._last_root_value = 0.0
         self.rng_seed = rng_seed
-        self._python_rng_state = None
-        self._python_random_state = None
         self._rust_seed_initialized = False
         self.progress_callback = progress_callback
         self.progress_interval_ms = progress_interval_ms
 
-        if rng_seed is not None:
-            python_rng = np.random.RandomState(rng_seed)
-            self._python_rng_state = python_rng.get_state()
-            python_random = random.Random(rng_seed)
-            self._python_random_state = python_random.getstate()
+        # Note: Rust backend doesn't support multiprocess mode - use thread mode instead
+        if self.parallel == 'multiprocess':
+            if self.verbose:
+                print("Note: Using threaded mode for parallel MCTS")
+            self.parallel = 'thread'
 
-        # Determine backend
-        self.backend = get_backend(backend)
+        # Create Rust MCTS searcher
+        self.rust_mcts = hiivelabs_zertz_mcts.MCTSSearch(
+            exploration_constant=exploration_constant,
+            widening_constant=widening_constant,
+            fpu_reduction=fpu_reduction,
+            use_transposition_table=use_transposition_table,
+            use_transposition_lookups=use_transposition_lookups,
+        )
+        self.rust_mcts.set_transposition_table_enabled(use_transposition_table)
+        self.rust_mcts.set_transposition_lookups(use_transposition_lookups)
 
-        # Initialize appropriate backend
-        if self.backend == Backend.RUST:
-            # Rust backend doesn't support multiprocess mode - use thread mode instead
-            if self.parallel == 'multiprocess':
-                if self.verbose:
-                    print("Note: Rust backend doesn't support multiprocess mode, using threaded mode")
-                self.parallel = 'thread'
-
-            # Create Rust MCTS searcher
-            self.rust_mcts = hiivelabs_zertz_mcts.MCTSSearch(
-                exploration_constant=exploration_constant,
-                widening_constant=widening_constant,
-                fpu_reduction=fpu_reduction,
-                use_transposition_table=use_transposition_table,
-                use_transposition_lookups=use_transposition_lookups,
-            )
-            self.rust_mcts.set_transposition_table_enabled(use_transposition_table)
-            self.rust_mcts.set_transposition_lookups(use_transposition_lookups)
-
-            self.transposition_table = None  # Rust manages its own
-        else:
-            # Python backend
-            self.mcts = MCTSTree()
-
-            # Initialize transposition table (only used in serial/thread modes)
-            if use_transposition_table:
-                self.transposition_table = TranspositionTable()
-            else:
-                self.transposition_table = None
+        self.transposition_table = None  # Rust manages its own
 
     def get_action(self):
         """Select best action using MCTS.
@@ -140,12 +114,8 @@ class MCTSZertzPlayer(ZertzPlayer):
                 return ("PASS", None)
             # Multiple placements available - need MCTS to decide
 
-        # Route to appropriate backend
-        if self.backend == Backend.RUST:
-            action = self._rust_search()
-        else:
-            action = self._python_search()
-
+        # Run MCTS search
+        action = self._search()
         return action
 
     def get_last_action_scores(self):
@@ -154,49 +124,14 @@ class MCTSZertzPlayer(ZertzPlayer):
         Returns:
             Dict mapping action tuples to normalized scores [0.0, 1.0]
         """
-        if self.backend == Backend.RUST:
-            # Get statistics from Rust backend
-            child_stats = self.rust_mcts.last_child_statistics()
+        # Get statistics from Rust backend
+        child_stats = self.rust_mcts.last_child_statistics()
 
-            # Convert to dictionary with action tuples as keys
-            action_scores = {}
-            for action_type, action_data, score in child_stats:
-                action = (action_type, action_data)
-                action_scores[action] = score
-
-            return action_scores
-        else:
-            # Python backend stubbed - return uniform scores
-            return self._get_uniform_scores()
-
-    def _get_uniform_scores(self):
-        """Get uniform scores for all legal actions (fallback for Python backend).
-
-        NOTE: This is a planned parity break. The Python backend returns uniform scores
-        as a stub, while the Rust backend returns actual MCTS visit-based scores.
-        This is intentional for now since the Rust backend is the primary target.
-        """
-        p_actions, c_actions = self.game.get_valid_actions()
-
-        c1, c2, c3 = c_actions.nonzero()
-        p1, p2, p3 = p_actions.nonzero()
-
+        # Convert to dictionary with action tuples as keys
         action_scores = {}
-
-        # Collect all valid actions with uniform score
-        if c1.size > 0:
-            # Captures available
-            for i in range(c1.size):
-                action = ("CAP", (int(c1[i]), int(c2[i]), int(c3[i])))
-                action_scores[action] = 1.0
-        elif p1.size > 0:
-            # Placements available
-            for i in range(p1.size):
-                action = ("PUT", (int(p1[i]), int(p2[i]), int(p3[i])))
-                action_scores[action] = 1.0
-        else:
-            # Must pass
-            action_scores[("PASS", None)] = 1.0
+        for action_type, action_data, score in child_stats:
+            action = (action_type, action_data)
+            action_scores[action] = score
 
         return action_scores
 
@@ -206,15 +141,12 @@ class MCTSZertzPlayer(ZertzPlayer):
         # Standard mode has: {"w": 3, "g": 3, "b": 3}
         return self.game.win_con == BLITZ_WIN_CONDITIONS
 
-    def _rust_search(self):
+    def _search(self):
         """Run MCTS search using Rust backend."""
         # Get current state
         state = self.game.get_current_state()
         spatial = state['spatial'].astype(np.float32)
         global_state = state['global'].astype(np.float32)
-
-        if self.use_transposition_table and self.clear_table_each_move:
-            self.rust_mcts.clear_transposition_table()
 
         if self.use_transposition_table and self.clear_table_each_move:
             self.rust_mcts.clear_transposition_table()
@@ -261,71 +193,3 @@ class MCTSZertzPlayer(ZertzPlayer):
         self._last_root_value = self.rust_mcts.last_root_value()
 
         return (action_type, action_data)
-
-    def _python_search(self):
-        """Run MCTS search using Python backend."""
-        # Clear transposition table if configured
-        if self.clear_table_each_move and self.transposition_table:
-            self.transposition_table.clear()
-
-        if self.rng_seed is not None:
-            original_np_state = np.random.get_state()
-            original_random_state = random.getstate()
-            if self._python_rng_state is not None:
-                np.random.set_state(self._python_rng_state)
-            if self._python_random_state is not None:
-                random.setstate(self._python_random_state)
-
-        # Run MCTS search (multiprocess, threaded, or serial)
-        if self.parallel == 'multiprocess':
-            action = self.mcts.search_multiprocess(
-                self.game,
-                iterations=self.iterations,
-                exploration_constant=self.exploration_constant,
-                max_simulation_depth=self.max_simulation_depth,
-                fpu_reduction=self.fpu_reduction,
-                transposition_table=self.transposition_table,  # Creates per-process tables
-                use_transposition_lookups=self.use_transposition_lookups,
-                time_limit=self.time_limit,
-                verbose=self.verbose,
-                num_processes=self.num_workers
-            )
-        elif self.parallel == 'thread':
-            action = self.mcts.search_parallel(
-                self.game,
-                iterations=self.iterations,
-                exploration_constant=self.exploration_constant,
-                max_simulation_depth=self.max_simulation_depth,
-                fpu_reduction=self.fpu_reduction,
-                widening_constant=self.widening_constant,
-                transposition_table=self.transposition_table,
-                use_transposition_lookups=self.use_transposition_lookups,
-                time_limit=self.time_limit,
-                verbose=self.verbose,
-                num_threads=self.num_workers
-            )
-        else:  # Serial mode
-            action = self.mcts.search(
-                self.game,
-                iterations=self.iterations,
-                exploration_constant=self.exploration_constant,
-                max_simulation_depth=self.max_simulation_depth,
-                fpu_reduction=self.fpu_reduction,
-                widening_constant=self.widening_constant,
-                transposition_table=self.transposition_table,
-                use_transposition_lookups=self.use_transposition_lookups,
-                time_limit=self.time_limit,
-                verbose=self.verbose
-            )
-
-        self._last_root_children = getattr(self.mcts, "_last_root_children", 0)
-        self._last_root_visits = getattr(self.mcts, "_last_root_visits", 0)
-        self._last_root_value = getattr(self.mcts, "_last_root_value", 0.0)
-
-        if self.rng_seed is not None:
-            self._python_rng_state = np.random.get_state()
-            self._python_random_state = random.getstate()
-            np.random.set_state(original_np_state)
-            random.setstate(original_random_state)
-
-        return action

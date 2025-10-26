@@ -16,17 +16,16 @@ if str(project_root) not in sys.path:
 import numpy as np
 from game.zertz_game import ZertzGame
 from game.players.mcts_zertz_player import MCTSZertzPlayer
-from learner.mcts.backend import get_backend_info
+from learner.mcts.backend import HAS_RUST
 
 # Print backend info
-backend_info = get_backend_info()
 print("=" * 60)
-print("BACKEND INFORMATION")
+print("MCTS BACKEND INFORMATION")
 print("=" * 60)
-print(f"Python available: {backend_info['python_available']}")
-print(f"Rust available:   {backend_info['rust_available']}")
-print(f"Current backend:  {backend_info['current']}")
-print(f"Default backend:  {backend_info['default']}")
+print(f"Rust backend available: {HAS_RUST}")
+if not HAS_RUST:
+    print("ERROR: Rust backend is required!")
+    sys.exit(1)
 print()
 
 # Set random seed for reproducibility
@@ -44,23 +43,19 @@ player1 = MCTSZertzPlayer(
     n=1,
     iterations=100,  # Small number for quick test
     parallel=False,   # Serial mode for simplicity
-    verbose=True,
-    backend='auto'
-)
+    verbose=True)
 
 player2 = MCTSZertzPlayer(
     game,
     n=2,
     iterations=100,
     parallel=False,
-    verbose=True,
-    backend='auto'
-)
+    verbose=True)
 
 players = [player1, player2]
 
-print(f"Player 1: MCTS (backend={player1.backend.value})")
-print(f"Player 2: MCTS (backend={player2.backend.value})")
+print("Player 1: MCTS (Rust backend)")
+print("Player 2: MCTS (Rust backend)")
 print()
 
 # Play game

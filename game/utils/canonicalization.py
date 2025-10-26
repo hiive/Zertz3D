@@ -8,6 +8,12 @@ Supports D6 (37/61 rings) and D3 (48 rings) dihedral group symmetries.
 from enum import Flag, auto
 import numpy as np
 
+# Import Rust axial transform primitives
+from hiivelabs_zertz_mcts import (
+    ax_rot60 as rust_ax_rot60,
+    ax_mirror_q_axis as rust_ax_mirror_q_axis,
+)
+
 
 class TransformFlags(Flag):
     """Flags for controlling which transforms to use in canonicalization."""
@@ -204,20 +210,16 @@ class CanonicalizationManager:
 
     @staticmethod
     def ax_rot60(q, r, k=1):
-        """Rotate (q,r) by k * 60° counterclockwise in axial coords.
+        """Rotate (q,r) by k * 60° counterclockwise in axial coords (delegates to Rust).
 
         Works for both regular and doubled coordinates (for even-width boards).
         """
-        k %= 6
-        for _ in range(k):
-            q, r = -r, q + r  # 60° CCW
-        return q, r
+        return rust_ax_rot60(q, r, k)
 
     @staticmethod
     def ax_mirror_q_axis(q, r):
-        """Reflect (q,r) across the q-axis (cube: swap y and z)."""
-        # In cube coords (x=q, z=r, y=-q-r), mirror over q-axis => (x, z, y)
-        return q, -q - r
+        """Reflect (q,r) across the q-axis (cube: swap y and z) (delegates to Rust)."""
+        return rust_ax_mirror_q_axis(q, r)
 
     def transform_state_hex(self, state, rot60_k=0, mirror=False, mirror_first=False):
         """Apply rotation and/or mirror to the whole SPATIAL state.

@@ -36,7 +36,6 @@ def test_with_progressive_widening(enabled, iterations=1500, games=10, seed=2097
             game,
             n=2,
             iterations=iterations,
-            backend='rust',
             verbose=False
         )
 

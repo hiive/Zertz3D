@@ -10,9 +10,6 @@ The crash occurred with:
 import pytest
 import numpy as np
 from game.zertz_game import ZertzGame
-from learner.mcts.backend import HAS_RUST
-
-pytestmark = pytest.mark.skipif(not HAS_RUST, reason="Rust backend not available")
 
 
 def test_crash_seed_1760910995_with_high_iterations():

@@ -217,7 +217,7 @@ class TestBothLoseStateless:
 
     def test_stateless_both_lose_detection(self):
         """Test get_game_outcome() returns BOTH_LOSE for full board with no captures."""
-        config = BoardConfig.standard(rings=37)
+        config = BoardConfig.standard_config(rings=37)
 
         # Create a board state with all positions filled
         width = config.width
@@ -251,7 +251,7 @@ class TestBothLoseStateless:
 
     def test_stateless_normal_win_with_captures(self):
         """Test that stateless function returns normal win when captures exist."""
-        config = BoardConfig.standard(rings=37)
+        config = BoardConfig.standard_config(rings=37)
 
         # Create full board
         width = config.width
@@ -285,7 +285,7 @@ class TestBothLoseStateless:
 
     def test_stateless_48_ring_both_lose(self):
         """Test BOTH_LOSE detection on 48-ring board."""
-        config = BoardConfig.standard(rings=48)
+        config = BoardConfig.standard_config(rings=48)
 
         # Create full board
         width = config.width
@@ -310,7 +310,7 @@ class TestBothLoseStateless:
 
     def test_stateless_61_ring_both_lose(self):
         """Test BOTH_LOSE detection on 61-ring board."""
-        config = BoardConfig.standard(rings=61)
+        config = BoardConfig.standard_config(rings=61)
 
         # Create full board
         width = config.width

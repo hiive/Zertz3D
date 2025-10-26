@@ -30,14 +30,13 @@ class TestActionScores:
         # Should have at least one action
         assert len(scores) > 0
 
-    def test_mcts_rust_returns_normalized_scores(self):
-        """MCTS Rust backend should return normalized scores [0.0, 1.0]."""
+    def test_mcts_returns_normalized_scores(self):
+        """MCTS should return normalized scores [0.0, 1.0]."""
         game = ZertzGame(rings=37)
         player = MCTSZertzPlayer(
             game,
             n=1,
             iterations=100,
-            backend='rust',
             parallel=False,
             rng_seed=42,
         )
@@ -59,28 +58,6 @@ class TestActionScores:
         # Selected action should have high score
         assert scores[action] >= 0.5  # Should be in top half
 
-    def test_mcts_python_returns_uniform_scores(self):
-        """MCTS Python backend (stubbed) should return uniform scores."""
-        game = ZertzGame(rings=37)
-        player = MCTSZertzPlayer(
-            game,
-            n=1,
-            iterations=100,
-            backend='python',
-            parallel=False,
-            rng_seed=42,
-        )
-
-        # Get action and scores
-        action = player.get_action()
-        scores = player.get_last_action_scores()
-
-        # Verify action is in scores
-        assert action in scores
-
-        # All scores should be 1.0 (uniform - stubbed)
-        assert all(score == 1.0 for score in scores.values())
-
     def test_scores_match_action_format(self):
         """Action scores should use correct action tuple format."""
         game = ZertzGame(rings=37)
@@ -88,7 +65,6 @@ class TestActionScores:
             game,
             n=1,
             iterations=50,
-            backend='rust',
             parallel=False,
             rng_seed=42,
         )
@@ -121,7 +97,6 @@ class TestActionScores:
             game,
             n=1,
             iterations=200,
-            backend='rust',
             parallel=False,
             rng_seed=42,
         )
@@ -141,7 +116,6 @@ class TestActionScores:
             game,
             n=1,
             iterations=500,  # More iterations for better distribution
-            backend='rust',
             parallel=False,
             rng_seed=42,
         )
@@ -168,7 +142,6 @@ class TestActionScores:
             game,
             n=1,
             iterations=100,
-            backend='rust',
             parallel=False,
             rng_seed=42,
         )
@@ -199,14 +172,13 @@ class TestActionScores:
             if game.get_game_ended():
                 break
 
-    def test_parallel_rust_returns_scores(self):
-        """Parallel Rust MCTS should also return action scores."""
+    def test_parallel_returns_scores(self):
+        """Parallel MCTS should also return action scores."""
         game = ZertzGame(rings=37)
         player = MCTSZertzPlayer(
             game,
             n=1,
             iterations=100,
-            backend='rust',
             parallel='thread',  # Parallel mode
             num_workers=4,
             rng_seed=42,

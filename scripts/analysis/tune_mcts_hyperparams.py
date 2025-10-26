@@ -21,6 +21,18 @@ from typing import Any
 
 import numpy as np
 
+
+class NumpyEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy types."""
+    def default(self, obj):
+        if isinstance(obj, (np.integer, np.int64, np.int32)):
+            return int(obj)
+        if isinstance(obj, (np.floating, np.float64, np.float32)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
 # Add project root to Python path
 script_dir = Path(__file__).parent
 sys.path.insert(0, str(script_dir.parent))
@@ -79,8 +91,7 @@ def evaluate_hyperparams(
     backend: str,
     rings: int = 37,
     seed: int | None = None,
-    verbose: bool = False,
-) -> TuningResult:
+    verbose: bool = False) -> TuningResult:
     """Evaluate a hyperparameter configuration by playing games vs random."""
     if seed is None:
         seed = 0
@@ -107,8 +118,7 @@ def evaluate_hyperparams(
             hyperparams=hyperparams,
             mcts_as_player1=mcts_as_p1,
             rings=rings,
-            rng_seed=game_seed,
-        )
+            rng_seed=game_seed)
 
         elapsed = time.perf_counter() - start_time
         total_time += elapsed
@@ -138,8 +148,7 @@ def evaluate_hyperparams(
         wins=wins,
         losses=losses,
         ties=ties,
-        mean_time_per_game=mean_time,
-    )
+        mean_time_per_game=mean_time)
 
 
 def play_single_game(
@@ -148,8 +157,7 @@ def play_single_game(
     hyperparams: MCTSHyperparams,
     mcts_as_player1: bool,
     rings: int,
-    rng_seed: int | None,
-) -> int:
+    rng_seed: int | None) -> int:
     """Play a single game and return the terminal result (1, -1, or 0)."""
     game = ZertzGame(rings=rings)
 
@@ -185,8 +193,7 @@ def make_mcts_player(
     backend: str,
     iterations: int,
     hyperparams: MCTSHyperparams,
-    rng_seed: int | None,
-) -> MCTSZertzPlayer:
+    rng_seed: int | None) -> MCTSZertzPlayer:
     """Create a configured MCTS player with given hyperparameters."""
     return MCTSZertzPlayer(
         game,
@@ -202,8 +209,7 @@ def make_mcts_player(
         use_transposition_lookups=True,
         clear_table_each_move=True,
         verbose=False,
-        rng_seed=rng_seed,
-    )
+        rng_seed=rng_seed)
 
 
 def grid_search(
@@ -212,8 +218,7 @@ def grid_search(
     backend: str,
     rings: int,
     seed: int,
-    verbose: bool = True,
-) -> list[TuningResult]:
+    verbose: bool = True) -> list[TuningResult]:
     """
     Perform grid search over hyperparameter space.
 
@@ -245,8 +250,7 @@ def grid_search(
                         exploration_constant=exploration,
                         fpu_reduction=fpu,
                         max_simulation_depth=depth,
-                        widening_constant=widening,
-                    )
+                        widening_constant=widening)
 
                 if verbose:
                     print(f"[{config_num}/{total_configs}] Testing: "
@@ -261,8 +265,7 @@ def grid_search(
                     backend=backend,
                     rings=rings,
                     seed=seed + config_num * 1000,
-                    verbose=verbose,
-                )
+                    verbose=verbose)
 
                 results.append(result)
 
@@ -281,16 +284,15 @@ def random_search(
     rings: int,
     seed: int,
     num_samples: int = 20,
-    verbose: bool = True,
-) -> list[TuningResult]:
+    verbose: bool = True) -> list[TuningResult]:
     """
     Perform random search over hyperparameter space.
 
-    IMPROVED FOCUSED SEARCH - Based on overnight tuning showing 70% win rate:
-    - exploration_constant: uniform[1.0, 2.5] (wider range, overnight showed 1.187-2.391 all competitive)
-    - fpu_reduction: 70% enabled with uniform[0.05, 0.50] (wider range, overnight showed 0.085-0.487 work)
-    - max_simulation_depth: NOW EXPLORED! 30% chance of limited depth [15, 20, 25, 30, 40]
-    - widening_constant: 60% enabled with uniform[5.0, 20.0] (overnight showed 8-19 range)
+    ULTRA-FOCUSED SEARCH - Based on empirical results showing 70% win rate:
+    - exploration_constant: uniform[1.5, 2.4] (top performers: 1.778, 2.278, 1.836, 1.965)
+    - fpu_reduction: 50% None, 50% uniform[0.08, 0.20] (top performers: 0.120, 0.110, None, 0.092)
+    - max_simulation_depth: ALWAYS None (limited depth underperforms significantly)
+    - widening_constant: 70% enabled with uniform[8.0, 18.0] (top performers: 17.8, 16.0, 13.2, 8.2)
     """
     rng = np.random.RandomState(seed)
     results = []
@@ -300,34 +302,31 @@ def random_search(
         print(f"Each config: {games_per_config} games, {iterations} iterations/move\n")
 
     for sample_num in range(num_samples):
-        # Sample hyperparameters - IMPROVED FOCUSED search with BROADER ranges
-        # Top overnight performers: exploration 1.187-2.391, FPU 0.085-0.487, widening 8-19
+        # Sample hyperparameters - ULTRA-FOCUSED on empirically proven ranges
+        # Top overnight performers: exploration 1.5-2.3, FPU 0.08-0.12 or None, widening 8-18
 
-        # Exploration: broader range [1.0, 2.5] based on overnight results
-        exploration = rng.uniform(1.0, 2.5)
+        # Exploration: NARROWED to sweet spot [1.5, 2.4] where top performers cluster
+        exploration = rng.uniform(1.5, 2.4)
 
-        # FPU reduction: 70% enabled, WIDER range [0.05, 0.50] to capture overnight diversity
-        use_fpu = rng.rand() < 0.70
-        fpu = rng.uniform(0.05, 0.50) if use_fpu else None
+        # FPU reduction: 50/50 between None and low values [0.08, 0.20]
+        # Top performers had None or very low FPU (0.085-0.120)
+        use_fpu = rng.rand() < 0.50
+        fpu = rng.uniform(0.08, 0.20) if use_fpu else None
 
-        # Max depth: NOW EXPLORED! 30% chance of limited depth for speed/exploration tradeoff
-        use_depth_limit = rng.rand() < 0.30
-        if use_depth_limit:
-            # Try various depths: 15, 20, 25, 30, 40 moves
-            depth = rng.choice([15, 20, 25, 30, 40])
-        else:
-            depth = None  # Full game
+        # Max depth: REMOVED - limited depth consistently underperforms
+        # All top performers used full game depth
+        depth = None
 
-        # Progressive widening: 60% enabled, range [5.0, 20.0] based on overnight
-        use_widening = rng.rand() < 0.60
-        widening = rng.uniform(5.0, 20.0) if use_widening else None
+        # Progressive widening: 70% enabled, FOCUSED range [8.0, 18.0]
+        # Top performers: 17.8, 16.0, 13.2, 8.2 - all in this range
+        use_widening = rng.rand() < 0.70
+        widening = rng.uniform(8.0, 18.0) if use_widening else None
 
         hyperparams = MCTSHyperparams(
             exploration_constant=exploration,
             fpu_reduction=fpu,
             max_simulation_depth=depth,
-            widening_constant=widening,
-        )
+            widening_constant=widening)
 
         if verbose:
             fpu_str = f"{fpu:.2f}" if fpu is not None else "None"
@@ -344,8 +343,7 @@ def random_search(
             backend=backend,
             rings=rings,
             seed=seed + sample_num * 1000,
-            verbose=verbose,
-        )
+            verbose=verbose)
 
         results.append(result)
 
@@ -395,7 +393,7 @@ def save_results(results: list[TuningResult], output_file: str) -> None:
     }
 
     with open(output_path, 'w') as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f, indent=2, cls=NumpyEncoder)
 
     print(f"\nResults saved to: {output_path}")
 
@@ -475,8 +473,7 @@ def main() -> None:
             backend=args.backend,
             rings=args.rings,
             seed=args.seed,
-            verbose=verbose,
-        )
+            verbose=verbose)
     else:  # random
         results = random_search(
             iterations=args.iterations,
@@ -485,8 +482,7 @@ def main() -> None:
             rings=args.rings,
             seed=args.seed,
             num_samples=args.samples,
-            verbose=verbose,
-        )
+            verbose=verbose)
 
     # Print summary
     print_summary(results, top_n=args.top)
