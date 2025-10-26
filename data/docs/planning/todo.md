@@ -664,7 +664,7 @@ policy = PolicyHead(combined)
 - ✅ for MCTS player, optimization is when single capture move is only option do it without checking tree.
 - unit test to verify MCTS is actually being the right player at each level.
 - Tree visualizer.
-- Need visual details in graphical mode (which player and what they are thinking)
+- ✅ Need visual details in graphical mode (which player and what they are thinking)
 - ✅ What happens if no edge rings can be removed after placement? How is that notated?
 - ✅ Check tournament rule (BOTH_LOSE when board full with zero captures)
 - ✅ Verify loop detection (is it possible?!) and consecutive passing.
@@ -674,3 +674,4 @@ policy = PolicyHead(combined)
 - Rename rust module
 - Move zertz specific stuff into zertz subfolder in rust.
 - Module constants: PLAYER_1 and PLAYER_2 need to be used from Python
+- check architecture_update_code_duplication_fix.md

@@ -293,17 +293,35 @@ def _transform_coordinate(y: int, x: int, rot60_k: int, mirror: bool, mirror_fir
     return dest
 
 
-def _transform_coordinate_put(y: int, x: int, rot60_k: int, mirror: bool, config: BoardConfig) -> Tuple[int, int]:
-    """Apply rotation/mirror to placement coordinate (rotation then optional mirror)."""
+def _transform_coordinate_put(y: int, x: int, rot60_k: int, mirror: bool, mirror_first: bool, config: BoardConfig) -> Tuple[int, int]:
+    """Apply rotation/mirror to placement coordinate.
+
+    Args:
+        y: Y coordinate
+        x: X coordinate
+        rot60_k: Number of 60° rotations
+        mirror: Whether to apply mirror
+        mirror_first: If True, mirror then rotate. If False, rotate then mirror.
+        config: Board configuration
+    """
     yx_to_ax, ax_to_yx = _build_axial_maps(config)
     key = (int(y), int(x))
     if key not in yx_to_ax:
         raise ValueError(f"Coordinate {(y, x)} is not on the board")
 
     q, r = yx_to_ax[key]
-    q, r = _ax_rot60(q, r, rot60_k)
-    if mirror:
-        q, r = _ax_mirror_q_axis(q, r)
+
+    # Apply transformations in correct order
+    if mirror_first:
+        # Mirror first, then rotate (for R{k}M transforms)
+        if mirror:
+            q, r = _ax_mirror_q_axis(q, r)
+        q, r = _ax_rot60(q, r, rot60_k)
+    else:
+        # Rotate first, then mirror (for MR{k} transforms)
+        q, r = _ax_rot60(q, r, rot60_k)
+        if mirror:
+            q, r = _ax_mirror_q_axis(q, r)
 
     dest = ax_to_yx.get((q, r))
     if dest is None:
@@ -385,12 +403,12 @@ def _apply_orientation(action, rot60_k: int, mirror: bool, mirror_first: bool, c
     if action_type == "PUT":
         marble_idx, put_flat, rem_flat = payload
         py, px = divmod(int(put_flat), width)
-        new_py, new_px = _transform_coordinate_put(py, px, rot60_k, mirror, config)
+        new_py, new_px = _transform_coordinate_put(py, px, rot60_k, mirror, mirror_first, config)
         if rem_flat == width * width:
             new_rem_flat = rem_flat
         else:
             ry, rx = divmod(int(rem_flat), width)
-            new_ry, new_rx = _transform_coordinate_put(ry, rx, rot60_k, mirror, config)
+            new_ry, new_rx = _transform_coordinate_put(ry, rx, rot60_k, mirror, mirror_first, config)
             new_rem_flat = new_ry * width + new_rx
         new_put_flat = new_py * width + new_px
         return "PUT", (marble_idx, new_put_flat, new_rem_flat)
