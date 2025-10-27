@@ -3,10 +3,54 @@
 import argparse
 
 from factory import ZertzFactory
+from game.player_config import parse_player_spec, PlayerConfig
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Zèrtz 3D Game")
+    parser = argparse.ArgumentParser(
+        description="Zèrtz 3D Game",
+        epilog="""
+Player Configuration:
+  Use --player1 and --player2 to configure each player with the format:
+    TYPE[:PARAM=VALUE,PARAM=VALUE,...]
+
+  Types:
+    random          - Random move selection
+    human           - Manual control (requires renderer)
+    mcts            - Monte Carlo Tree Search AI
+
+  MCTS Parameters (examples):
+    iterations=N    - MCTS iterations per move (default: 1000)
+    exploration=X   - UCB1 exploration constant (default: 1.41)
+    fpu=X           - First Play Urgency reduction (e.g., 0.2)
+    widening=X      - Progressive widening constant (e.g., 10.0)
+    rave=X          - RAVE constant (300-3000, e.g., 1000)
+    workers=N       - Number of worker threads (default: 16)
+    verbose=1       - Print search statistics
+    seed=N          - Random seed for reproducibility
+
+  Examples:
+    --player1 human
+    --player2 mcts:iterations=500,workers=1
+    --player1 mcts:iterations=1000,exploration=2.0,rave=1000
+    --player2 mcts:iterations=2000,workers=8,verbose=1
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--player1",
+        type=str,
+        default="random",
+        metavar="SPEC",
+        help="Player 1 configuration (default: random). See --help for format."
+    )
+    parser.add_argument(
+        "--player2",
+        type=str,
+        default="random",
+        metavar="SPEC",
+        help="Player 2 configuration (default: random). See --help for format."
+    )
     parser.add_argument(
         "--replay", type=str, help="Path to transcript/notationre file (board size auto-detected)"
     )
@@ -83,11 +127,6 @@ def main() -> None:
         help="Duration between moves in seconds (default: 0.666)",
     )
     parser.add_argument(
-        "--human",
-        action="store_true",
-        help="Control player 1 manually (requires interactive renderer)",
-    )
-    parser.add_argument(
         "--start-delay",
         type=float,
         default=0.0,
@@ -98,16 +137,22 @@ def main() -> None:
         action="store_true",
         help="Track and report statistics for each game",
     )
-    parser.add_argument(
-        "--mcts-player2",
-        type=int,
-        nargs='?',
-        const=100,
-        default=None,
-        metavar="ITERATIONS",
-        help="Use MCTS player for player 2 with N iterations (default: 100 if not specified)",
-    )
     args = parser.parse_args()
+
+    # Parse player configurations
+    try:
+        player1_config = parse_player_spec(args.player1)
+        player2_config = parse_player_spec(args.player2)
+    except ValueError as e:
+        parser.error(f"Invalid player configuration: {e}")
+        return
+
+    # Determine which players are human (for renderer interaction)
+    human_players = []
+    if player1_config.player_type == "human":
+        human_players.append(1)
+    if player2_config.player_type == "human":
+        human_players.append(2)
 
     factory = ZertzFactory()
     controller = factory.create_controller(
@@ -125,10 +170,11 @@ def main() -> None:
         show_coords=args.show_coords,
         blitz=args.blitz,
         move_duration=args.move_duration,
-        human_players=(1,) if args.human else None,
+        human_players=tuple(human_players) if human_players else None,
         start_delay=args.start_delay,
         track_statistics=args.stats,
-        mcts_player2_iterations=args.mcts_player2,
+        player1_config=player1_config,
+        player2_config=player2_config,
     )
     controller.run()
 

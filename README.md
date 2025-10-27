@@ -1,6 +1,10 @@
 # Zèrtz 3D
 
-A 3D implementation of the abstract board game Zèrtz using Panda3D. This project combines sophisticated game logic with interactive 3D visualization to create an engaging digital version of the classic strategy game.
+A sophisticated 3D implementation of the abstract board game Zèrtz using Panda3D, featuring a high-performance Rust-accelerated MCTS AI engine with advanced search techniques (RAVE, transposition tables, parallel search). This project combines clean layered architecture with state-of-the-art game AI to create both a playable game and a research platform.
+
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Full game rules: http://www.gipf.com/zertz/rules/rules.html
 
@@ -8,79 +12,203 @@ Full game rules: http://www.gipf.com/zertz/rules/rules.html
 
 ## Features
 
+### Core Gameplay
 - **Multiple Board Sizes**: Play on 37, 48, or 61 ring boards
-- **3D Visualization**: Panda3D rendering with water reflections and dynamic lighting
-- **Replay System**: Record and replay games from text files in two formats (transcript/notation)
-- **AI Opponents**: Monte Carlo Tree Search (MCTS) player with configurable search depth
-- **Rust Acceleration**: Optional hiivelabs_zertz_mcts extension for fast MCTS rollouts
-- **Deterministic Gameplay**: Seeded random number generation for reproducible games
-- **Headless Mode**: Run games without rendering for testing or simulation
-- **Performance Metrics**: Collect timing/win/loss stats across batches of games
+- **Game Variants**: Standard and Blitz modes with different win conditions
 - **Official Notation**: Full support for official Zèrtz notation format
+- **Deterministic Gameplay**: Seeded random number generation for reproducible games
+- **Replay System**: Record and replay games in transcript or notation format
+
+### AI & Performance
+- **Advanced MCTS**: Monte Carlo Tree Search with RAVE, progressive widening, and FPU
+- **Rust Acceleration**: High-performance game logic and MCTS engine via PyO3
+- **Parallel Search**: Multi-threaded MCTS with virtual loss for lock-free parallelism
+- **Transposition Tables**: Position caching with Zobrist hashing
+- **Flexible Player Configuration**: Configure AI parameters via command-line
+
+### Visualization & UI
+- **3D Rendering**: Panda3D-based visualization with water reflections and dynamic lighting
+- **Move Highlighting**: Visual feedback showing valid moves and AI move preferences
+- **Human Play Mode**: Interactive mouse-based gameplay
+- **Headless Mode**: Run games without rendering for batch simulations
+- **Text Rendering**: Console-based output for terminal-only environments
+
+### Development & Testing
+- **Comprehensive Tests**: 34 test files covering game logic, edge cases, and integrations
+- **Clean Architecture**: Layered design with clear separation of concerns
+- **Python-Rust Parity**: Identical game logic in both languages for reliability
+- **Statistics Tracking**: Detailed performance metrics and win/loss tracking
 
 ## Installation
 
-This project uses `uv` for dependency management. Install dependencies with:
+### Prerequisites
+
+- Python 3.12+
+- Rust and Cargo (for Rust acceleration)
+- `uv` package manager
+
+### Install Python Dependencies
 
 ```bash
 uv sync
 ```
 
-To enable the Rust-accelerated MCTS backend, install the Rust toolchain and run either:
+### Build Rust Extension (Recommended)
+
+The Rust extension provides significant performance improvements for MCTS:
 
 ```bash
-./rust-dev.sh                        # Builds the extension in editable mode
-# or
+# Development build (with hot reload)
+./rust-dev.sh
+
+# Or manual release build
 cd rust && uv run python -m maturin develop --release
 ```
 
 ## Usage
 
-### Basic Usage
+### Quick Start
 
 ```bash
+# Random vs Random (default)
 uv run main.py
+
+# Human vs Random
+uv run main.py --player1 human
+
+# MCTS vs MCTS
+uv run main.py --player1 mcts --player2 mcts
+
+# Strong MCTS with RAVE
+uv run main.py --player1 mcts:iterations=5000,rave=1000,parallel=1
+```
+
+### Player Configuration
+
+Configure each player using the `--player1` and `--player2` flags with the format:
+
+```
+TYPE[:PARAM=VALUE,PARAM=VALUE,...]
+```
+
+**Player Types:**
+- `random` - Random move selection (default)
+- `human` - Manual control via mouse (requires renderer, cannot be used with --headless)
+- `mcts` - Monte Carlo Tree Search AI
+
+**MCTS Parameters:**
+
+| Parameter | Description | Default | Example Values |
+|-----------|-------------|---------|----------------|
+| `iterations` | MCTS iterations per move | 1000 | 500, 5000, 10000 |
+| `exploration` | UCB1 exploration constant | 1.41 | 1.0, 2.0 |
+| `fpu` | First Play Urgency reduction | None | 0.2, 0.5 |
+| `widening` | Progressive widening constant | None | 10.0, 20.0 |
+| `rave` | RAVE constant (300-3000) | None | 1000, 2000 |
+| `parallel` | Enable parallel search | 0 | 1 |
+| `workers` | Number of worker threads | 16 | 4, 8, 32 |
+| `verbose` | Print search statistics | 0 | 1 |
+| `seed` | Random seed for this player | None | 12345 |
+
+**MCTS Examples:**
+
+```bash
+# Basic MCTS with 1000 iterations (default)
+uv run main.py --player1 mcts
+
+# Stronger MCTS with 5000 iterations
+uv run main.py --player1 mcts:iterations=5000
+
+# MCTS with RAVE (Rapid Action Value Estimation)
+uv run main.py --player1 mcts:iterations=2000,rave=1000
+
+# Parallel MCTS with 8 threads
+uv run main.py --player1 mcts:iterations=5000,parallel=1,workers=8
+
+# Advanced MCTS with multiple features
+uv run main.py --player1 mcts:iterations=10000,exploration=2.0,rave=1000,fpu=0.2,widening=10,parallel=1,workers=16
+
+# Verbose mode for debugging
+uv run main.py --player1 mcts:iterations=1000,verbose=1
 ```
 
 ### Command Line Options
 
+**Board Configuration:**
 ```bash
-# Board Configuration
 uv run main.py --rings 61                    # Board size: 37, 48, or 61 rings (default: 37)
 uv run main.py --seed 1234567890             # Random seed for reproducible games
 uv run main.py --blitz                       # Blitz variant (37 rings only, fewer marbles)
+```
 
-# Replay System
-uv run main.py --replay path/to/file.txt     # Replay from transcript or notation file
-uv run main.py --replay file.txt --partial   # Continue with random play after replay ends
-
-# Game Control
+**Game Control:**
+```bash
 uv run main.py --games 10                    # Number of games to play (default: infinite)
-uv run main.py --headless                    # Run without 3D renderer
-uv run main.py --human                       # Control player 1 manually (requires renderer)
+uv run main.py --headless                    # Run without 3D renderer (faster)
 uv run main.py --move-duration 0.5           # Duration between moves in seconds (default: 0.5)
 uv run main.py --start-delay 2.0             # Delay before first move in seconds (default: 0)
-uv run main.py --stats                       # Print timing and win/loss stats after each batch
+uv run main.py --stats                       # Print timing and win/loss stats
+```
 
-# Logging Options
+**Replay System:**
+```bash
+uv run main.py --replay path/to/file.txt     # Replay from transcript or notation file
+uv run main.py --replay file.txt --partial   # Continue with random play after replay ends
+```
+
+**Logging Options:**
+```bash
+# Transcript format (Python dictionary)
 uv run main.py --transcript-file             # Log to zertzlog_<seed>.txt (current dir)
 uv run main.py --transcript-file ./logs      # Log to zertzlog_<seed>.txt in ./logs
+uv run main.py --transcript-screen           # Output transcript format to screen
+
+# Official Zèrtz notation
 uv run main.py --notation-file               # Log official notation to file (current dir)
 uv run main.py --notation-file ./logs        # Log official notation to ./logs
-uv run main.py --transcript-screen           # Output transcript format to screen
 uv run main.py --notation-screen             # Output official notation to screen
 
 # Use multiple logging formats simultaneously
 uv run main.py --transcript-file --notation-file
 uv run main.py --transcript-screen --notation-screen
+```
 
-# Visual Options (3D renderer only)
-uv run main.py --highlight-choices           # Highlight valid moves before each turn
+**Visual Options (3D renderer only):**
+```bash
+uv run main.py --highlight-choices uniform   # Highlight all valid moves equally
+uv run main.py --highlight-choices heatmap   # Highlight by AI move preference
 uv run main.py --show-coords                 # Display coordinate labels on rings
+```
 
-# AI Options (falls back to Python backend if Rust extension is unavailable)
-uv run main.py --mcts-player2                # Use MCTS for player 2 (default 100 iterations)
-uv run main.py --mcts-player2 500            # Override iteration count for the MCTS opponent
+### Common Use Cases
+
+**Tournament Simulations:**
+```bash
+# Run 100 games between two MCTS players, headless mode, with statistics
+uv run main.py --player1 mcts:iterations=5000 --player2 mcts:iterations=5000 \
+  --headless --games 100 --stats --notation-file ./tournament_logs
+```
+
+**Interactive Play:**
+```bash
+# Human vs MCTS with move highlighting
+uv run main.py --player1 human --player2 mcts:iterations=2000 \
+  --highlight-choices heatmap --show-coords
+```
+
+**Performance Testing:**
+```bash
+# Strong parallel MCTS in headless mode
+uv run main.py --player1 mcts:iterations=10000,parallel=1,workers=16 \
+  --player2 mcts:iterations=10000,parallel=1,workers=16 \
+  --headless --games 10 --stats
+```
+
+**Debugging & Analysis:**
+```bash
+# Verbose MCTS with full logging
+uv run main.py --player1 mcts:iterations=1000,verbose=1 \
+  --transcript-screen --notation-screen --highlight-choices heatmap
 ```
 
 ## Project Structure
@@ -258,6 +386,41 @@ Board size is automatically detected from coordinates in the replay file.
 
 ## Development
 
+### Building the Rust Extension
+
+The Rust extension (`hiivelabs_zertz_mcts`) provides significant performance improvements for MCTS:
+
+```bash
+# Development build (faster iteration, less optimized)
+cd rust && uv run python -m maturin develop
+
+# Release build (full optimizations, slower compile)
+cd rust && uv run python -m maturin develop --release
+
+# Quick development script (with automatic rebuild)
+./rust-dev.sh
+```
+
+**Requirements:**
+- Rust toolchain (install from https://rustup.rs/)
+- Cargo (comes with Rust)
+- Maturin (included in project dependencies)
+
+**Build Output:**
+The extension will be built and installed into your Python environment as `hiivelabs_zertz_mcts`, enabling:
+- Fast game logic functions (move generation, state validation)
+- Rust MCTS implementation with parallel search
+- Zero-copy numpy array integration
+
+**Testing Rust Extension:**
+```bash
+# Verify the extension is available
+uv run python -c "import hiivelabs_zertz_mcts; print('Rust extension loaded!')"
+
+# Run tests that verify Python-Rust parity
+uv run pytest tests/test_rust_parity.py -v
+```
+
 ### Testing
 
 The project includes a comprehensive test suite covering game logic, notation systems, and board mechanics across all supported board sizes.
@@ -312,6 +475,107 @@ uv run pytest --cov=game --cov=controller --cov=shared --cov-report=html tests/
 - **Unified Animation System**: Single animation queue handles both movement animations and highlight effects (material changes). Type discrimination (`'move'` vs `'highlight'`) allows different processing paths while maintaining consistent timing and lifecycle. Highlights apply instantly; moves interpolate over time
 - **Code Architecture**: Both Python and Rust follow delegation pattern - MCTS delegates to pure game logic functions (mcts.rs → game.rs, mcts_tree.py → zertz_logic.py) ensuring single source of truth for all game rules
 
+## Architecture Overview
+
+Zertz3D follows **clean architecture principles** with clear separation of concerns and a layered design pattern. The system combines Python for flexibility with Rust for performance-critical paths.
+
+### Layered Architecture
+
+```
+┌─────────────────────────────────────────┐
+│      Presentation Layer                 │
+│  (main.py, CLI argument parsing)        │
+└─────────────────────────────────────────┘
+                  │
+┌─────────────────────────────────────────┐
+│      Application Layer                  │
+│  (Controllers, Session Management)      │
+└─────────────────────────────────────────┘
+                  │
+┌─────────────────────────────────────────┐
+│      Domain Layer                       │
+│  (Game Logic, Board State, Players)     │
+└─────────────────────────────────────────┘
+                  │
+┌─────────────────────────────────────────┐
+│      Infrastructure Layer               │
+│  (Renderers, File I/O, Rust Backend)   │
+└─────────────────────────────────────────┘
+```
+
+### Key Design Patterns
+
+- **Factory Pattern**: `ZertzFactory` provides clean dependency injection and object construction
+- **Protocol-Based Interfaces**: `IRenderer` protocol enables multiple renderer implementations without inheritance coupling
+- **Stateless Game Logic**: Pure functional design in both Python (`zertz_logic.py`) and Rust (`game.rs`) enables parallelization and easy testing
+- **Observer Pattern**: Async callbacks for renderer synchronization
+- **Strategy Pattern**: Pluggable player implementations (Random, MCTS, Human, Replay)
+
+### Python-Rust Integration
+
+The system uses PyO3 for seamless Python-Rust integration:
+
+```
+Python Layer (High-level orchestration)
+    │
+    ├─▶ zertz_logic.py (thin wrapper)
+    │
+    ▼
+PyO3 FFI (zero-copy array transfer)
+    │
+    ▼
+Rust Layer (performance-critical paths)
+    │
+    ├─▶ game.rs (pure stateless game logic)
+    ├─▶ mcts.rs (MCTS search engine)
+    ├─▶ transposition.rs (position caching)
+    └─▶ zobrist.rs (hash functions)
+```
+
+**Benefits:**
+- Zero-copy numpy array transfer between Python and Rust
+- 10-100x performance improvement for MCTS
+- Absolute parity between Python and Rust implementations
+- Fallback to pure Python if Rust extension unavailable
+
+### MCTS Architecture
+
+The MCTS implementation features advanced techniques for competitive AI:
+
+**Core Components:**
+- **UCB1 Selection**: Balance exploration vs exploitation
+- **RAVE (Rapid Action Value Estimation)**: Faster convergence using all-moves-as-first statistics
+- **Progressive Widening**: Focus search on promising moves
+- **First Play Urgency (FPU)**: Penalize unexplored nodes
+- **Transposition Tables**: Cache position evaluations with Zobrist hashing
+- **Virtual Loss**: Lock-free parallel search via optimistic concurrency
+
+**Parallel Architecture:**
+```
+┌─────────────────────────────────────────┐
+│   Thread 1   Thread 2   ...   Thread N  │
+│       │          │               │       │
+│       └──────────┴───────────────┘       │
+│                  │                       │
+│                  ▼                       │
+│     Shared Root Node (Arc + Atomics)    │
+│       visits: AtomicU32                  │
+│       value: AtomicU32                   │
+│       children: Mutex<Vec<...>>          │
+└─────────────────────────────────────────┘
+```
+
+Thread-safe statistics with atomic operations and minimal lock contention (mutex only during node expansion).
+
+### Renderer Protocol
+
+Multiple renderer implementations demonstrate the Open/Closed Principle:
+
+- **PandaRenderer**: Full 3D visualization with Panda3D
+- **TextRenderer**: Console-based output for terminal environments
+- **CompositeRenderer**: Combines multiple renderers (e.g., 3D + text logging)
+
+All renderers implement the `IRenderer` protocol, allowing the controller to work with any renderer without code changes.
 
 ## Dependencies
 

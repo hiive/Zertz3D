@@ -113,7 +113,7 @@ class ActionVisualizationSequencer:
         # This shows increasing confidence as the search progresses
         total_iterations = event.get('total_iterations', 50000)
         progress = min(1.0, iteration / min(5000, total_iterations * 0.5))  # Ramp up over first half or 5000 iters
-        overall_brightness = progress # 0.05 + (0.95 * progress)  # Scale from 5% to 100% brightness
+        overall_brightness = progress * progress * progress # 0.05 + (0.95 * progress)  # Scale from 5% to 100% brightness
 
         action_scores = {(action_type, action_data): score
                         for action_type, action_data, score in action_stats}
@@ -235,7 +235,8 @@ class ActionVisualizationSequencer:
     def _on_search_ended(self, event):
         """End thinking phase and prepare for action execution.
 
-        Fades out thinking highlights over the standard highlight duration.
+        Leaves highlights active - they will be selectively cleared when the
+        selected action is known in start().
 
         Args:
             event: SearchEnded event with:
@@ -245,8 +246,9 @@ class ActionVisualizationSequencer:
         if not self.thinking_active:
             return
 
-        # Queue fade-out animations for all thinking highlights
-        self._fade_thinking_highlights()
+        # DON'T clear highlights here - we want to leave the selected positions
+        # highlighted for visual continuity. The start() method will selectively
+        # clear non-selected highlights.
 
         # Mark thinking phase as inactive
         self.thinking_active = False
@@ -283,6 +285,46 @@ class ActionVisualizationSequencer:
                 self.renderer.highlighting_manager.clear_context_highlights(f"thinking_both_{pos_str}")
 
         self.thinking_highlights.clear()
+
+    def _clear_non_selected_thinking_highlights(self, selected_placement, selected_removal):
+        """Remove thinking highlights except for the selected placement/removal positions.
+
+        Args:
+            selected_placement: Position string for the selected placement (e.g., 'C4')
+            selected_removal: Position string for the selected removal (e.g., 'D5'), or None if no removal
+        """
+        # Clear bulk highlights (won't affect individual position highlights)
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_placement")
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_removal")
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_both")
+
+        # Clear non-selected placement highlights
+        if 'placement' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['placement']:
+                if pos_str != selected_placement:
+                    self.renderer.highlighting_manager.clear_context_highlights(f"thinking_placement_{pos_str}")
+
+        # Clear non-selected removal highlights
+        if 'removal' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['removal']:
+                if pos_str != selected_removal:
+                    self.renderer.highlighting_manager.clear_context_highlights(f"thinking_removal_{pos_str}")
+
+        # Clear both highlights (unless they match selected positions)
+        if 'both' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['both']:
+                # Keep if it's the selected placement OR selected removal
+                if pos_str != selected_placement and pos_str != selected_removal:
+                    self.renderer.highlighting_manager.clear_context_highlights(f"thinking_both_{pos_str}")
+
+        # Don't clear the thinking_highlights dict - we might need it later
+        # But do clear the highlight references for cleared positions
+        if 'placement' in self.thinking_highlights:
+            self.thinking_highlights['placement'] = {selected_placement} & self.thinking_highlights['placement']
+        if 'removal' in self.thinking_highlights:
+            self.thinking_highlights['removal'] = {selected_removal} & self.thinking_highlights['removal'] if selected_removal else set()
+        if 'both' in self.thinking_highlights:
+            self.thinking_highlights['both'] = ({selected_placement, selected_removal} & self.thinking_highlights['both']) if selected_removal else ({selected_placement} & self.thinking_highlights['both'])
 
     def _queue_position_highlights(
         self,
@@ -429,6 +471,11 @@ class ActionVisualizationSequencer:
         """
         action_dict = render_data.action_dict
         selected_ring = action_dict["dst"]
+        selected_removal = action_dict.get("remove")
+
+        # If thinking phase just happened, selectively clear non-selected highlights
+        if self.skip_placement_highlights and self.thinking_highlights:
+            self._clear_non_selected_thinking_highlights(selected_ring, selected_removal)
 
         # Queue placement highlights (skip if thinking phase just showed them)
         if render_data.placement_positions and not self.skip_placement_highlights:
@@ -471,8 +518,19 @@ class ActionVisualizationSequencer:
             selected_removal = action_dict.get("remove")
             removal_defer = marble_delay + task_delay_time
 
+            # For selection phase, only highlight the actual ring being removed
+            # (render_data contains all possible removals with scores, but we only want the selected one)
+            selected_removal_only = [
+                pos_dict for pos_dict in render_data.removal_positions
+                if pos_dict.get('pos') == selected_removal or pos_dict == selected_removal
+            ]
+
+            # If no match found (shouldn't happen), show all with full brightness on selected
+            if not selected_removal_only and selected_removal:
+                selected_removal_only = [{'pos': selected_removal, 'score': 1.0}]
+
             self._queue_position_highlights(
-                render_data.removal_positions,
+                selected_removal_only,
                 selected_removal,
                 DARK_RED_MATERIAL_MOD,
                 task_delay_time,

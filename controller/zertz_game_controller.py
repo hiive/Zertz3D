@@ -11,6 +11,7 @@ import numpy as np
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
 from game.loaders import TranscriptLoader, NotationLoader
 from game.formatters.notation_formatter import NotationFormatter
+from game.player_config import PlayerConfig
 from controller.game_logger import GameLogger
 from controller.action_text_formatter import ActionTextFormatter
 from controller.action_processor import ActionProcessor
@@ -69,7 +70,8 @@ class ZertzGameController:
         renderer_or_factory: IRenderer | IRendererFactory | None = None,
         human_players: tuple[int, ...] | None = None,
         track_statistics=False,
-        mcts_player2_iterations: int | None = None,
+        player1_config: PlayerConfig | None = None,
+        player2_config: PlayerConfig | None = None,
     ):
         self.show_coords = show_coords
         self.max_games = max_games  # None means play indefinitely
@@ -120,7 +122,8 @@ class ZertzGameController:
             t=5,
             status_reporter=print,
             human_players=human_players,
-            mcts_player2_iterations=mcts_player2_iterations,
+            player1_config=player1_config,
+            player2_config=player2_config,
         )
 
         # Create logger with all configuration - it manages all writers internally

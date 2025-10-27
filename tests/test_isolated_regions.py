@@ -199,6 +199,58 @@ class TestIsolatedRegionCaptureRules:
         assert small_board.str_to_index("G1") in open_rings
         assert small_board.str_to_index("G2") not in open_rings  # occupied
 
+    def test_placement_triggered_isolation_capture(self, small_board):
+        """
+        Test that placing a marble that creates a fully-occupied isolated region
+        triggers immediate capture of that region.
+
+        Rule: If by placing a marble and/or removing a ring, there are any regions
+        that are completely full of marbles, the player captures those marbles and
+        removes their rings.
+
+        This tests "self-isolation" - placing a marble that immediately gets captured
+        because the region it's in becomes fully occupied and isolated.
+        """
+        # Place marble on D7
+        d7_idx = small_board.str_to_index("D7")
+        small_board.state[small_board.MARBLE_LAYERS.start, *d7_idx] = 1  # white
+
+        # Remove D7's neighbors to isolate it: E6, C6, B5, C5, D6
+        small_board.state[small_board.RING_LAYER, *small_board.str_to_index("E6")] = 0
+        small_board.state[small_board.RING_LAYER, *small_board.str_to_index("C6")] = 0
+        small_board.state[small_board.RING_LAYER, *small_board.str_to_index("B5")] = 0
+        small_board.state[small_board.RING_LAYER, *small_board.str_to_index("C5")] = 0
+        small_board.state[small_board.RING_LAYER, *small_board.str_to_index("D6")] = 0
+
+        # Now place a marble somewhere else to trigger the isolation check
+        # Place on C3, remove any removable ring
+        put_action = (
+            0,  # white marble
+            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("C3")),
+            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("G1")),
+        )
+
+        p1_white_before = small_board.global_state[small_board.P1_CAP_W]
+        isolated = small_board._take_placement_action(put_action)
+
+        # D7 should be captured (it's a fully-occupied isolated region)
+        assert (
+            small_board.state[small_board.MARBLE_LAYERS.start, *d7_idx] == 0
+        ), "D7 marble should be captured (fully-occupied isolated region)"
+        assert (
+            small_board.state[small_board.RING_LAYER, *d7_idx] == 0
+        ), "D7 ring should be removed (fully-occupied isolated region)"
+
+        # Should have captured the marble from D7
+        assert (
+            small_board.global_state[small_board.P1_CAP_W] == p1_white_before + 1
+        ), "Should capture 1 marble from D7"
+
+        # Verify isolated list contains the D7 marble
+        assert isolated is not None, "Isolation should occur"
+        assert len(isolated) == 1, "Should capture D7 region"
+        assert isolated[0]["marble"] == "w", "Captured marble should be white"
+
 
 class TestPartiallyIsolatedRegionProperties:
     """Test properties of isolated regions that still contain empty rings."""

@@ -674,4 +674,5 @@ policy = PolicyHead(combined)
 - Rename rust module
 - Move zertz specific stuff into zertz subfolder in rust.
 - Module constants: PLAYER_1 and PLAYER_2 need to be used from Python
-- check architecture_update_code_duplication_fix.md
+- ✅check architecture_update_code_duplication_fix.md
+- rename global parameter as global_state (same for spatial -> spatial_state)

@@ -17,10 +17,9 @@ class MCTSZertzPlayer(ZertzPlayer):
     def __init__(self, game, n, iterations=1000, exploration_constant=1.41,
                  max_simulation_depth=None, fpu_reduction=None,
                  use_transposition_table=True, use_transposition_lookups=True,
-                 time_limit=None, verbose=False, clear_table_each_move=True,
-                 parallel='multiprocess', num_workers=16,
-                 rng_seed=None, widening_constant=None, progress_callback=None,
-                 progress_interval_ms=100):
+                 time_limit=None, verbose=False, clear_table_each_move=True, num_workers=16,
+                 rng_seed=None, widening_constant=None, rave_constant=None,
+                 progress_callback=None, progress_interval_ms=100):
         """Initialize MCTS player.
 
         Args:
@@ -35,10 +34,10 @@ class MCTSZertzPlayer(ZertzPlayer):
             time_limit: Max search time per move in seconds (None = no limit)
             verbose: Print search statistics after each move
             clear_table_each_move: Clear transposition table between moves
-            parallel: Parallelization mode: False (serial), 'thread' (threaded), 'multiprocess' (uses thread mode)
             num_workers: Number of threads for parallel search (default: 16)
             rng_seed: Optional integer seed used to initialize randomness for reproducible runs
             widening_constant: Progressive widening constant (None = disabled, e.g. 10.0 = moderate)
+            rave_constant: RAVE constant (None = disabled, 300-3000 = enabled, e.g. 1000 = balanced)
             progress_callback: Optional callback for MCTS search progress
             progress_interval_ms: Interval in milliseconds for progress updates (default: 100ms)
         """
@@ -52,12 +51,12 @@ class MCTSZertzPlayer(ZertzPlayer):
         self.max_simulation_depth = max_simulation_depth
         self.fpu_reduction = fpu_reduction
         self.widening_constant = widening_constant
+        self.rave_constant = rave_constant
         self.use_transposition_table = use_transposition_table
         self.use_transposition_lookups = use_transposition_lookups
         self.time_limit = time_limit
         self.verbose = verbose
         self.clear_table_each_move = clear_table_each_move
-        self.parallel = parallel
         self.num_workers = num_workers
         self._last_root_children = 0
         self._last_root_visits = 0
@@ -67,24 +66,18 @@ class MCTSZertzPlayer(ZertzPlayer):
         self.progress_callback = progress_callback
         self.progress_interval_ms = progress_interval_ms
 
-        # Note: Rust backend doesn't support multiprocess mode - use thread mode instead
-        if self.parallel == 'multiprocess':
-            if self.verbose:
-                print("Note: Using threaded mode for parallel MCTS")
-            self.parallel = 'thread'
-
         # Create Rust MCTS searcher
         self.rust_mcts = hiivelabs_zertz_mcts.MCTSSearch(
             exploration_constant=exploration_constant,
             widening_constant=widening_constant,
             fpu_reduction=fpu_reduction,
+            rave_constant=rave_constant,
             use_transposition_table=use_transposition_table,
             use_transposition_lookups=use_transposition_lookups,
         )
         self.rust_mcts.set_transposition_table_enabled(use_transposition_table)
         self.rust_mcts.set_transposition_lookups(use_transposition_lookups)
 
-        self.transposition_table = None  # Rust manages its own
 
     def get_action(self):
         """Select best action using MCTS.
@@ -174,7 +167,7 @@ class MCTSZertzPlayer(ZertzPlayer):
         )
 
         # Run search (serial or parallel)
-        if self.parallel == 'thread':
+        if self.num_workers > 1:
             action_type, action_data = self.rust_mcts.search_parallel(
                 spatial,
                 global_state,

@@ -54,6 +54,7 @@ class MCTSHyperparams:
     fpu_reduction: float | None  # First Play Urgency reduction (default: None)
     max_simulation_depth: int | None  # Max rollout depth (default: None = full game)
     widening_constant: float | None  # Progressive widening constant (None = disabled, 10.0 = moderate)
+    rave_constant: float | None  # RAVE constant (None = disabled, 300-3000 = enabled)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -194,7 +195,10 @@ def make_mcts_player(
     iterations: int,
     hyperparams: MCTSHyperparams,
     rng_seed: int | None) -> MCTSZertzPlayer:
-    """Create a configured MCTS player with given hyperparameters."""
+    """Create a configured MCTS player with given hyperparameters.
+
+    Note: backend parameter is kept for compatibility but ignored - Rust is always used.
+    """
     return MCTSZertzPlayer(
         game,
         n=player_n,
@@ -203,7 +207,7 @@ def make_mcts_player(
         max_simulation_depth=hyperparams.max_simulation_depth,
         fpu_reduction=hyperparams.fpu_reduction,
         widening_constant=hyperparams.widening_constant,
-        backend=backend,
+        rave_constant=hyperparams.rave_constant,
         parallel=False,
         use_transposition_table=True,
         use_transposition_lookups=True,
@@ -250,7 +254,8 @@ def grid_search(
                         exploration_constant=exploration,
                         fpu_reduction=fpu,
                         max_simulation_depth=depth,
-                        widening_constant=widening)
+                        widening_constant=widening,
+                        rave_constant=None)  # Disabled for grid search by default
 
                 if verbose:
                     print(f"[{config_num}/{total_configs}] Testing: "
@@ -288,11 +293,12 @@ def random_search(
     """
     Perform random search over hyperparameter space.
 
-    ULTRA-FOCUSED SEARCH - Based on empirical results showing 70% win rate:
-    - exploration_constant: uniform[1.5, 2.4] (top performers: 1.778, 2.278, 1.836, 1.965)
-    - fpu_reduction: 50% None, 50% uniform[0.08, 0.20] (top performers: 0.120, 0.110, None, 0.092)
-    - max_simulation_depth: ALWAYS None (limited depth underperforms significantly)
-    - widening_constant: 70% enabled with uniform[8.0, 18.0] (top performers: 17.8, 16.0, 13.2, 8.2)
+    BALANCED SEARCH - Based on 70% win rate empirical results:
+    - exploration_constant: uniform[1.4, 2.4] (top performers: 1.778, 2.278, 1.836 cluster 1.5-2.3)
+    - fpu_reduction: 50% None, 50% uniform[0.08, 0.14] (top: 0.120, 0.110, None, 0.092)
+    - max_simulation_depth: ALWAYS None (full game depth required)
+    - widening_constant: 65% enabled with uniform[8.0, 20.0] (top: 17.9, 16.1, 13.2, 8.2)
+    - rave_constant: 30% enabled with uniform[300, 3000] (expected 15-25% boost)
     """
     rng = np.random.RandomState(seed)
     results = []
@@ -302,39 +308,48 @@ def random_search(
         print(f"Each config: {games_per_config} games, {iterations} iterations/move\n")
 
     for sample_num in range(num_samples):
-        # Sample hyperparameters - ULTRA-FOCUSED on empirically proven ranges
-        # Top overnight performers: exploration 1.5-2.3, FPU 0.08-0.12 or None, widening 8-18
+        # Sample hyperparameters - BALANCED search based on 70% win rate results
+        # Top performers: exploration 1.5-2.3, FPU 0.08-0.13 or None, widening 8-20
 
-        # Exploration: NARROWED to sweet spot [1.5, 2.4] where top performers cluster
-        exploration = rng.uniform(1.5, 2.4)
+        # Exploration: Slightly wider range [1.4, 2.4] to not miss edge cases
+        # Core sweet spot is 1.5-2.3 where 70% win rate configs cluster
+        exploration = rng.uniform(1.4, 2.4)
 
-        # FPU reduction: 50/50 between None and low values [0.08, 0.20]
-        # Top performers had None or very low FPU (0.085-0.120)
+        # FPU reduction: 50/50 between None and low values [0.08, 0.14]
+        # Top performers: 0.120, 0.110, None, 0.092 (never above 0.14)
         use_fpu = rng.rand() < 0.50
-        fpu = rng.uniform(0.08, 0.20) if use_fpu else None
+        fpu = rng.uniform(0.08, 0.14) if use_fpu else None
 
-        # Max depth: REMOVED - limited depth consistently underperforms
-        # All top performers used full game depth
+        # Max depth: Always full game - limited depth consistently underperforms
         depth = None
 
-        # Progressive widening: 70% enabled, FOCUSED range [8.0, 18.0]
-        # Top performers: 17.8, 16.0, 13.2, 8.2 - all in this range
-        use_widening = rng.rand() < 0.70
-        widening = rng.uniform(8.0, 18.0) if use_widening else None
+        # Progressive widening: 65% enabled, range [8.0, 20.0]
+        # Top performers: 17.9, 16.1, 13.2, 8.2 (8-20 covers all good configs)
+        use_widening = rng.rand() < 0.65
+        widening = rng.uniform(8.0, 20.0) if use_widening else None
+
+        # RAVE: 30% enabled, range [300, 3000] as recommended
+        # Expected 15-25% improvement when enabled
+        use_rave = rng.rand() < 0.30
+        rave = rng.uniform(300, 3000) if use_rave else None
 
         hyperparams = MCTSHyperparams(
             exploration_constant=exploration,
             fpu_reduction=fpu,
             max_simulation_depth=depth,
-            widening_constant=widening)
+            widening_constant=widening,
+            rave_constant=rave)
 
         if verbose:
             fpu_str = f"{fpu:.2f}" if fpu is not None else "None"
             depth_str = str(depth) if depth is not None else "Full"
+            widening_str = f"{widening:.1f}" if widening is not None else "None"
+            rave_str = f"{rave:.0f}" if rave is not None else "None"
             print(f"[{sample_num + 1}/{num_samples}] Testing: "
                   f"exploration={exploration:.2f}, "
                   f"fpu={fpu_str}, "
-                  f"depth={depth_str}")
+                  f"widening={widening_str}, "
+                  f"rave={rave_str}")
 
         result = evaluate_hyperparams(
             hyperparams=hyperparams,
@@ -378,6 +393,9 @@ def print_summary(results: list[TuningResult], top_n: int = 5) -> None:
 
         pw_str = f"Yes (constant={hp.widening_constant})" if hp.widening_constant is not None else "No"
         print(f"    Progressive widening: {pw_str}")
+
+        rave_str = f"Yes (constant={hp.rave_constant:.0f})" if hp.rave_constant is not None else "No"
+        print(f"    RAVE: {rave_str}")
 
         print(f"    Avg time/game: {result.mean_time_per_game:.3f}s")
 

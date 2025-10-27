@@ -10,6 +10,7 @@ from renderer.text_renderer import TextRenderer
 from renderer.composite_renderer import CompositeRenderer
 from shared.interfaces import IRenderer
 from game.zertz_board import ZertzBoard
+from game.player_config import PlayerConfig
 
 
 class ZertzFactory:
@@ -38,7 +39,8 @@ class ZertzFactory:
         human_players: tuple[int, ...] | None = None,
         start_delay: float = 0.0,
         track_statistics: bool = False,
-        mcts_player2_iterations: int | None = None,
+        player1_config: PlayerConfig | None = None,
+        player2_config: PlayerConfig | None = None,
     ) -> ZertzGameController:
         """Create a fully-wired ZertzGameController with appropriate renderers."""
 
@@ -89,5 +91,6 @@ class ZertzFactory:
             renderer_or_factory=renderer_factory,
             human_players=human_players,
             track_statistics=track_statistics,
-            mcts_player2_iterations=mcts_player2_iterations,
+            player1_config=player1_config,
+            player2_config=player2_config,
         )
