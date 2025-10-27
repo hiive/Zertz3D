@@ -37,7 +37,7 @@ class TestActionScores:
             game,
             n=1,
             iterations=100,
-            parallel=False,
+            num_workers=1,
             rng_seed=42,
         )
 
@@ -65,7 +65,7 @@ class TestActionScores:
             game,
             n=1,
             iterations=50,
-            parallel=False,
+            num_workers=1,
             rng_seed=42,
         )
 
@@ -97,7 +97,7 @@ class TestActionScores:
             game,
             n=1,
             iterations=200,
-            parallel=False,
+            num_workers=1,
             rng_seed=42,
         )
 
@@ -116,7 +116,7 @@ class TestActionScores:
             game,
             n=1,
             iterations=500,  # More iterations for better distribution
-            parallel=False,
+            num_workers=1,
             rng_seed=42,
         )
 
@@ -142,7 +142,7 @@ class TestActionScores:
             game,
             n=1,
             iterations=100,
-            parallel=False,
+            num_workers=1,
             rng_seed=42,
         )
 
@@ -179,7 +179,6 @@ class TestActionScores:
             game,
             n=1,
             iterations=100,
-            parallel='thread',  # Parallel mode
             num_workers=4,
             rng_seed=42,
         )

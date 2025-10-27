@@ -44,7 +44,7 @@ class TestBlitzModeMCTS:
             game=game,
             n=1,
             iterations=100,
-            parallel=False,
+            num_workers=1,
             verbose=False
         )
 
@@ -59,7 +59,7 @@ class TestBlitzModeMCTS:
             game=game,
             n=1,
             iterations=100,
-            parallel=False,
+            num_workers=1,
             verbose=False
         )
 
@@ -80,7 +80,7 @@ class TestBlitzModeMCTS:
             game=game,
             n=1,
             iterations=100,
-            parallel=False,
+            num_workers=1,
             verbose=False
         )
 
@@ -106,7 +106,7 @@ class TestBlitzModeMCTS:
             game=game,
             n=1,
             iterations=100,
-            parallel=False,
+            num_workers=1,
             verbose=False
         )
 
@@ -137,7 +137,6 @@ class TestBlitzModeMCTS:
             game=game,
             n=1,
             iterations=100,
-            parallel='thread',
             num_workers=4,
             verbose=False
         )

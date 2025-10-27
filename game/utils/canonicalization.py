@@ -436,7 +436,8 @@ class CanonicalizationManager:
 
     # ======================  INVERSE TRANSFORMS  ===================
 
-    def _get_inverse_transform(self, transform_name):
+    @staticmethod
+    def _get_inverse_transform(transform_name):
         """
         Get the inverse of a symmetry transform.
 

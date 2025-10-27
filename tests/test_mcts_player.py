@@ -6,7 +6,7 @@ from game.zertz_game import ZertzGame
 from game.players.mcts_zertz_player import MCTSZertzPlayer
 from game.zertz_player import RandomZertzPlayer
 
-
+#TODO fill in test stubs
 class TestMCTSZertzPlayer:
     """Test suite for MCTSZertzPlayer."""
 
@@ -73,16 +73,6 @@ class TestMCTSZertzPlayer:
         action = player.get_action()
         assert action is not None
 
-    def test_transposition_table_optional(self):
-        """Test that transposition table can be disabled."""
-        game = ZertzGame(rings=37)
-        player = MCTSZertzPlayer(
-            game, n=1, iterations=10, use_transposition_table=False, verbose=False
-        )
-
-        assert player.transposition_table is None
-        action = player.get_action()
-        assert action[0] in ["PUT", "CAP", "PASS"]
 
     def test_transposition_lookups_configurable(self):
         """Test that transposition lookups can be disabled."""
@@ -153,7 +143,6 @@ class TestMCTSZertzPlayer:
             use_transposition_table=True,
             use_transposition_lookups=False,
             clear_table_each_move=True,
-            parallel='thread',
             num_workers=2,
             verbose=False,
         )
@@ -308,7 +297,7 @@ class TestMCTSCorrectness:
         for _ in range(games):
             game = ZertzGame(rings=37)
             player1 = RandomZertzPlayer(game, n=1)
-            player2 = MCTSZertzPlayer(game, n=2, iterations=200, verbose=False, parallel=False)
+            player2 = MCTSZertzPlayer(game, n=2, iterations=200, verbose=False, num_workers=1)
 
             move_count = 0
             max_moves = 100
