@@ -504,7 +504,7 @@ class ZertzBoard:
                 # Note: Don't use index_to_str() because the ring has already been removed
                 # by the Rust code, so we need to get the label directly
                 pos = self.position_from_yx((y, x)).label
-                print(f"[DEBUG] Isolation capture: marble_layer={marble_layer}, y={y}, x={x}, pos={pos}, marble_type={marble_type}")
+                # print(f"[DEBUG] Isolation capture: marble_layer={marble_layer}, y={y}, x={x}, pos={pos}, marble_type={marble_type}")
                 captured_marbles.append({"marble": marble_type, "pos": pos})
             return captured_marbles
         return None

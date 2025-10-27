@@ -18,16 +18,6 @@ from game.zertz_game import ZertzGame
 from game.players.mcts_zertz_player import MCTSZertzPlayer
 from learner.mcts.backend import HAS_RUST
 
-# Print backend info
-print("=" * 60)
-print("MCTS BACKEND INFORMATION")
-print("=" * 60)
-print(f"Rust backend available: {HAS_RUST}")
-if not HAS_RUST:
-    print("ERROR: Rust backend is required!")
-    sys.exit(1)
-print()
-
 # Set random seed for reproducibility
 np.random.seed(42)
 
@@ -42,14 +32,14 @@ player1 = MCTSZertzPlayer(
     game,
     n=1,
     iterations=100,  # Small number for quick test
-    parallel=False,   # Serial mode for simplicity
+    num_workers=1,   # Serial mode for simplicity
     verbose=True)
 
 player2 = MCTSZertzPlayer(
     game,
     n=2,
     iterations=100,
-    parallel=False,
+    num_workers=1,
     verbose=True)
 
 players = [player1, player2]
@@ -60,7 +50,7 @@ print()
 
 # Play game
 move_count = 0
-max_moves = 10  # Just test a few moves
+max_moves = 1000  # Just test a few moves
 
 while game.get_game_ended() is None and move_count < max_moves:
     current_player = game.get_cur_player_value()
@@ -90,5 +80,7 @@ elif result == -1:
     print("Winner: Player 2")
 elif result == 0:
     print("Result: Tie")
+else:
+    print(f"Result: Unknown: {result}")
 
 print(f"Total moves: {move_count}")

@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing as mp
 import random
 import sys
 import time
 from dataclasses import dataclass, asdict
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -85,59 +87,127 @@ class TuningResult:
         }
 
 
+def _play_evaluation_game(
+    game_idx: int,
+    hyperparams: MCTSHyperparams,
+    iterations: int,
+    rings: int,
+    seed: int,
+    verbose: bool = False) -> tuple[int, float, int]:
+    """
+    Worker function to play a single game for hyperparameter evaluation.
+
+    Args:
+        game_idx: Game index (used for alternating player positions and seeding)
+        hyperparams: MCTS hyperparameters to evaluate
+        iterations: Number of MCTS iterations per move
+        rings: Board size (37, 48, or 61)
+        seed: Base RNG seed
+        verbose: Whether to print diagnostic messages
+
+    Returns:
+        (result, elapsed_time, game_idx) tuple where result is from MCTS perspective
+    """
+    import os
+    process_id = os.getpid()
+
+    # Alternate MCTS between player 1 and 2 to reduce first-player bias
+    mcts_as_p1 = (game_idx % 2 == 0)
+
+    game_seed = seed + game_idx
+    if game_seed is not None:
+        random.seed(game_seed)
+        np.random.seed(game_seed)
+
+    if verbose and False:
+        print(f"  [PID {process_id}] Game {game_idx} STARTING (MCTS as P{'1' if mcts_as_p1 else '2'}, seed={game_seed})")
+
+    start_time = time.perf_counter()
+
+    result, move_count = play_single_game(
+        iterations=iterations,
+        hyperparams=hyperparams,
+        mcts_as_player1=mcts_as_p1,
+        rings=rings,
+        rng_seed=game_seed)
+
+    elapsed = time.perf_counter() - start_time
+
+    # Convert result to MCTS perspective
+    if not mcts_as_p1:
+        result = -result
+
+    if verbose and False :
+        outcome_str = "WIN" if result > 0 else ("LOSS" if result < 0 else "TIE")
+        print(f"  [PID {process_id}] Game {game_idx} FINISHED: {outcome_str} in {elapsed:.4f}s ({move_count} moves, {elapsed/move_count if move_count > 0 else 0:.4f}s/move)")
+
+    return (result, elapsed, game_idx)
+
+
 def evaluate_hyperparams(
     hyperparams: MCTSHyperparams,
     games: int,
     iterations: int,
-    backend: str,
     rings: int = 37,
     seed: int | None = None,
-    verbose: bool = False) -> TuningResult:
-    """Evaluate a hyperparameter configuration by playing games vs random."""
+    verbose: bool = False,
+    num_processes: int = 10) -> TuningResult:
+    """
+    Evaluate a hyperparameter configuration by playing games vs random.
+
+    Games are run in parallel using multiprocessing for faster evaluation.
+
+    Args:
+        hyperparams: MCTS hyperparameters to evaluate
+        games: Number of games to play
+        iterations: Number of MCTS iterations per move
+        rings: Board size (37, 48, or 61)
+        seed: Base RNG seed for reproducibility
+        verbose: Whether to print progress (currently disabled for multiprocessing)
+        num_processes: Number of parallel processes to use (default: 10)
+
+    Returns:
+        TuningResult with win rate and statistics
+    """
     if seed is None:
         seed = 0
 
+    if verbose:
+        print(f"  Starting {games} games across {num_processes} processes...")
+
+    pool_start = time.perf_counter()
+
+    # Create a partial function with fixed parameters
+    worker_fn = partial(
+        _play_evaluation_game,
+        hyperparams=hyperparams,
+        iterations=iterations,
+        rings=rings,
+        seed=seed,
+        verbose=verbose)
+
+    # Run games in parallel using multiprocessing
+    with mp.Pool(processes=num_processes) as pool:
+        results = pool.map(worker_fn, range(games))
+
+    pool_elapsed = time.perf_counter() - pool_start
+    if verbose:
+        print(f"  All games completed in {pool_elapsed:.2f}s (wall time)")
+
+    # Aggregate results
     wins = 0
     losses = 0
     ties = 0
     total_time = 0.0
 
-    for game_idx in range(games):
-        # Alternate MCTS between player 1 and 2 to reduce first-player bias
-        mcts_as_p1 = (game_idx % 2 == 0)
-
-        game_seed = seed + game_idx
-        if game_seed is not None:
-            random.seed(game_seed)
-            np.random.seed(game_seed)
-
-        start_time = time.perf_counter()
-
-        result = play_single_game(
-            backend=backend,
-            iterations=iterations,
-            hyperparams=hyperparams,
-            mcts_as_player1=mcts_as_p1,
-            rings=rings,
-            rng_seed=game_seed)
-
-        elapsed = time.perf_counter() - start_time
+    for result, elapsed, game_idx in results:
         total_time += elapsed
-
-        # Convert result to MCTS perspective
-        if not mcts_as_p1:
-            result = -result
-
         if result > 0:
             wins += 1
         elif result < 0:
             losses += 1
         else:
             ties += 1
-
-        if verbose and (game_idx + 1) % 10 == 0:
-            print(f"  Progress: {game_idx + 1}/{games} games, "
-                  f"current win rate: {wins / (game_idx + 1):.1%}")
 
     win_rate = wins / games if games > 0 else 0.0
     mean_time = total_time / games if games > 0 else 0.0
@@ -153,51 +223,55 @@ def evaluate_hyperparams(
 
 
 def play_single_game(
-    backend: str,
     iterations: int,
     hyperparams: MCTSHyperparams,
     mcts_as_player1: bool,
     rings: int,
-    rng_seed: int | None) -> int:
-    """Play a single game and return the terminal result (1, -1, or 0)."""
+    rng_seed: int | None) -> tuple[int, int]:
+    """Play a single game and return the terminal result and move count.
+
+    Returns:
+        (result, move_count) where result is 1, -1, or 0, and move_count is the number of moves
+    """
     game = ZertzGame(rings=rings)
 
     if mcts_as_player1:
         player1 = make_mcts_player(
-            game, player_n=1, backend=backend, iterations=iterations,
+            game, player_n=1, iterations=iterations,
             hyperparams=hyperparams, rng_seed=rng_seed
         )
         player2 = RandomZertzPlayer(game, n=2)
     else:
         player1 = RandomZertzPlayer(game, n=1)
         player2 = make_mcts_player(
-            game, player_n=2, backend=backend, iterations=iterations,
+            game, player_n=2, iterations=iterations,
             hyperparams=hyperparams, rng_seed=rng_seed
         )
 
-    players = [player1, player2]
+    players = {1: player1, -1: player2}  # Map player value (1 or -1) to player object
+    move_count = 0
 
     while game.get_game_ended() is None:
-        current = players[game.get_cur_player_value() - 1]
+        player_value = game.get_cur_player_value()  # Returns 1 for P1, -1 for P2
+        current = players[player_value]
         action_type, action_data = current.get_action()
         if action_type == "PASS":
             game.take_action("PASS", None)
         else:
             game.take_action(action_type, action_data)
+        move_count += 1
 
-    return game.get_game_ended()
+    return game.get_game_ended(), move_count
 
 
 def make_mcts_player(
     game: ZertzGame,
     player_n: int,
-    backend: str,
     iterations: int,
     hyperparams: MCTSHyperparams,
     rng_seed: int | None) -> MCTSZertzPlayer:
     """Create a configured MCTS player with given hyperparameters.
 
-    Note: backend parameter is kept for compatibility but ignored - Rust is always used.
     """
     return MCTSZertzPlayer(
         game,
@@ -208,7 +282,7 @@ def make_mcts_player(
         fpu_reduction=hyperparams.fpu_reduction,
         widening_constant=hyperparams.widening_constant,
         rave_constant=hyperparams.rave_constant,
-        parallel=False,
+        num_workers=4,
         use_transposition_table=True,
         use_transposition_lookups=True,
         clear_table_each_move=True,
@@ -219,10 +293,10 @@ def make_mcts_player(
 def grid_search(
     iterations: int,
     games_per_config: int,
-    backend: str,
     rings: int,
     seed: int,
-    verbose: bool = True) -> list[TuningResult]:
+    verbose: bool = True,
+    num_processes: int = 10) -> list[TuningResult]:
     """
     Perform grid search over hyperparameter space.
 
@@ -232,10 +306,10 @@ def grid_search(
     - max_simulation_depth: [None (full game)]
     - progressive_widening: [False] (disabled by default after bug fix)
     """
-    exploration_values = [0.5, 1.0, 1.41, 2.0, 3.0]
+    exploration_values = [0.2, 0.35, 0.5, 1.0, 1.41, 2.0, 3.0]
     fpu_values = [None, 0.1, 0.2, 0.3, 0.5]
     depth_values = [None]  # Start with full-depth only
-    widening_values = [None]  # Progressive widening disabled by default
+    widening_values = [None, 8.0, 12.0, 16.0, 20.0]  # Progressive widening disabled by default
 
     results = []
     total_configs = len(exploration_values) * len(fpu_values) * len(depth_values) * len(widening_values)
@@ -257,27 +331,28 @@ def grid_search(
                         widening_constant=widening,
                         rave_constant=None)  # Disabled for grid search by default
 
-                if verbose:
-                    print(f"[{config_num}/{total_configs}] Testing: "
-                          f"exploration={exploration:.2f}, "
-                          f"fpu={fpu if fpu else 'None'}, "
-                          f"depth={depth if depth else 'Full'}")
+                    if verbose:
+                        print(f"[{config_num}/{total_configs}] Testing: "
+                              f"exploration={exploration:.2f}, "
+                              f"fpu={fpu if fpu else 'None'}, "
+                              f"depth={depth if depth else 'Full'}, "
+                              f"widening={widening if widening else 'None'}, ")
 
-                result = evaluate_hyperparams(
-                    hyperparams=hyperparams,
-                    games=games_per_config,
-                    iterations=iterations,
-                    backend=backend,
-                    rings=rings,
-                    seed=seed + config_num * 1000,
-                    verbose=verbose)
+                    result = evaluate_hyperparams(
+                        hyperparams=hyperparams,
+                        games=games_per_config,
+                        iterations=iterations,
+                        rings=rings,
+                        seed=seed + config_num * 1000,
+                        verbose=verbose,
+                        num_processes=num_processes)
 
-                results.append(result)
+                    results.append(result)
 
-                if verbose:
-                    print(f"  → Win rate: {result.win_rate:.1%} "
-                          f"({result.wins}W/{result.losses}L/{result.ties}T), "
-                          f"avg time: {result.mean_time_per_game:.3f}s\n")
+                    if verbose:
+                        print(f"  → Win rate: {result.win_rate:.1%} "
+                              f"({result.wins}W/{result.losses}L/{result.ties}T), "
+                              f"avg time: {result.mean_time_per_game:.3f}s\n")
 
     return results
 
@@ -285,11 +360,11 @@ def grid_search(
 def random_search(
     iterations: int,
     games_per_config: int,
-    backend: str,
     rings: int,
     seed: int,
     num_samples: int = 20,
-    verbose: bool = True) -> list[TuningResult]:
+    verbose: bool = True,
+    num_processes: int = 10) -> list[TuningResult]:
     """
     Perform random search over hyperparameter space.
 
@@ -355,10 +430,10 @@ def random_search(
             hyperparams=hyperparams,
             games=games_per_config,
             iterations=iterations,
-            backend=backend,
             rings=rings,
             seed=seed + sample_num * 1000,
-            verbose=verbose)
+            verbose=verbose,
+            num_processes=num_processes)
 
         results.append(result)
 
@@ -427,20 +502,14 @@ def main() -> None:
     parser.add_argument(
         "--games",
         type=int,
-        default=20,
-        help="Games per configuration (default: 20)"
+        default=100,
+        help="Games per configuration (default: 100)"
     )
     parser.add_argument(
         "--iterations",
         type=int,
         default=1500,
         help="MCTS iterations per move (default: 1500)"
-    )
-    parser.add_argument(
-        "--backend",
-        choices=["python", "rust"],
-        default="rust",
-        help="MCTS backend to use (default: rust)"
     )
     parser.add_argument(
         "--samples",
@@ -463,8 +532,8 @@ def main() -> None:
     parser.add_argument(
         "--top",
         type=int,
-        default=5,
-        help="Number of top configurations to display (default: 5)"
+        default=10,
+        help="Number of top configurations to display (default: 10)"
     )
     parser.add_argument(
         "--rings",
@@ -478,6 +547,12 @@ def main() -> None:
         action="store_true",
         help="Suppress progress output"
     )
+    parser.add_argument(
+        "--processes",
+        type=int,
+        default=10,
+        help="Number of parallel processes for game evaluation (default: 10)"
+    )
 
     args = parser.parse_args()
 
@@ -488,19 +563,19 @@ def main() -> None:
         results = grid_search(
             iterations=args.iterations,
             games_per_config=args.games,
-            backend=args.backend,
             rings=args.rings,
             seed=args.seed,
-            verbose=verbose)
+            verbose=verbose,
+            num_processes=args.processes)
     else:  # random
         results = random_search(
             iterations=args.iterations,
             games_per_config=args.games,
-            backend=args.backend,
             rings=args.rings,
             seed=args.seed,
             num_samples=args.samples,
-            verbose=verbose)
+            verbose=verbose,
+            num_processes=args.processes)
 
     # Print summary
     print_summary(results, top_n=args.top)
