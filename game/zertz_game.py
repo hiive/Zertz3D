@@ -466,8 +466,15 @@ class ZertzGame:
             src = self.board.str_to_index(src_str)
             dst = self.board.str_to_index(dst_str)
             cap = self.board.get_middle_ring(src, dst)
-            neighbors = self.board.get_neighbors(src)
-            direction = neighbors.index(cap)
+
+            # Find direction by calculating offset and matching to DIRECTIONS
+            dy = cap[0] - src[0]
+            dx = cap[1] - src[1]
+            try:
+                direction = self.board.DIRECTIONS.index((dy, dx))
+            except ValueError:
+                raise ValueError(f"Invalid capture: {src_str} to {dst_str} via {cap}")
+
             action = (direction, src[0], src[1])
         else:
             action = None
