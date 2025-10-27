@@ -1,6 +1,6 @@
 [project]
 name = "zertz3d"
-version = "0.2.0"
+version = "0.5.1"
 description = "A 3D implementation of the abstract board game Zèrtz."
 readme = "README.md"
 requires-python = ">=3.12"

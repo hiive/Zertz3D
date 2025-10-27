@@ -549,7 +549,7 @@ def apply_placement_action(
     global_state: np.ndarray,
     action: Tuple[int, int, int],
     config: BoardConfig
-) -> None:
+) -> List[Tuple[int, int, int]]:
     """Apply placement action to state IN-PLACE.
 
     Args:
@@ -557,6 +557,10 @@ def apply_placement_action(
         global_state: (10,) global state array (MUTATED IN-PLACE)
         action: (type_index, put_loc, rem_loc) placement action
         config: BoardConfig
+
+    Returns:
+        List of captured marble positions as (marble_layer, y, x) tuples from isolation,
+        or empty list if no isolation captures occurred
     """
     type_index, put_loc, rem_loc = action
     dst_y, dst_x = divmod(put_loc, config.width)
@@ -565,7 +569,7 @@ def apply_placement_action(
     else:
         remove_y, remove_x = divmod(rem_loc, config.width)
 
-    rust_apply_placement_action(
+    return rust_apply_placement_action(
         board_state,
         global_state,
         type_index,

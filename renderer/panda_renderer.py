@@ -926,6 +926,9 @@ class PandaRenderer(ShowBase):
         Args:
             action_duration: Animation duration (already scaled by controller)
         """
+        print(f"[RENDERER DEBUG] show_isolated_removal called: pos={pos}, marble_color={marble_color}")
+        print(f"[RENDERER DEBUG] pos_to_marble keys: {list(self.pos_to_marble.keys())}")
+
         # Remove the ring base piece
         if pos in self.pos_to_base:
             base_piece = self.pos_to_base[pos]
@@ -949,7 +952,6 @@ class PandaRenderer(ShowBase):
         if marble_color is not None and pos in self.pos_to_marble:
             captured_marble = self.pos_to_marble.pop(pos)
             src_coords = captured_marble.get_pos()
-
             # For isolated removal, immediate animation
             self._animate_captured_marble(
                 captured_marble,
@@ -1115,7 +1117,7 @@ class PandaRenderer(ShowBase):
         Args:
             captured_marble: The marble entity
             src_pos_str: Source position for reference (unused, kept for compatibility)
-            src_coords: Source coordinates (unused, kept for compatibility)
+            src_coords: Source coordinates in world space
             player: Capturing player
             marble_color: Marble color ('w', 'g', or 'b')
             action_duration: Animation duration
@@ -1154,15 +1156,12 @@ class PandaRenderer(ShowBase):
             # Restore original scale for interpolation
             captured_marble.set_scale(current_scale)
 
-            # Get placeholder coordinates for reparenting
-            src_coords_local = captured_marble.get_pos()
-            src_coords_world_placeholder = self._board_local_to_world(src_coords_local)
-
+            # Use the src_coords passed in (already in world space)
             # Queue animation
             self.animation_manager.queue_animation(
                 anim_type="move",
                 entity=captured_marble,
-                src=src_coords_world_placeholder,
+                src=src_coords,
                 dst=capture_pool_coords,
                 scale=self.CAPTURED_MARBLE_SCALE,
                 duration=action_duration,

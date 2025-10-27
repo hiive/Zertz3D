@@ -483,36 +483,30 @@ class ZertzBoard:
                 f"No {marble_type} marbles in supply. Cannot use captured marbles until entire pool is empty."
             )
 
-        # Track captures before/after to return captured marble list
-        # (for backward compatibility with tests and logging)
-        cur_player = self.get_cur_player()
-        cap_slice = self.P1_CAP_SLICE if cur_player == self.PLAYER_1 else self.P2_CAP_SLICE
-        captures_before = np.copy(self.global_state[cap_slice])
-
         # Delegate to Rust (which handles marble placement, ring removal,
         # isolation capture, supply/captured pool management, and player switching)
+        # Returns list of captured marble positions from isolation
         config = self._get_config()
-        zertz_logic.apply_placement_action(
+        captured_positions = zertz_logic.apply_placement_action(
             self.state,
             self.global_state,
             action,  # Pass the full action tuple
             config
         )
 
-        # Check if isolation captures occurred by comparing capture counts
-        captures_after = self.global_state[cap_slice]
-        if np.any(captures_after > captures_before):
-            # Isolation captures occurred - return placeholder list
-            # Note: We don't have the exact positions anymore since Rust removed them
-            # Return a generic list indicating captures occurred
-            # TODO: Enhance Rust to return detailed capture info
+        # Convert captured positions to expected format for ActionResult
+        if captured_positions:
             captured_marbles = []
-            for i, (before, after) in enumerate(zip(captures_before, captures_after)):
-                if after > before:
-                    marble_type = ['w', 'g', 'b'][i]
-                    for _ in range(int(after - before)):
-                        captured_marbles.append({"marble": marble_type, "pos": ""})
-            return captured_marbles if captured_marbles else None
+            for marble_layer, y, x in captured_positions:
+                # Convert marble layer to marble type
+                marble_type = self.LAYER_TO_MARBLE[marble_layer]
+                # Convert (y, x) to board position string
+                # Note: Don't use index_to_str() because the ring has already been removed
+                # by the Rust code, so we need to get the label directly
+                pos = self.position_from_yx((y, x)).label
+                print(f"[DEBUG] Isolation capture: marble_layer={marble_layer}, y={y}, x={x}, pos={pos}, marble_type={marble_type}")
+                captured_marbles.append({"marble": marble_type, "pos": pos})
+            return captured_marbles
         return None
 
     def _take_capture_action(self, action):
@@ -565,30 +559,6 @@ class ZertzBoard:
         if np.sum(self.state[self.CAPTURE_LAYER]) == 0:
             self._next_player()
         return captured_type
-
-    def _check_for_isolation_capture(self):
-        """Check for isolated regions and capture marbles (delegates to stateless version)."""
-
-        # Call stateless version
-        config = self._get_config()
-        spatial_out, global_out, captured_list = zertz_logic.check_for_isolation_capture(
-            self.state, self.global_state, config
-        )
-
-        # Update state with results
-        self.state[:] = spatial_out
-        self.global_state[:] = global_out
-
-        # Convert captured list to expected format
-        if captured_list:
-            captured_marbles = []
-            for marble_layer, y, x in captured_list:
-                # Convert layer index back to marble type
-                marble_type = {1: 'w', 2: 'g', 3: 'b'}[marble_layer]
-                pos_str = self.index_to_str((y, x))
-                captured_marbles.append({"marble": marble_type, "pos": pos_str})
-            return captured_marbles
-        return None
 
 
     def get_valid_moves(self):

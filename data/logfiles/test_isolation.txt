@@ -1,0 +1,28 @@
+# Seed: 999999
+# Rings: 37
+# Test case: Create an isolated single ring with a marble
+#
+# Board layout (37 rings):
+#  A4 B5 C6 D7
+#  A3 B4 C5 D6 E6
+#  A2 B3 C4 D5 E5 F5
+#  A1 B2 C3 D4 E4 F4 G4
+#     B1 C2 D3 E3 F3 G3
+#        C1 D2 E2 F2 G2
+#           D1 E1 F1 G1
+#
+# Strategy: Isolate A4 (corner ring) by removing all its neighbors
+# A4 neighbors: A3, B4, B5
+#
+# Step 1: Place marble on A4
+# Step 2: Remove B5 (one neighbor)
+# Step 3: Remove A3 (second neighbor)
+# Step 4: Remove B4 (third neighbor - A4 becomes isolated!)
+#
+Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'A4', 'remove': 'G4'} # isolate contains marble
+# Player 1: {'action': 'PUT', 'marble': 'b', 'dst': 'G1', 'remove': 'G4'} # isolate is empty
+Player 2: {'action': 'PUT', 'marble': 'w', 'dst': 'D4', 'remove': 'B5'}
+Player 1: {'action': 'PUT', 'marble': 'g', 'dst': 'E4', 'remove': 'G3'}
+Player 2: {'action': 'PUT', 'marble': 'b', 'dst': 'C3', 'remove': 'A3'}
+Player 1: {'action': 'PUT', 'marble': 'w', 'dst': 'F3', 'remove': 'G2'}
+Player 2: {'action': 'PUT', 'marble': 'g', 'dst': 'C4', 'remove': 'B4'}
