@@ -526,7 +526,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=str,
-        default="data/tuning_results.json",
+        default="data/tuning/tuning_results.json",
         help="Output file for results (default: data/tuning_results.json)"
     )
     parser.add_argument(

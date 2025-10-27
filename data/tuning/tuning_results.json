@@ -1,0 +1,2630 @@
+{
+  "results": [
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.57,
+      "games_played": 100,
+      "wins": 57,
+      "losses": 43,
+      "ties": 0,
+      "mean_time_per_game": 7.172742859649007
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.66,
+      "games_played": 100,
+      "wins": 66,
+      "losses": 34,
+      "ties": 0,
+      "mean_time_per_game": 3.832263041678816
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.83,
+      "games_played": 100,
+      "wins": 83,
+      "losses": 17,
+      "ties": 0,
+      "mean_time_per_game": 4.296755550445523
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.7,
+      "games_played": 100,
+      "wins": 70,
+      "losses": 30,
+      "ties": 0,
+      "mean_time_per_game": 4.88325659258524
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 5.0403118458087555
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.6,
+      "games_played": 100,
+      "wins": 60,
+      "losses": 40,
+      "ties": 0,
+      "mean_time_per_game": 7.765739553757012
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.73,
+      "games_played": 100,
+      "wins": 73,
+      "losses": 27,
+      "ties": 0,
+      "mean_time_per_game": 3.979893847866915
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 4.359649962510448
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 4.80824316964252
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.77,
+      "games_played": 100,
+      "wins": 77,
+      "losses": 23,
+      "ties": 0,
+      "mean_time_per_game": 5.286106198327616
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.58,
+      "games_played": 100,
+      "wins": 58,
+      "losses": 42,
+      "ties": 0,
+      "mean_time_per_game": 7.967354897123296
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.63,
+      "games_played": 100,
+      "wins": 63,
+      "losses": 37,
+      "ties": 0,
+      "mean_time_per_game": 3.7902023987984284
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 4.388142200843431
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 4.98229060459882
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 5.212747965769377
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.58,
+      "games_played": 100,
+      "wins": 58,
+      "losses": 42,
+      "ties": 0,
+      "mean_time_per_game": 7.870429844642058
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.66,
+      "games_played": 100,
+      "wins": 66,
+      "losses": 34,
+      "ties": 0,
+      "mean_time_per_game": 4.025965370445046
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 4.361168578327633
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 4.91142002828652
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.79,
+      "games_played": 100,
+      "wins": 79,
+      "losses": 21,
+      "ties": 0,
+      "mean_time_per_game": 5.4722656324924905
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.57,
+      "games_played": 100,
+      "wins": 57,
+      "losses": 43,
+      "ties": 0,
+      "mean_time_per_game": 8.356160681576002
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.58,
+      "games_played": 100,
+      "wins": 58,
+      "losses": 42,
+      "ties": 0,
+      "mean_time_per_game": 3.9717438708106054
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.7,
+      "games_played": 100,
+      "wins": 70,
+      "losses": 30,
+      "ties": 0,
+      "mean_time_per_game": 4.384970017562154
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 5.042834030825179
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.2,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.76,
+      "games_played": 100,
+      "wins": 76,
+      "losses": 24,
+      "ties": 0,
+      "mean_time_per_game": 5.543502797917463
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.59,
+      "games_played": 100,
+      "wins": 59,
+      "losses": 41,
+      "ties": 0,
+      "mean_time_per_game": 8.34908468290465
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.61,
+      "games_played": 100,
+      "wins": 61,
+      "losses": 39,
+      "ties": 0,
+      "mean_time_per_game": 3.9896751963486894
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.73,
+      "games_played": 100,
+      "wins": 73,
+      "losses": 27,
+      "ties": 0,
+      "mean_time_per_game": 4.5655481945560314
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 4.920189149135258
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.8,
+      "games_played": 100,
+      "wins": 80,
+      "losses": 20,
+      "ties": 0,
+      "mean_time_per_game": 5.381249490883201
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 8.341367129192221
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.65,
+      "games_played": 100,
+      "wins": 65,
+      "losses": 35,
+      "ties": 0,
+      "mean_time_per_game": 3.966936825856101
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.65,
+      "games_played": 100,
+      "wins": 65,
+      "losses": 35,
+      "ties": 0,
+      "mean_time_per_game": 4.51761313452851
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.73,
+      "games_played": 100,
+      "wins": 73,
+      "losses": 27,
+      "ties": 0,
+      "mean_time_per_game": 4.763894016230479
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.77,
+      "games_played": 100,
+      "wins": 77,
+      "losses": 23,
+      "ties": 0,
+      "mean_time_per_game": 5.063368159565143
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 7.934150660890155
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.59,
+      "games_played": 100,
+      "wins": 59,
+      "losses": 41,
+      "ties": 0,
+      "mean_time_per_game": 3.830241194155533
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 4.574538385821507
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.61,
+      "games_played": 100,
+      "wins": 61,
+      "losses": 39,
+      "ties": 0,
+      "mean_time_per_game": 5.067221842580475
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.62,
+      "games_played": 100,
+      "wins": 62,
+      "losses": 38,
+      "ties": 0,
+      "mean_time_per_game": 5.189347101673484
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.6,
+      "games_played": 100,
+      "wins": 60,
+      "losses": 40,
+      "ties": 0,
+      "mean_time_per_game": 8.114031462888233
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.62,
+      "games_played": 100,
+      "wins": 62,
+      "losses": 38,
+      "ties": 0,
+      "mean_time_per_game": 3.8149981999839655
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.65,
+      "games_played": 100,
+      "wins": 65,
+      "losses": 35,
+      "ties": 0,
+      "mean_time_per_game": 4.3425963191851045
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 4.736516096293927
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 4.9823767053778285
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.61,
+      "games_played": 100,
+      "wins": 61,
+      "losses": 39,
+      "ties": 0,
+      "mean_time_per_game": 8.255784448741469
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 3.908306663297117
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 4.342340902895667
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.67,
+      "games_played": 100,
+      "wins": 67,
+      "losses": 33,
+      "ties": 0,
+      "mean_time_per_game": 4.644327762173488
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.35,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 5.171780296221841
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.62,
+      "games_played": 100,
+      "wins": 62,
+      "losses": 38,
+      "ties": 0,
+      "mean_time_per_game": 7.832183050452731
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 3.8122707491368057
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 4.264744772526901
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 4.671658903700299
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 5.1035169411939565
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.6,
+      "games_played": 100,
+      "wins": 60,
+      "losses": 40,
+      "ties": 0,
+      "mean_time_per_game": 8.022695853777696
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 3.929611177085899
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.73,
+      "games_played": 100,
+      "wins": 73,
+      "losses": 27,
+      "ties": 0,
+      "mean_time_per_game": 4.27898671453353
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 4.7256326228519905
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.71,
+      "games_played": 100,
+      "wins": 71,
+      "losses": 29,
+      "ties": 0,
+      "mean_time_per_game": 5.247427034145221
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.66,
+      "games_played": 100,
+      "wins": 66,
+      "losses": 34,
+      "ties": 0,
+      "mean_time_per_game": 7.670041305841878
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.6,
+      "games_played": 100,
+      "wins": 60,
+      "losses": 40,
+      "ties": 0,
+      "mean_time_per_game": 4.094336893751752
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.66,
+      "games_played": 100,
+      "wins": 66,
+      "losses": 34,
+      "ties": 0,
+      "mean_time_per_game": 4.295651045443956
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.67,
+      "games_played": 100,
+      "wins": 67,
+      "losses": 33,
+      "ties": 0,
+      "mean_time_per_game": 4.84225274093682
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 5.249798630508594
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.63,
+      "games_played": 100,
+      "wins": 63,
+      "losses": 37,
+      "ties": 0,
+      "mean_time_per_game": 7.985069314579014
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.65,
+      "games_played": 100,
+      "wins": 65,
+      "losses": 35,
+      "ties": 0,
+      "mean_time_per_game": 3.767765148326289
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.79,
+      "games_played": 100,
+      "wins": 79,
+      "losses": 21,
+      "ties": 0,
+      "mean_time_per_game": 4.3329957816354
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 4.675046347083989
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.74,
+      "games_played": 100,
+      "wins": 74,
+      "losses": 26,
+      "ties": 0,
+      "mean_time_per_game": 5.117583897067234
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.62,
+      "games_played": 100,
+      "wins": 62,
+      "losses": 38,
+      "ties": 0,
+      "mean_time_per_game": 7.7420672004413795
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.63,
+      "games_played": 100,
+      "wins": 63,
+      "losses": 37,
+      "ties": 0,
+      "mean_time_per_game": 3.890131731647998
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.71,
+      "games_played": 100,
+      "wins": 71,
+      "losses": 29,
+      "ties": 0,
+      "mean_time_per_game": 4.344987536186818
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.63,
+      "games_played": 100,
+      "wins": 63,
+      "losses": 37,
+      "ties": 0,
+      "mean_time_per_game": 4.636531891745981
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 0.5,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.76,
+      "games_played": 100,
+      "wins": 76,
+      "losses": 24,
+      "ties": 0,
+      "mean_time_per_game": 5.361454054173082
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 7.992705417415127
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.71,
+      "games_played": 100,
+      "wins": 71,
+      "losses": 29,
+      "ties": 0,
+      "mean_time_per_game": 4.097774999528192
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.74,
+      "games_played": 100,
+      "wins": 74,
+      "losses": 26,
+      "ties": 0,
+      "mean_time_per_game": 4.212438114574179
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.77,
+      "games_played": 100,
+      "wins": 77,
+      "losses": 23,
+      "ties": 0,
+      "mean_time_per_game": 4.924935227464885
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.74,
+      "games_played": 100,
+      "wins": 74,
+      "losses": 26,
+      "ties": 0,
+      "mean_time_per_game": 5.178683543736115
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.58,
+      "games_played": 100,
+      "wins": 58,
+      "losses": 42,
+      "ties": 0,
+      "mean_time_per_game": 8.097039284615311
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.62,
+      "games_played": 100,
+      "wins": 62,
+      "losses": 38,
+      "ties": 0,
+      "mean_time_per_game": 3.941706182495691
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.73,
+      "games_played": 100,
+      "wins": 73,
+      "losses": 27,
+      "ties": 0,
+      "mean_time_per_game": 4.413882690821774
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.79,
+      "games_played": 100,
+      "wins": 79,
+      "losses": 21,
+      "ties": 0,
+      "mean_time_per_game": 4.798265882923733
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 5.278359885043464
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.65,
+      "games_played": 100,
+      "wins": 65,
+      "losses": 35,
+      "ties": 0,
+      "mean_time_per_game": 8.051036400462035
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.61,
+      "games_played": 100,
+      "wins": 61,
+      "losses": 39,
+      "ties": 0,
+      "mean_time_per_game": 3.998938509528525
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.71,
+      "games_played": 100,
+      "wins": 71,
+      "losses": 29,
+      "ties": 0,
+      "mean_time_per_game": 4.416770890404004
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.73,
+      "games_played": 100,
+      "wins": 73,
+      "losses": 27,
+      "ties": 0,
+      "mean_time_per_game": 4.712033813802991
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.7,
+      "games_played": 100,
+      "wins": 70,
+      "losses": 30,
+      "ties": 0,
+      "mean_time_per_game": 5.2876447916845795
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.57,
+      "games_played": 100,
+      "wins": 57,
+      "losses": 43,
+      "ties": 0,
+      "mean_time_per_game": 8.0291500028898
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 4.239479238274507
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 4.458453304884024
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 4.840414421230089
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 5.4797444108058695
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.56,
+      "games_played": 100,
+      "wins": 56,
+      "losses": 44,
+      "ties": 0,
+      "mean_time_per_game": 8.56509067955194
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 4.0648597716330555
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.71,
+      "games_played": 100,
+      "wins": 71,
+      "losses": 29,
+      "ties": 0,
+      "mean_time_per_game": 4.445944476302247
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 4.851691614571028
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.76,
+      "games_played": 100,
+      "wins": 76,
+      "losses": 24,
+      "ties": 0,
+      "mean_time_per_game": 5.233906251247972
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.61,
+      "games_played": 100,
+      "wins": 61,
+      "losses": 39,
+      "ties": 0,
+      "mean_time_per_game": 7.693058409965597
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.69,
+      "games_played": 100,
+      "wins": 69,
+      "losses": 31,
+      "ties": 0,
+      "mean_time_per_game": 4.029320441687014
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.79,
+      "games_played": 100,
+      "wins": 79,
+      "losses": 21,
+      "ties": 0,
+      "mean_time_per_game": 4.536212420817464
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.85,
+      "games_played": 100,
+      "wins": 85,
+      "losses": 15,
+      "ties": 0,
+      "mean_time_per_game": 5.067766420412808
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 5.233698572521098
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.65,
+      "games_played": 100,
+      "wins": 65,
+      "losses": 35,
+      "ties": 0,
+      "mean_time_per_game": 7.9694025917002
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.74,
+      "games_played": 100,
+      "wins": 74,
+      "losses": 26,
+      "ties": 0,
+      "mean_time_per_game": 4.015199911990203
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 4.436878929545637
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.8,
+      "games_played": 100,
+      "wins": 80,
+      "losses": 20,
+      "ties": 0,
+      "mean_time_per_game": 4.927874898756854
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 5.296450991318562
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.59,
+      "games_played": 100,
+      "wins": 59,
+      "losses": 41,
+      "ties": 0,
+      "mean_time_per_game": 7.99186896832427
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 4.057338543317746
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 4.647268161613028
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.79,
+      "games_played": 100,
+      "wins": 79,
+      "losses": 21,
+      "ties": 0,
+      "mean_time_per_game": 5.018903697121423
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.82,
+      "games_played": 100,
+      "wins": 82,
+      "losses": 18,
+      "ties": 0,
+      "mean_time_per_game": 5.477395744586829
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.57,
+      "games_played": 100,
+      "wins": 57,
+      "losses": 43,
+      "ties": 0,
+      "mean_time_per_game": 8.099458707114682
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.71,
+      "games_played": 100,
+      "wins": 71,
+      "losses": 29,
+      "ties": 0,
+      "mean_time_per_game": 4.040237466322724
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.82,
+      "games_played": 100,
+      "wins": 82,
+      "losses": 18,
+      "ties": 0,
+      "mean_time_per_game": 4.48512948500691
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.8,
+      "games_played": 100,
+      "wins": 80,
+      "losses": 20,
+      "ties": 0,
+      "mean_time_per_game": 4.97409687287407
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.83,
+      "games_played": 100,
+      "wins": 83,
+      "losses": 17,
+      "ties": 0,
+      "mean_time_per_game": 5.218548569236882
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.59,
+      "games_played": 100,
+      "wins": 59,
+      "losses": 41,
+      "ties": 0,
+      "mean_time_per_game": 7.766074049260933
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 4.161749499624129
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.83,
+      "games_played": 100,
+      "wins": 83,
+      "losses": 17,
+      "ties": 0,
+      "mean_time_per_game": 4.302051626665052
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.76,
+      "games_played": 100,
+      "wins": 76,
+      "losses": 24,
+      "ties": 0,
+      "mean_time_per_game": 4.884061367108952
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 1.41,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.82,
+      "games_played": 100,
+      "wins": 82,
+      "losses": 18,
+      "ties": 0,
+      "mean_time_per_game": 5.574916331211571
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.62,
+      "games_played": 100,
+      "wins": 62,
+      "losses": 38,
+      "ties": 0,
+      "mean_time_per_game": 8.044738918375224
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 3.9973099195747634
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.74,
+      "games_played": 100,
+      "wins": 74,
+      "losses": 26,
+      "ties": 0,
+      "mean_time_per_game": 4.679416166248266
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.77,
+      "games_played": 100,
+      "wins": 77,
+      "losses": 23,
+      "ties": 0,
+      "mean_time_per_game": 4.913908690856769
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.89,
+      "games_played": 100,
+      "wins": 89,
+      "losses": 11,
+      "ties": 0,
+      "mean_time_per_game": 5.358288015767466
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.56,
+      "games_played": 100,
+      "wins": 56,
+      "losses": 44,
+      "ties": 0,
+      "mean_time_per_game": 7.674148361224216
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.66,
+      "games_played": 100,
+      "wins": 66,
+      "losses": 34,
+      "ties": 0,
+      "mean_time_per_game": 4.0099921337375415
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 4.7826431058882735
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.83,
+      "games_played": 100,
+      "wins": 83,
+      "losses": 17,
+      "ties": 0,
+      "mean_time_per_game": 4.955945156228263
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.81,
+      "games_played": 100,
+      "wins": 81,
+      "losses": 19,
+      "ties": 0,
+      "mean_time_per_game": 5.556907907978166
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.64,
+      "games_played": 100,
+      "wins": 64,
+      "losses": 36,
+      "ties": 0,
+      "mean_time_per_game": 8.199650896254461
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.81,
+      "games_played": 100,
+      "wins": 81,
+      "losses": 19,
+      "ties": 0,
+      "mean_time_per_game": 4.199256817926653
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 4.533147440804169
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.83,
+      "games_played": 100,
+      "wins": 83,
+      "losses": 17,
+      "ties": 0,
+      "mean_time_per_game": 4.907828163364902
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.82,
+      "games_played": 100,
+      "wins": 82,
+      "losses": 18,
+      "ties": 0,
+      "mean_time_per_game": 5.343649250308517
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.56,
+      "games_played": 100,
+      "wins": 56,
+      "losses": 44,
+      "ties": 0,
+      "mean_time_per_game": 8.137313488384244
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.8,
+      "games_played": 100,
+      "wins": 80,
+      "losses": 20,
+      "ties": 0,
+      "mean_time_per_game": 4.265419717931654
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.85,
+      "games_played": 100,
+      "wins": 85,
+      "losses": 15,
+      "ties": 0,
+      "mean_time_per_game": 4.548637423771433
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 4.973987340787426
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 5.3207698920438995
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.53,
+      "games_played": 100,
+      "wins": 53,
+      "losses": 47,
+      "ties": 0,
+      "mean_time_per_game": 8.258915872592478
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.82,
+      "games_played": 100,
+      "wins": 82,
+      "losses": 18,
+      "ties": 0,
+      "mean_time_per_game": 4.255230153319426
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.77,
+      "games_played": 100,
+      "wins": 77,
+      "losses": 23,
+      "ties": 0,
+      "mean_time_per_game": 4.526855312970001
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.86,
+      "games_played": 100,
+      "wins": 86,
+      "losses": 14,
+      "ties": 0,
+      "mean_time_per_game": 4.904592186717782
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 2.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.76,
+      "games_played": 100,
+      "wins": 76,
+      "losses": 24,
+      "ties": 0,
+      "mean_time_per_game": 5.458984284203034
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.51,
+      "games_played": 100,
+      "wins": 51,
+      "losses": 49,
+      "ties": 0,
+      "mean_time_per_game": 8.034478763241786
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.82,
+      "games_played": 100,
+      "wins": 82,
+      "losses": 18,
+      "ties": 0,
+      "mean_time_per_game": 4.213762882850133
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.82,
+      "games_played": 100,
+      "wins": 82,
+      "losses": 18,
+      "ties": 0,
+      "mean_time_per_game": 4.686123958318494
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.68,
+      "games_played": 100,
+      "wins": 68,
+      "losses": 32,
+      "ties": 0,
+      "mean_time_per_game": 5.2621443680021915
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": null,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 5.522444780392107
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.54,
+      "games_played": 100,
+      "wins": 54,
+      "losses": 46,
+      "ties": 0,
+      "mean_time_per_game": 8.20095810792409
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 4.1166002995381135
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 4.714442155815195
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.7,
+      "games_played": 100,
+      "wins": 70,
+      "losses": 30,
+      "ties": 0,
+      "mean_time_per_game": 5.122467669523321
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.1,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.83,
+      "games_played": 100,
+      "wins": 83,
+      "losses": 17,
+      "ties": 0,
+      "mean_time_per_game": 5.703381472101901
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.65,
+      "games_played": 100,
+      "wins": 65,
+      "losses": 35,
+      "ties": 0,
+      "mean_time_per_game": 7.910545281185769
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.71,
+      "games_played": 100,
+      "wins": 71,
+      "losses": 29,
+      "ties": 0,
+      "mean_time_per_game": 4.200797867053188
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.85,
+      "games_played": 100,
+      "wins": 85,
+      "losses": 15,
+      "ties": 0,
+      "mean_time_per_game": 4.51964827838121
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.76,
+      "games_played": 100,
+      "wins": 76,
+      "losses": 24,
+      "ties": 0,
+      "mean_time_per_game": 4.963874256662093
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.2,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.72,
+      "games_played": 100,
+      "wins": 72,
+      "losses": 28,
+      "ties": 0,
+      "mean_time_per_game": 5.473369837105274
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.57,
+      "games_played": 100,
+      "wins": 57,
+      "losses": 43,
+      "ties": 0,
+      "mean_time_per_game": 7.866106789172627
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.75,
+      "games_played": 100,
+      "wins": 75,
+      "losses": 25,
+      "ties": 0,
+      "mean_time_per_game": 4.020808452512138
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.88,
+      "games_played": 100,
+      "wins": 88,
+      "losses": 12,
+      "ties": 0,
+      "mean_time_per_game": 4.684965934576467
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.76,
+      "games_played": 100,
+      "wins": 76,
+      "losses": 24,
+      "ties": 0,
+      "mean_time_per_game": 5.1146525717061015
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.3,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 5.487952795405872
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": null,
+        "rave_constant": null
+      },
+      "win_rate": 0.59,
+      "games_played": 100,
+      "wins": 59,
+      "losses": 41,
+      "ties": 0,
+      "mean_time_per_game": 7.856110264570452
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 8.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.89,
+      "games_played": 100,
+      "wins": 89,
+      "losses": 11,
+      "ties": 0,
+      "mean_time_per_game": 4.137046494537499
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 12.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.89,
+      "games_played": 100,
+      "wins": 89,
+      "losses": 11,
+      "ties": 0,
+      "mean_time_per_game": 4.435936573348008
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 16.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.74,
+      "games_played": 100,
+      "wins": 74,
+      "losses": 26,
+      "ties": 0,
+      "mean_time_per_game": 5.105440792939626
+    },
+    {
+      "hyperparams": {
+        "exploration_constant": 3.0,
+        "fpu_reduction": 0.5,
+        "max_simulation_depth": null,
+        "widening_constant": 20.0,
+        "rave_constant": null
+      },
+      "win_rate": 0.78,
+      "games_played": 100,
+      "wins": 78,
+      "losses": 22,
+      "ties": 0,
+      "mean_time_per_game": 5.413489776172209
+    }
+  ],
+  "timestamp": "2025-10-27 15:37:21"
+}
