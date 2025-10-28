@@ -676,3 +676,8 @@ policy = PolicyHead(combined)
 - Module constants: PLAYER_1 and PLAYER_2 need to be used from Python
 - ✅check architecture_update_code_duplication_fix.md
 - rename global parameter as global_state (same for spatial -> spatial_state)
+
+## Notes
+
+This seems to be promising:
+`uv run main.py --show-coords --highlight-choices heatmap --player2 mcts:iterations=5000,exploration=2.0,widening=20,rave=1000  --seed 1761531618`

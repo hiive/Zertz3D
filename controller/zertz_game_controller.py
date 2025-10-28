@@ -9,7 +9,7 @@ import time
 import numpy as np
 
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
-from game.loaders import TranscriptLoader, NotationLoader
+from game.loaders import TranscriptLoader, NotationLoader, SGFLoader
 from game.formatters.notation_formatter import NotationFormatter
 from game.player_config import PlayerConfig
 from controller.game_logger import GameLogger
@@ -36,8 +36,11 @@ class ZertzGameController:
             filepath: Path to the file to detect
 
         Returns:
-            "transcript" or "notation"
+            "transcript", "notation" or "sgf"
         """
+        if filepath.lower().endswith(".sgf"):
+            return "sgf"
+
         with open(filepath, 'r') as f:
             for line in f:
                 line = line.strip()
@@ -104,6 +107,8 @@ class ZertzGameController:
             file_format = self._detect_file_format(replay_file)
             if file_format == "notation":
                 loader = NotationLoader(replay_file, status_reporter=print)
+            elif file_format == "sgf":
+                loader = SGFLoader(replay_file, status_reporter=print)
             else:  # transcript format
                 loader = TranscriptLoader(replay_file, status_reporter=print)
 

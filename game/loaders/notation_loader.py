@@ -71,7 +71,7 @@ class NotationLoader:
 
         for line_num, line in enumerate(lines[1:], start=2):
             line = line.strip()
-            if not line:
+            if not line or line.startswith("#"):
                 continue
 
             try:

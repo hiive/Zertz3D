@@ -2,5 +2,6 @@
 
 from .notation_loader import NotationLoader
 from .transcript_loader import TranscriptLoader
+from .sgf_loader import SGFLoader
 
-__all__ = ["NotationLoader", "TranscriptLoader"]
+__all__ = ["NotationLoader", "TranscriptLoader", "SGFLoader"]
