@@ -926,8 +926,8 @@ class PandaRenderer(ShowBase):
         Args:
             action_duration: Animation duration (already scaled by controller)
         """
-        print(f"[RENDERER DEBUG] show_isolated_removal called: pos={pos}, marble_color={marble_color}")
-        print(f"[RENDERER DEBUG] pos_to_marble keys: {list(self.pos_to_marble.keys())}")
+        # print(f"[RENDERER DEBUG] show_isolated_removal called: pos={pos}, marble_color={marble_color}")
+        # print(f"[RENDERER DEBUG] pos_to_marble keys: {list(self.pos_to_marble.keys())}")
 
         # Remove the ring base piece
         if pos in self.pos_to_base:
