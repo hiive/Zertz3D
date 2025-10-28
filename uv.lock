@@ -1839,6 +1839,7 @@ dependencies = [
     { name = "numpy" },
     { name = "panda3d" },
     { name = "panda3d-simplepbr" },
+    { name = "sgfmill" },
     { name = "torch" },
     { name = "torch-geometric" },
 ]
@@ -1850,7 +1851,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "seaborn" },
-    { name = "sgfmill" },
 ]
 
 [package.metadata]
@@ -1860,6 +1860,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "panda3d", specifier = ">=1.10.15" },
     { name = "panda3d-simplepbr", specifier = ">=0.12.0" },
+    { name = "sgfmill", specifier = ">=1.1.1" },
     { name = "torch", specifier = ">=2.8.0" },
     { name = "torch-geometric", specifier = ">=2.7.0" },
 ]
@@ -1871,5 +1872,4 @@ dev = [
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "sgfmill", specifier = ">=1.1.1" },
 ]

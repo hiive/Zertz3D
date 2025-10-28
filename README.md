@@ -1,10 +1,9 @@
 # Zèrtz 3D
 
-A sophisticated 3D implementation of the abstract board game Zèrtz using Panda3D, featuring a high-performance Rust-accelerated MCTS AI engine with advanced search techniques (RAVE, transposition tables, parallel search). This project combines clean layered architecture with state-of-the-art game AI to create both a playable game and a research platform.
+A sophisticated 3D implementation of the abstract board game Zèrtz using Panda3D, featuring a high-performance Rust-accelerated MCTS AI engine with advanced search techniques (RAVE, transposition tables, parallel search).
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Full game rules: http://www.gipf.com/zertz/rules/rules.html
 
@@ -20,9 +19,9 @@ Full game rules: http://www.gipf.com/zertz/rules/rules.html
 - **Replay System**: Record and replay games in transcript or notation format
 
 ### AI & Performance
-- **Advanced MCTS**: Monte Carlo Tree Search with RAVE, progressive widening, and FPU
+- **MCTS**: Monte Carlo Tree Search with RAVE, progressive widening, and FPU
 - **Rust Acceleration**: High-performance game logic and MCTS engine via PyO3
-- **Parallel Search**: Multi-threaded MCTS with virtual loss for lock-free parallelism
+- **Parallel Search**: Multi-threaded MCTS with virtual loss for parallelism
 - **Transposition Tables**: Position caching with Zobrist hashing
 - **Flexible Player Configuration**: Configure AI parameters via command-line
 
@@ -32,12 +31,6 @@ Full game rules: http://www.gipf.com/zertz/rules/rules.html
 - **Human Play Mode**: Interactive mouse-based gameplay
 - **Headless Mode**: Run games without rendering for batch simulations
 - **Text Rendering**: Console-based output for terminal-only environments
-
-### Development & Testing
-- **Comprehensive Tests**: 34 test files covering game logic, edge cases, and integrations
-- **Clean Architecture**: Layered design with clear separation of concerns
-- **Python-Rust Parity**: Identical game logic in both languages for reliability
-- **Statistics Tracking**: Detailed performance metrics and win/loss tracking
 
 ## Installation
 
@@ -80,7 +73,7 @@ uv run main.py --player1 human
 uv run main.py --player1 mcts --player2 mcts
 
 # Strong MCTS with RAVE
-uv run main.py --player1 mcts:iterations=5000,rave=1000,parallel=1
+uv run main.py --player1 mcts:iterations=5000,rave=1000
 ```
 
 ### Player Configuration
@@ -105,7 +98,6 @@ TYPE[:PARAM=VALUE,PARAM=VALUE,...]
 | `fpu` | First Play Urgency reduction | None | 0.2, 0.5 |
 | `widening` | Progressive widening constant | None | 10.0, 20.0 |
 | `rave` | RAVE constant (300-3000) | None | 1000, 2000 |
-| `parallel` | Enable parallel search | 0 | 1 |
 | `workers` | Number of worker threads | 16 | 4, 8, 32 |
 | `verbose` | Print search statistics | 0 | 1 |
 | `seed` | Random seed for this player | None | 12345 |
@@ -123,10 +115,10 @@ uv run main.py --player1 mcts:iterations=5000
 uv run main.py --player1 mcts:iterations=2000,rave=1000
 
 # Parallel MCTS with 8 threads
-uv run main.py --player1 mcts:iterations=5000,parallel=1,workers=8
+uv run main.py --player1 mcts:iterations=5000,workers=8
 
 # Advanced MCTS with multiple features
-uv run main.py --player1 mcts:iterations=10000,exploration=2.0,rave=1000,fpu=0.2,widening=10,parallel=1,workers=16
+uv run main.py --player1 mcts:iterations=10000,exploration=2.0,rave=1000,fpu=0.2,widening=10,workers=16
 
 # Verbose mode for debugging
 uv run main.py --player1 mcts:iterations=1000,verbose=1
@@ -456,14 +448,12 @@ uv run pytest --cov=game --cov=controller --cov=shared --cov-report=html tests/
 
 ### Visual Features
 
-- **Frozen Region Indication**: Isolated regions with vacant rings (unplayable per official rules) are visually distinguished with faded/transparent rings (70% opacity)
 - **Move Highlighting**: Use `--highlight-choices` flag to see valid placement positions (green), removable rings (red), and capture paths (blue)
   - Intelligent highlighting: automatically skips highlight phase when only one capture is available
   - Per-phase timing: different durations for placement, removal, and capture highlights
 - **Coordinate Labels**: Use `--show-coords` flag to display coordinate labels on rings (e.g., A1, B2) that always face the camera
 - **Water Reflections**: Dynamic water plane with custom shaders for realistic reflections
 - **Dynamic Lighting**: Directional and ambient lighting for depth and atmosphere
-- **Human Player Mode**: Use `--human` flag to control player 1 manually with mouse interaction
 
 ### Key Technical Details
 
@@ -535,7 +525,6 @@ Rust Layer (performance-critical paths)
 **Benefits:**
 - Zero-copy numpy array transfer between Python and Rust
 - 10-100x performance improvement for MCTS
-- Absolute parity between Python and Rust implementations
 - Fallback to pure Python if Rust extension unavailable
 
 ### MCTS Architecture
@@ -569,7 +558,7 @@ Thread-safe statistics with atomic operations and minimal lock contention (mutex
 
 ### Renderer Protocol
 
-Multiple renderer implementations demonstrate the Open/Closed Principle:
+Multiple renderer implementations:
 
 - **PandaRenderer**: Full 3D visualization with Panda3D
 - **TextRenderer**: Console-based output for terminal environments
