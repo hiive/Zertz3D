@@ -101,6 +101,7 @@ class ZertzGameController:
 
         # Load replay first to detect board size and variant if needed
         replay_actions = None
+        player_names = None
         loader = None
         if replay_file is not None:
             # Auto-detect file format (transcript or notation)
@@ -116,6 +117,7 @@ class ZertzGameController:
             # Use loader's authoritative configuration
             rings = loader.detected_rings
             blitz = loader.blitz
+            player_names = loader.player_names
 
         # Create game session (handles game instance, players, seed)
         self.session = GameSession(
@@ -129,6 +131,7 @@ class ZertzGameController:
             human_players=human_players,
             player1_config=player1_config,
             player2_config=player2_config,
+            player_names=player_names,
         )
 
         # Create logger with all configuration - it manages all writers internally
@@ -308,7 +311,7 @@ class ZertzGameController:
 
         # Update player indicator in renderer (without notation - action hasn't been taken yet)
         if self.renderer and hasattr(self.renderer, 'update_player_indicator'):
-            self.renderer.update_player_indicator(player.n)
+            self.renderer.update_player_indicator(player.n, player.name)
 
         placement_mask, capture_mask = self.session.game.get_valid_actions()
         self._resolve_player_context(player, placement_mask, capture_mask)
@@ -377,7 +380,7 @@ class ZertzGameController:
 
         # Update player indicator with notation
         if self.renderer and hasattr(self.renderer, 'update_player_indicator'):
-            self.renderer.update_player_indicator(player.n, notation)
+            self.renderer.update_player_indicator(player.n, player.name, notation)
 
         # Log action with action_result (used by NotationWriter for isolation captures)
         self._log_action(player.n, action_dict, action_result)

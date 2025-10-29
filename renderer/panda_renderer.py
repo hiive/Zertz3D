@@ -1675,19 +1675,20 @@ class PandaRenderer(ShowBase):
             shadowOffset=(0.04, 0.04),  # Shadow offset for depth
         )
 
-    def update_player_indicator(self, player_number: int, notation: str = "") -> None:
+    def update_player_indicator(self, player_number: int, player_name: str, notation: str = "") -> None:
         """Update the player indicator to show the current player and move notation.
 
         Args:
             player_number: The player number (1 or 2)
+            player_name: display name of the player
             notation: Optional move notation to display after the player number
         """
         if not hasattr(self, 'player_indicator'):
             return
         if notation:
-            text = f"Player {player_number}: {notation}"
+            text = f"{player_name}: {notation}"
         else:
-            text = f"Player {player_number}"
+            text = f"{player_name}"
         self.player_indicator.setText(text)
         # Change color based on player
         if player_number == 1:

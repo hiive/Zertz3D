@@ -19,6 +19,7 @@ class ZertzPlayer:
         self.captured = {"b": 0, "g": 0, "w": 0}
         self.game = game
         self.n = n
+        self.name = f"Player {n}"
 
     def get_action(self):
         raise NotImplementedError
@@ -495,6 +496,10 @@ class HumanZertzPlayer(ZertzPlayer):
 
 
 class RandomZertzPlayer(ZertzPlayer):
+
+    def __init__(self, game: ZertzGame, n):
+        super().__init__(game, n)
+        self.name = f"Random {n}"
     def get_action(self):
         """
         Select random valid action.

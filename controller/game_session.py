@@ -6,7 +6,7 @@ Manages a single game's lifecycle including board state, players, and seed manag
 import random
 import time
 import hashlib
-from typing import Callable
+from typing import Callable, Dict
 import numpy as np
 
 from game.constants import (
@@ -34,6 +34,7 @@ class GameSession:
         t=5,
         status_reporter: Callable[[str], None] | None = None,
         human_players: tuple[int, ...] | None = None,
+        player_names: Dict[str, str] | None = None,
         player1_config: PlayerConfig | None = None,
         player2_config: PlayerConfig | None = None,
     ):
@@ -88,6 +89,7 @@ class GameSession:
         self.game = None
         self.player1 = None
         self.player2 = None
+        self.player_names = player_names or {}
         self.games_played = 0
 
         # Initialize first game
@@ -182,6 +184,11 @@ class GameSession:
             # Create players from configs
             self.player1 = self._create_player_from_config(1, self.player1_config)
             self.player2 = self._create_player_from_config(2, self.player2_config)
+        # todo fix
+        if self.player_names.get(1) is not None:
+            self.player1.name = self.player_names[1]
+        if self.player_names.get(2) is not None:
+            self.player2.name = self.player_names[2]
 
     def get_current_player(self):
         """Get the player whose turn it is.

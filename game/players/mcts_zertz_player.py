@@ -65,6 +65,7 @@ class MCTSZertzPlayer(ZertzPlayer):
         self._rust_seed_initialized = False
         self.progress_callback = progress_callback
         self.progress_interval_ms = progress_interval_ms
+        self.player_name = f"MCTS {n}"
 
         # Create Rust MCTS searcher
         self.rust_mcts = hiivelabs_zertz_mcts.MCTSSearch(

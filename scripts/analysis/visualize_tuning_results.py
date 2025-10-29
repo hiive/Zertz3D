@@ -25,8 +25,10 @@ from matplotlib import pyplot as plt
 
 try:
     import plotly.express as px
+    import plotly.graph_objects as go
 except ImportError:  # pragma: no cover - optional dependency
     px = None
+    go = None
 
 
 def load_results(path: Path) -> pd.DataFrame:
@@ -74,32 +76,57 @@ def load_results(path: Path) -> pd.DataFrame:
     return df
 
 
-def _bucket_series(
-    series: pd.Series, max_bins: int = 8
-) -> tuple[pd.Series, list[str]]:
-    """Coerce a series to coarse bins so sparse random sweeps still form a grid."""
-    if ptypes.is_numeric_dtype(series) and series.nunique() > max_bins:
-        binned = pd.cut(series, bins=max_bins, duplicates="drop")
-        labels = binned.astype(str)
-        order = [str(cat) for cat in binned.cat.categories]
-        return labels, order
+def _format_float(value: float) -> str:
+    """Format a float concisely for axis display."""
+    text = f"{value:.3f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text
 
-    labels = series.astype(str)
-    order = sorted(labels.unique(), key=lambda value: labels[labels == value].index[0])
-    return labels, order
+
+def _bucket_series(series: pd.Series, max_bins: int = 8) -> tuple[pd.Series, list[str]]:
+    """Coerce a numeric series into coarse bins for readable heatmap axes."""
+    numeric = pd.to_numeric(series, errors="coerce")
+    labels = pd.Series(index=series.index, dtype=object)
+
+    if numeric.notna().sum() and numeric.nunique() > max_bins:
+        binned = pd.cut(numeric, bins=max_bins, duplicates="drop")
+        mapping = {
+            cat: f"{_format_float(cat.left)}–{_format_float(cat.right)}"
+            for cat in binned.cat.categories
+        }
+        labels = binned.map(mapping)
+    elif numeric.notna().sum():
+        mapping = {
+            val: _format_float(val) for val in sorted(numeric.dropna().unique().tolist())
+        }
+        labels = numeric.map(mapping)
+    else:
+        labels = series.astype(object)
+
+    labels = pd.Series(labels, index=series.index, dtype="object")
+    labels = labels.where(pd.notna(labels), "None")
+    order: list[str] = []
+    seen: set[str] = set()
+    for label in labels:
+        if label not in seen:
+            order.append(label)
+            seen.add(label)
+    return labels.astype(str), order
 
 
 def plot_heatmap(df: pd.DataFrame, output_dir: Path) -> None:
-    pivot = (
-        df[df["rave_constant"].isna()]
-        .pivot_table(
-            index="exploration_constant",
-            columns="widening_constant",
-            values="win_rate",
-            aggfunc="mean",
-        )
-        .sort_index()
-    )
+    """Baseline heatmap (light theme) for exploration vs widening."""
+    subset = df[df["rave_label"] == "None"]
+    if subset.empty:
+        subset = df
+
+    pivot = subset.pivot_table(
+        index="exploration_constant",
+        columns="widening_constant",
+        values="win_rate",
+        aggfunc="mean",
+    ).sort_index()
 
     plt.figure(figsize=(8, 5))
     sns.heatmap(
@@ -200,7 +227,7 @@ def plot_pareto_dark(df: pd.DataFrame, output_dir: Path) -> None:
 
     ax.text(
         0.02,
-        0.02,
+        0.02, # df['win_rate'].max() - 0.01,
         "Color key:\nR ↑ exploration constant\nG ↑ widening constant\nB ↑ FPU reduction",
         transform=ax.transAxes,
         color="white",
@@ -255,38 +282,45 @@ def plot_dark_heatmaps(df: pd.DataFrame, output_dir: Path) -> None:
     base_df["rave_label"] = base_df["rave_label"].astype(str)
 
     comparisons = [
-        (
-            ("exploration_constant", "widening_label"),
-            base_df[base_df["rave_label"] == "None"],
-            "Win rate (RAVE disabled)",
-            "Progressive widening constant",
-        ),
-        (
-            ("exploration_constant", "fpu_label"),
-            base_df[base_df["rave_label"] == "None"],
-            "Win rate vs FPU (RAVE disabled)",
-            "FPU reduction",
-        ),
-        (
-            ("fpu_label", "widening_label"),
-            base_df[base_df["rave_label"] == "None"],
-            "Win rate vs FPU/Widening (RAVE disabled)",
-            "Progressive widening constant",
-        ),
-        (
-            ("exploration_constant", "rave_label"),
-            base_df,
-            "Win rate vs RAVE constant",
-            "RAVE constant",
-        ),
+        {
+            "title": "Win rate (RAVE disabled)",
+            "subset": base_df[base_df["rave_label"] == "None"],
+            "row": ("exploration_constant", "exploration_constant", "Exploration constant"),
+            "col": ("widening_label", "widening_constant", "Progressive widening constant"),
+        },
+        {
+            "title": "Win rate vs FPU (RAVE disabled)",
+            "subset": base_df[base_df["rave_label"] == "None"],
+            "row": ("exploration_constant", "exploration_constant", "Exploration constant"),
+            "col": ("fpu_label", "fpu_reduction", "FPU reduction"),
+        },
+        {
+            "title": "Win rate vs FPU/Widening (RAVE disabled)",
+            "subset": base_df[base_df["rave_label"] == "None"],
+            "row": ("fpu_label", "fpu_reduction", "FPU reduction"),
+            "col": ("widening_label", "widening_constant", "Progressive widening constant"),
+        },
+        {
+            "title": "Win rate vs RAVE constant",
+            "subset": base_df,
+            "row": ("exploration_constant", "exploration_constant", "Exploration constant"),
+            "col": ("rave_label", "rave_constant", "RAVE constant"),
+        },
     ]
 
-    for (row_key, col_key), subset, title, col_label in comparisons:
+    for spec in comparisons:
+        subset = spec["subset"]
         if subset.empty:
             continue
 
-        row_labels, row_order = _bucket_series(subset[row_key])
-        col_labels, col_order = _bucket_series(subset[col_key])
+        row_key, row_numeric, row_title = spec["row"]
+        col_key, col_numeric, col_title = spec["col"]
+
+        row_source = subset[row_numeric] if row_numeric else subset[row_key]
+        col_source = subset[col_numeric] if col_numeric else subset[col_key]
+
+        row_labels, row_order = _bucket_series(row_source)
+        col_labels, col_order = _bucket_series(col_source)
         working = subset.assign(__row=row_labels, __col=col_labels)
 
         pivot = working.pivot_table(
@@ -296,16 +330,17 @@ def plot_dark_heatmaps(df: pd.DataFrame, output_dir: Path) -> None:
             aggfunc="mean",
         )
         pivot = pivot.reindex(index=row_order, columns=col_order)
+        pivot = pivot.dropna(how="all", axis=0).dropna(how="all", axis=1)
+        if pivot.empty:
+            continue
+        row_order = [label for label in row_order if label in pivot.index]
+        col_order = [label for label in col_order if label in pivot.columns]
+        pivot = pivot.reindex(index=row_order, columns=col_order)
+        pivot.index.name = row_title
+        pivot.columns.name = col_title
 
         fig, ax = plt.subplots(figsize=(8, 5))
         fig.patch.set_facecolor("black")
-        _setup_dark_axes(
-            ax,
-            title,
-            col_label,
-            row_key.replace("_", " ").title(),
-        )
-
         hm = sns.heatmap(
             pivot,
             annot=True,
@@ -316,9 +351,22 @@ def plot_dark_heatmaps(df: pd.DataFrame, output_dir: Path) -> None:
             linewidths=0.2,
             linecolor="white",
             mask=pivot.isna(),
+            ax=ax,
         )
-        hm.figure.axes[-1].yaxis.label.set_color("white")
-        hm.figure.axes[-1].tick_params(colors="white")
+        ax.set_title(spec["title"], color="white")
+        ax.set_xlabel(col_title, color="white")
+        ax.set_ylabel(row_title, color="white")
+        ax.tick_params(colors="white")
+        ax.tick_params(axis="x", labelrotation=45)
+        for spine in ax.spines.values():
+            spine.set_color("white")
+
+        if hm and hm.collections:
+            cbar = hm.collections[0].colorbar
+            cbar.set_label("Mean win rate", color="white")
+            cbar.ax.tick_params(colors="white")
+            for label in cbar.ax.get_yticklabels():
+                label.set_color("white")
 
         plt.tight_layout()
         filename = f"heatmap_dark_{row_key}_vs_{col_key}.png"
@@ -358,6 +406,133 @@ def plot_interactive(df: pd.DataFrame, output_dir: Path) -> Path | None:
     return output_path
 
 
+def plot_hyperparam_scatter_3d(df: pd.DataFrame, output_dir: Path) -> None:
+    """Render a dark-themed 3D scatter of the hyperparameter cube."""
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    rave_markers = {
+        label: marker
+        for label, marker in zip(
+            df["rave_label"].unique(),
+            ["o", "^", "s", "D", "P", "X", "v", "*", ">"],
+        )
+    }
+
+    norm = plt.Normalize(df["win_rate"].min(), df["win_rate"].max())
+    cmap = plt.cm.magma
+
+    fig = plt.figure(figsize=(9, 7))
+    ax = fig.add_subplot(111, projection="3d")
+    fig.patch.set_facecolor("black")
+    ax.set_facecolor("black")
+
+    for label, subset in df.groupby("rave_label"):
+        ax.scatter(
+            subset["fpu_reduction"].fillna(0.0),
+            subset["widening_constant"].fillna(0.0),
+            subset["exploration_constant"],
+            c=cmap(norm(subset["win_rate"])),
+            edgecolor="white",
+            linewidths=0.3,
+            marker=rave_markers.get(label, "o"),
+            label=f"RAVE {label}",
+            s=28,
+        )
+
+    ax.set_xlabel("FPU reduction", color="white")
+    ax.set_ylabel("Widening constant", color="white")
+    ax.set_zlabel("Exploration constant", color="white")
+    ax.set_title("Win rate across hyperparameter cube", color="white")
+    ax.tick_params(colors="white")
+
+    panes = []
+    for axis in (getattr(ax, "xaxis", None), getattr(ax, "yaxis", None), getattr(ax, "zaxis", None)):
+        pane = getattr(axis, "pane", None)
+        if pane is not None:
+            panes.append(pane)
+    for pane in panes:
+        pane.set_facecolor((0.05, 0.05, 0.05, 0.7))
+        pane.set_edgecolor("white")
+
+    legend = ax.legend(loc="upper left")
+    for text in legend.get_texts():
+        text.set_color("white")
+
+    mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+    cbar = fig.colorbar(mappable, ax=ax, pad=0.1, shrink=0.7)
+    cbar.set_label("Win rate", color="white")
+    cbar.ax.tick_params(colors="white")
+
+    plt.tight_layout()
+    (output_dir / "hyperparams_scatter_3d.png").parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir / "hyperparams_scatter_3d.png", dpi=200, facecolor="black")
+    plt.close(fig)
+
+
+def plot_isosurface(df: pd.DataFrame, output_dir: Path) -> Path | None:
+    """Optionally emit an isosurface plotly figure if plotly is available."""
+    if go is None:
+        return None
+
+    required = {"fpu_reduction", "widening_constant", "exploration_constant"}
+    if not required.issubset(df.columns):
+        return None
+
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter3d(
+            x=df["fpu_reduction"].fillna(0.0),
+            y=df["widening_constant"].fillna(0.0),
+            z=df["exploration_constant"],
+            mode="markers",
+            marker=dict(
+                size=4,
+                color=df["win_rate"],
+                colorscale="Magma",
+                opacity=0.7,
+                colorbar=dict(title="Win rate"),
+            ),
+            text=[f"RAVE {label}" for label in df["rave_label"]],
+        )
+    )
+
+    try:
+        figure.add_trace(
+            go.Isosurface(
+                x=df["fpu_reduction"].fillna(0.0),
+                y=df["widening_constant"].fillna(0.0),
+                z=df["exploration_constant"],
+                value=df["win_rate"],
+                isomin=df["win_rate"].quantile(0.75),
+                isomax=df["win_rate"].max(),
+                opacity=0.2,
+                surface_count=3,
+                colorscale="Magma",
+                showscale=False,
+            )
+        )
+    except Exception:
+        # Plotly may fail if the data are too sparse for an isosurface;
+        # continue gracefully with just the scatter trace.
+        pass
+
+    figure.update_layout(
+        title="Hyperparameter isosurface (interactive)",
+        scene=dict(
+            xaxis_title="FPU reduction",
+            yaxis_title="Widening constant",
+            zaxis_title="Exploration constant",
+            bgcolor="black",
+        ),
+        paper_bgcolor="black",
+        font=dict(color="white"),
+    )
+
+    output_path = output_dir / "hyperparams_isosurface.html"
+    figure.write_html(output_path, include_plotlyjs="cdn")
+    return output_path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate visual summaries of MCTS tuning runs."
@@ -389,14 +564,20 @@ def main() -> None:
     plot_pareto(df, output_dir)
     plot_pareto_dark(df, output_dir)
     plot_dark_heatmaps(df, output_dir)
+    plot_hyperparam_scatter_3d(df, output_dir)
 
     interactive_path = plot_interactive(df, output_dir)
+    isosurface_path = plot_isosurface(df, output_dir)
 
     print(f"Saved static figures to {output_dir}")
     if interactive_path is not None:
         print(f"Interactive HTML written to {interactive_path}")
     else:
         print("Plotly not available; skipped interactive output.")
+    if isosurface_path is not None:
+        print(f"Isosurface HTML written to {isosurface_path}")
+    elif go is None:
+        print("Plotly graph_objects not available; skipped isosurface plot.")
 
 
 if __name__ == "__main__":
