@@ -182,9 +182,12 @@ class GameLogger:
             if not self.session.is_replay_mode():
                 self._create_game_file_writers()
 
-        # Write headers to all writers
+        # Write headers to all writers (include player names if available)
+        player1_name = self.session.player1_config.name
+        player2_name = self.session.player2_config.name
+
         for writer in self.writers:
-            writer.write_header(seed, rings, blitz)
+            writer.write_header(seed, rings, blitz, player1_name, player2_name)
 
         self._game_active = True
 

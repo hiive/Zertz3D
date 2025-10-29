@@ -30,7 +30,8 @@ class SGFLoader:
         self.detected_rings: int | None = None
         self.variant: str | None = None
         self.game_result: str | None = None
-        self.player_names: dict[int, str] = {}
+        self.player1_name: str | None = None
+        self.player2_name: str | None = None
         self.player_times: dict[int, str] = {}
         self.blitz = False
         self.marbles = None
@@ -53,7 +54,7 @@ class SGFLoader:
         self._report(f"Loading SGF from: {self.filename}")
         raw_text = self.filename.read_text(encoding="utf-8")
 
-        self.player_names = self._extract_player_names(raw_text)
+        self._extract_player_names(raw_text)
         sanitized = self._sanitize_sgf(raw_text)
         game = sgf.Sgf_game.from_string(sanitized.strip())
         root = game.get_root()
@@ -324,16 +325,14 @@ class SGFLoader:
         """Replace non-standard property names so sgfmill can parse the tree."""
         return raw_text.replace("P0[", "PA[").replace("P1[", "PB[")
 
-    @staticmethod
-    def _extract_player_names(raw_text: str) -> dict[int, str]:
-        names: dict[int, str] = {}
+    def _extract_player_names(self, raw_text: str) -> None:
+        """Extract player names from SGF text and set player1_name and player2_name."""
         match0 = re.search(r'P0\[id "([^"]+)"]', raw_text)
-        match1 = re.search(r'P1\[id "([^"]+)"]', raw_text) # was r'P1\[id "([^"]+)"\]'
+        match1 = re.search(r'P1\[id "([^"]+)"]', raw_text)
         if match0:
-            names[1] = match0.group(1)
+            self.player1_name = match0.group(1)
         if match1:
-            names[2] = match1.group(1)
-        return names
+            self.player2_name = match1.group(1)
 
     @staticmethod
     def _get_root_property(node: sgf.Sgf_node, prop: str) -> str | None:

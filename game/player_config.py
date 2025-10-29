@@ -49,16 +49,17 @@ class PlayerConfig:
 
     # General player settings
     rng_seed: int | None = None
+    name: str | None = None  # Player display name
 
     @classmethod
-    def random(cls, seed: int | None = None) -> PlayerConfig:
+    def random(cls, seed: int | None = None, name: str | None = None) -> PlayerConfig:
         """Create a random player configuration."""
-        return cls(player_type="random", rng_seed=seed)
+        return cls(player_type="random", rng_seed=seed, name=name)
 
     @classmethod
-    def human(cls) -> PlayerConfig:
+    def human(cls, name: str | None = None) -> PlayerConfig:
         """Create a human player configuration."""
-        return cls(player_type="human")
+        return cls(player_type="human", name=name)
 
     @classmethod
     def mcts(
@@ -78,6 +79,7 @@ class PlayerConfig:
         num_workers: int = 16,
         verbose: bool = False,
         seed: int | None = None,
+        name: str | None = None,
     ) -> PlayerConfig:
         """Create an MCTS player configuration.
 
@@ -96,6 +98,7 @@ class PlayerConfig:
             num_workers: Number of threads for parallel search
             verbose: Print search statistics after each move
             seed: Random seed for MCTS player (None = unseeded)
+            name: Player display name (None = auto-generated)
         """
         return cls(
             player_type="mcts",
@@ -113,6 +116,7 @@ class PlayerConfig:
             mcts_num_workers=num_workers,
             mcts_verbose=verbose,
             rng_seed=seed,
+            name=name,
         )
 
 

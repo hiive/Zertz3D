@@ -6,7 +6,7 @@ Manages a single game's lifecycle including board state, players, and seed manag
 import random
 import time
 import hashlib
-from typing import Callable, Dict
+from typing import Callable
 import numpy as np
 
 from game.constants import (
@@ -34,7 +34,6 @@ class GameSession:
         t=5,
         status_reporter: Callable[[str], None] | None = None,
         human_players: tuple[int, ...] | None = None,
-        player_names: Dict[str, str] | None = None,
         player1_config: PlayerConfig | None = None,
         player2_config: PlayerConfig | None = None,
     ):
@@ -47,6 +46,7 @@ class GameSession:
             replay_actions: Tuple of (player1_actions, player2_actions) for replay mode
             partial_replay: If True, continue with random play after replay ends
             t: History depth for loop detection
+            human_players: Tuple of player numbers (1, 2) that are human-controlled (deprecated, use player configs)
             player1_config: Configuration for player 1 (default: random)
             player2_config: Configuration for player 2 (default: random)
         """
@@ -55,9 +55,17 @@ class GameSession:
         self.t = t
         self._status_reporter: Callable[[str], None] | None = status_reporter
 
-        # Store player configs (use defaults if not provided)
+        # Initialize player configs (use defaults if not provided)
         self.player1_config = player1_config if player1_config is not None else PlayerConfig.random()
         self.player2_config = player2_config if player2_config is not None else PlayerConfig.random()
+
+        # Override with human_players parameter if provided (for backward compatibility)
+        # Note: human_players takes precedence over explicitly provided configs
+        human_players_set = set(human_players or ())
+        if 1 in human_players_set:
+            self.player1_config = PlayerConfig.human()
+        if 2 in human_players_set:
+            self.player2_config = PlayerConfig.human()
 
         # Set marbles and win conditions based on variant
         if blitz:
@@ -89,7 +97,6 @@ class GameSession:
         self.game = None
         self.player1 = None
         self.player2 = None
-        self.player_names = player_names or {}
         self.games_played = 0
 
         # Initialize first game
@@ -127,14 +134,14 @@ class GameSession:
             config: PlayerConfig describing player type and parameters
 
         Returns:
-            ZertzPlayer: Configured player instance
+            ZertzPlayer: Configured player instance with name set from config
         """
         if config.player_type == "human":
-            return HumanZertzPlayer(self.game, player_num)
+            player = HumanZertzPlayer(self.game, player_num)
         elif config.player_type == "random":
-            return RandomZertzPlayer(self.game, player_num)
+            player = RandomZertzPlayer(self.game, player_num)
         elif config.player_type == "mcts":
-            return MCTSZertzPlayer(
+            player = MCTSZertzPlayer(
                 self.game,
                 n=player_num,
                 iterations=config.mcts_iterations,
@@ -153,6 +160,12 @@ class GameSession:
             )
         else:
             raise ValueError(f"Unknown player type: {config.player_type}")
+
+        # Set player name from config if provided
+        if config.name is not None:
+            player.name = config.name
+
+        return player
 
     def reset_game(self):
         """Reset the game state for a new game.
@@ -180,15 +193,16 @@ class GameSession:
             player1_actions, player2_actions = self.replay_actions
             self.player1 = ReplayZertzPlayer(self.game, 1, player1_actions)
             self.player2 = ReplayZertzPlayer(self.game, 2, player2_actions)
+
+            # Apply names from configs (loaded from replay file)
+            if self.player1_config.name:
+                self.player1.name = self.player1_config.name
+            if self.player2_config.name:
+                self.player2.name = self.player2_config.name
         else:
-            # Create players from configs
+            # Create players from configs (names are set from config in _create_player_from_config)
             self.player1 = self._create_player_from_config(1, self.player1_config)
             self.player2 = self._create_player_from_config(2, self.player2_config)
-        # todo fix
-        if self.player_names.get(1) is not None:
-            self.player1.name = self.player_names[1]
-        if self.player_names.get(2) is not None:
-            self.player2.name = self.player_names[2]
 
     def get_current_player(self):
         """Get the player whose turn it is.

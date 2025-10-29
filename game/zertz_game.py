@@ -97,10 +97,36 @@ class ZertzGame:
         placement, capture = self.get_valid_actions()
         return np.any(placement) or np.any(capture)
 
+    def _normalize_move_for_loop_detection(self, move):
+        """Normalize a move for position-based loop detection (ignore marble colors).
+
+        Args:
+            move: (action_type, action) tuple from move_history
+
+        Returns:
+            Normalized move tuple with marble colors removed
+        """
+        action_type, action = move
+
+        if action_type == "PASS":
+            return ("PASS", None)
+        elif action_type == "PUT":
+            # PUT action: (marble_type, put_position, remove_position)
+            # Normalize by removing marble_type (set to 0)
+            _, put_pos, rem_pos = action
+            return ("PUT", (None, put_pos, rem_pos))
+        elif action_type == "CAP":
+            # CAP action: (direction, src_y, src_x)
+            # Already position-only, no normalization needed
+            return move
+        else:
+            return move
+
     def _has_move_loop(self):
         """Detect if last k move-pairs equal preceding k move-pairs.
 
         For k=2: Check if moves[-4:] (last 2 pairs) == moves[-8:-4] (preceding 2 pairs)
+        Comparison is position-based (marble colors are ignored).
 
         Returns:
             bool: True if loop detected
@@ -111,10 +137,16 @@ class ZertzGame:
         if len(self.move_history) < needed_moves:
             return False
 
-        # Get last k pairs (4k moves)
-        last_k_pairs = self.move_history[-needed_moves // 2 :]
-        # Get preceding k pairs
-        preceding_k_pairs = self.move_history[-needed_moves : -needed_moves // 2]
+        # Get last k pairs (4k moves) and normalize
+        last_k_pairs = [
+            self._normalize_move_for_loop_detection(move)
+            for move in self.move_history[-needed_moves // 2 :]
+        ]
+        # Get preceding k pairs and normalize
+        preceding_k_pairs = [
+            self._normalize_move_for_loop_detection(move)
+            for move in self.move_history[-needed_moves : -needed_moves // 2]
+        ]
 
         return last_k_pairs == preceding_k_pairs
 

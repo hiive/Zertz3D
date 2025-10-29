@@ -35,6 +35,8 @@ class TranscriptLoader:
         self.blitz = False
         self.marbles = None
         self.win_condition = None
+        self.player1_name: str | None = None
+        self.player2_name: str | None = None
         self._status_reporter: Callable[[str], None] | None = status_reporter
 
     def load(self):
@@ -61,6 +63,15 @@ class TranscriptLoader:
                     variant = line.split(":", 1)[1].strip().lower()
                     if variant == "blitz":
                         self.blitz = True
+                    continue
+
+                # Check for player name comments
+                if line.startswith("# Player 1:"):
+                    self.player1_name = line.split(":", 1)[1].strip()
+                    continue
+                elif line.startswith("# Player 2:"):
+                    self.player2_name = line.split(":", 1)[1].strip()
+                    continue
 
                 if not line or line.startswith("#"):
                     continue

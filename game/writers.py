@@ -28,13 +28,15 @@ class GameWriter(ABC):
         self._game_started = False
 
     @abstractmethod
-    def write_header(self, seed: int, rings: int, blitz: bool = False) -> None:
+    def write_header(self, seed: int, rings: int, blitz: bool = False, player1_name: str | None = None, player2_name: str | None = None) -> None:
         """Write file header with game metadata.
 
         Args:
             seed: Random seed for this game
             rings: Number of rings on the board (37, 48, or 61)
             blitz: Whether this is a blitz variant game
+            player1_name: Optional name for player 1
+            player2_name: Optional name for player 2
         """
         pass
 
@@ -100,18 +102,30 @@ class NotationWriter(GameWriter):
         super().__init__(output)
         self.formatter = NotationFormatter()
 
-    def write_header(self, seed: int, rings: int, blitz: bool = False) -> None:
+    def write_header(self, seed: int, rings: int, blitz: bool = False, player1_name: str | None = None, player2_name: str | None = None) -> None:
         """Write notation file header.
 
-        Format: "{rings} [Blitz]"
+        Format:
+            {rings} [Blitz]
+            # Player 1: {name}  (if player1_name provided)
+            # Player 2: {name}  (if player2_name provided)
 
         Args:
             seed: Random seed (not used in notation format)
             rings: Number of rings (37, 48, or 61)
             blitz: Whether this is a blitz game
+            player1_name: Optional name for player 1
+            player2_name: Optional name for player 2
         """
         variant_text = " Blitz" if blitz else ""
         self.output.write(f"{rings}{variant_text}\n")
+
+        # Write player names if provided
+        if player1_name:
+            self.output.write(f"# Player 1: {player1_name}\n")
+        if player2_name:
+            self.output.write(f"# Player 2: {player2_name}\n")
+
         self._game_started = True
         self.flush()
 
@@ -152,24 +166,35 @@ class TranscriptWriter(GameWriter):
         super().__init__(output)
         self.formatter = TranscriptFormatter()
 
-    def write_header(self, seed: int, rings: int, blitz: bool = False) -> None:
+    def write_header(self, seed: int, rings: int, blitz: bool = False, player1_name: str | None = None, player2_name: str | None = None) -> None:
         """Write transcript file header.
 
         Format:
             # Seed: {seed}
             # Rings: {rings}
             # Variant: Blitz  (if blitz=True)
+            # Player 1: {name}  (if player1_name provided)
+            # Player 2: {name}  (if player2_name provided)
             #
 
         Args:
             seed: Random seed
             rings: Number of rings
             blitz: Whether this is a blitz game
+            player1_name: Optional name for player 1
+            player2_name: Optional name for player 2
         """
         self.output.write(f"# Seed: {seed}\n")
         self.output.write(f"# Rings: {rings}\n")
         if blitz:
             self.output.write("# Variant: Blitz\n")
+
+        # Write player names if provided
+        if player1_name:
+            self.output.write(f"# Player 1: {player1_name}\n")
+        if player2_name:
+            self.output.write(f"# Player 2: {player2_name}\n")
+
         self.output.write("#\n")
         self._game_started = True
         self.flush()

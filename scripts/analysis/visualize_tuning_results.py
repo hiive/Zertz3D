@@ -18,6 +18,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import numpy as np
 import pandas as pd
 from pandas.api import types as ptypes
 import seaborn as sns
@@ -115,6 +116,50 @@ def _bucket_series(series: pd.Series, max_bins: int = 8) -> tuple[pd.Series, lis
     return labels.astype(str), order
 
 
+def _prepare_axis_values(
+    series: pd.Series,
+) -> tuple[np.ndarray, list[float] | None, list[str] | None, bool]:
+    """Return numeric axis positions, ticks, labels, and whether the data are numeric."""
+    numeric_series = pd.to_numeric(series, errors="coerce")
+    has_numeric = numeric_series.notna().any()
+
+    if has_numeric:
+        values = numeric_series.copy()
+        placeholder = None
+
+        if series.isna().any():
+            finite = numeric_series.dropna()
+            if finite.empty:
+                placeholder = 0.0
+            else:
+                min_val = float(finite.min())
+                max_val = float(finite.max())
+                span = max(max_val - min_val, 1.0)
+                placeholder = min_val - 0.1 * span
+            values = values.fillna(placeholder)
+        else:
+            values = values.fillna(0.0)
+
+        unique_vals = np.unique(values)
+        tick_positions = unique_vals.tolist() if unique_vals.size <= 12 else None
+        tick_labels = (
+            [
+                "None" if placeholder is not None and val == placeholder else _format_float(val)
+                for val in unique_vals
+            ]
+            if tick_positions is not None
+            else None
+        )
+        return values.to_numpy(dtype=float), tick_positions, tick_labels, True
+
+    categories = series.fillna("None").astype(str)
+    mapping = {cat: idx for idx, cat in enumerate(categories.unique())}
+    values = categories.map(mapping).to_numpy(dtype=float)
+    tick_positions = list(mapping.values())
+    tick_labels = list(mapping.keys())
+    return values, tick_positions, tick_labels, False
+
+
 def plot_heatmap(df: pd.DataFrame, output_dir: Path) -> None:
     """Baseline heatmap (light theme) for exploration vs widening."""
     subset = df[df["rave_label"] == "None"]
@@ -209,8 +254,8 @@ def plot_pareto_dark(df: pd.DataFrame, output_dir: Path) -> None:
             df.loc[mask, "win_rate"],
             c=[colors[i] for i in df.index[mask]],
             edgecolors="white",
-            linewidths=0.6,
-            s=50,
+            linewidths=0.3,
+            s=10,
             marker=marker,
             label=f"RAVE {value}",
         )
@@ -374,9 +419,103 @@ def plot_dark_heatmaps(df: pd.DataFrame, output_dir: Path) -> None:
         plt.close()
 
 
-def plot_interactive(df: pd.DataFrame, output_dir: Path) -> Path | None:
+def plot_dark_pareto(df: pd.DataFrame, output_dir: Path) -> None:
+    """Plot win rate vs each hyperparameter on a dark background."""
+    if df.empty:
+        return
+
+    columns = [
+        ("exploration_constant", "Exploration constant"),
+        ("fpu_reduction", "FPU reduction"),
+        ("widening_constant", "Progressive widening constant"),
+        ("rave_constant", "RAVE constant"),
+    ]
+
+    cmap = plt.cm.magma
+    norm = plt.Normalize(df["mean_time_per_game"].min(), df["mean_time_per_game"].max())
+
+    for column, label in columns:
+        if column not in df.columns:
+            continue
+
+        x_values, tick_positions, tick_labels, is_numeric = _prepare_axis_values(df[column])
+        y_values = df["win_rate"].to_numpy(dtype=float)
+        colors = cmap(norm(df["mean_time_per_game"]))
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        fig.patch.set_facecolor("black")
+        ax.set_facecolor("black")
+
+        ax.scatter(
+            x_values,
+            y_values,
+            c=colors,
+            edgecolors="white",
+            linewidths=0.4,
+            s=36,
+        )
+
+        ax.set_title(f"Win rate vs {label}", color="white")
+        ax.set_xlabel(label, color="white")
+        ax.set_ylabel("Win rate", color="white")
+        ax.tick_params(colors="white")
+
+        if tick_positions is not None and tick_labels is not None:
+            ax.set_xticks(tick_positions)
+            ax.set_xticklabels(tick_labels, rotation=30, ha="right", color="white")
+        elif not is_numeric:
+            ax.set_xticks([])
+
+        ax.grid(alpha=0.2, color="white")
+        for spine in ax.spines.values():
+            spine.set_color("white")
+
+        sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax, pad=0.02)
+        cbar.set_label("Mean time per game (s)", color="white")
+        cbar.ax.tick_params(colors="white")
+
+        filename = output_dir / f"pareto_{column}.png"
+        plt.tight_layout()
+        plt.savefig(filename, dpi=200, facecolor="black")
+        plt.close(fig)
+
+
+def plot_interactive(df: pd.DataFrame, output_dir: Path) -> tuple[Path | None, Path | None]:
     if px is None:
-        return None
+        return None, None
+
+    numeric_cols = ["exploration_constant", "fpu_reduction", "widening_constant", "rave_constant"]
+    color_column = "win_rate"
+
+    df_numeric = df.copy()
+    for col in numeric_cols:
+        if col not in df_numeric:
+            return None
+        df_numeric[col] = df_numeric[col].fillna(-1.0)
+
+    parallel_fig = px.parallel_coordinates(
+        df_numeric,
+        dimensions=numeric_cols + [color_column],
+        color=color_column,
+        color_continuous_scale=px.colors.sequential.Magma,
+        labels={
+            "exploration_constant": "Exploration",
+            "fpu_reduction": "FPU",
+            "widening_constant": "Widening",
+            "rave_constant": "RAVE",
+            "win_rate": "Win rate",
+        },
+    )
+    parallel_fig.update_layout(
+        title="Hyperparameter parallel coordinates",
+        plot_bgcolor="black",
+        paper_bgcolor="black",
+        font=dict(color="white"),
+    )
+    parallel_path = output_dir / "hyperparams_parallel_coordinates.html"
+    parallel_fig.write_html(parallel_path, include_plotlyjs="cdn")
 
     fig = px.scatter(
         df,
@@ -403,7 +542,7 @@ def plot_interactive(df: pd.DataFrame, output_dir: Path) -> Path | None:
 
     output_path = output_dir / "pareto_scatter.html"
     fig.write_html(output_path, include_plotlyjs="cdn")
-    return output_path
+    return output_path, parallel_path
 
 
 def plot_hyperparam_scatter_3d(df: pd.DataFrame, output_dir: Path) -> None:
@@ -564,9 +703,10 @@ def main() -> None:
     plot_pareto(df, output_dir)
     plot_pareto_dark(df, output_dir)
     plot_dark_heatmaps(df, output_dir)
+    plot_dark_pareto(df, output_dir)
     plot_hyperparam_scatter_3d(df, output_dir)
 
-    interactive_path = plot_interactive(df, output_dir)
+    interactive_path, parallel_path = plot_interactive(df, output_dir)
     isosurface_path = plot_isosurface(df, output_dir)
 
     print(f"Saved static figures to {output_dir}")
@@ -574,6 +714,10 @@ def main() -> None:
         print(f"Interactive HTML written to {interactive_path}")
     else:
         print("Plotly not available; skipped interactive output.")
+    if parallel_path is not None:
+        print(f"Parallel coordinates HTML written to {parallel_path}")
+    elif px is None:
+        print("Plotly not available; skipped parallel coordinates.")
     if isosurface_path is not None:
         print(f"Isosurface HTML written to {isosurface_path}")
     elif go is None:

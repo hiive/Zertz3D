@@ -90,7 +90,7 @@ The game ends immediately when a player holds one of the target sets listed unde
 
 1. If the pool is empty before anyone wins, continue playing using your **captured marbles**. As with the pool, you may choose any color from your captures on your turn.
 2. If every ring becomes occupied before a win condition is met, the player who filled the final vacant ring wins by claiming the now-isolated board.
-3. If both players repeat the same sequence of moves indefinitely, the game is declared a tie.
+3. If both players repeat the same sequence of moves indefinitely (no matter what color marbles are used), the game is declared a tie.
 4. **Tournament Rule:** If all marbles are placed on the board and the current player hasn't captured any marbles yet, this indicates prohibited player collaboration. In official tournament play, both players lose the game (ties are not permitted).
 
 ---
@@ -149,7 +149,7 @@ The official rulebook treats these situations implicitly; the Hiive implementati
 
 - **Single-player immobilization:** If the active player has no legal move (no placements or captures), their turn is skipped automatically. Play resumes with the opponent.  
 - **Mutual immobilization:** Two consecutive passes end the game immediately. Check the standard victory conditions; if neither player qualifies, the result is a tie.  
-- **Loop detection:** If the last two move-pairs repeat the previous two move-pairs exactly, the game is declared a tie to prevent infinite cycling.
+- **Loop detection:** If the last two move-pairs repeat the previous two move-pairs exactly (discounting marble color), the game is declared a tie to prevent infinite cycling.
 
 ---
 

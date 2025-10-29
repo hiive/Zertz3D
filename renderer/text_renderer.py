@@ -43,7 +43,7 @@ class TextRenderer(IRenderer):
     ) -> None:
         marble_label = marble if marble is not None else "none"
         self.report_status(
-            f"Isolation removal for Player {getattr(player, 'n', '?')}: {pos} ({marble_label})"
+            f"Isolation capture for Player {getattr(player, 'n', '?')}: {pos} ({marble_label})"
         )
 
     def report_status(self, message: str) -> None:

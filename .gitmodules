@@ -1,3 +1,6 @@
 [submodule "rust"]
 	path = rust
 	url = https://github.com/hiive/hiivelabs-zertz-mcts.git
+[submodule "data/sgf"]
+	path = data/sgf
+	url = https://github.com/hiive/zertz-sgf-files.git

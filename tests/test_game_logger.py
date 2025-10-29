@@ -46,6 +46,11 @@ def mock_session():
     session.is_replay_mode.return_value = False
     session.blitz = False
     session.get_seed.return_value = 12345
+    # Mock players with no names (for backward compatibility tests)
+    session.player1 = Mock()
+    session.player1.name = None
+    session.player2 = Mock()
+    session.player2.name = None
     return session
 
 

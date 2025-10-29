@@ -422,6 +422,11 @@ class PandaRenderer(ShowBase):
         self.capture_pools = {1: self._make_marble_dict(), 2: self._make_marble_dict()}
         self.capture_pool_coords = {1: [], 2: []}
 
+        # Track which capture pool slots are occupied
+        self.capture_pool_occupied_slots = {1: set(), 2: set()}
+        # Map marble ID to its slot index (for freeing slots when marble is used)
+        self.marble_to_capture_slot = {}
+
         # Find corner positions dynamically based on board size
         # Top-left corner: first letter, highest number in that column
         # Top-right corner: last letter, highest number in that column
@@ -977,14 +982,24 @@ class PandaRenderer(ShowBase):
 
         # add marble from supply
         supply = self.marble_supply[action_marble_color]
+        from_capture_pool = False
         if len(supply) == 0:
             supply = self.capture_pools[player.n][action_marble_color]
+            from_capture_pool = True
         if len(supply) == 0:
             logger.error(
                 f"No marbles available in supply for player {player.n}, color {action_marble_color}"
             )
             return
         put_marble = supply.pop()
+
+        # If marble came from capture pool, free its slot
+        if from_capture_pool:
+            slot_info = self.marble_to_capture_slot.pop(id(put_marble), None)
+            if slot_info is not None:
+                player_num, slot_index = slot_info
+                self.capture_pool_occupied_slots[player_num].discard(slot_index)
+
         mip = self.marbles_in_play[action_marble_color]
         src_coords_world = put_marble.get_pos()  # Get world position (marble still in render)
         if put_marble not in [p for p, _ in mip]:
@@ -1125,7 +1140,6 @@ class PandaRenderer(ShowBase):
         """
         # Add to player's captured marbles
         captured_marbles = self.capture_pools[player.n][marble_color]
-        captured_count = sum([len(k) for k in self.capture_pools[player.n].values()])
         captured_marbles.append(captured_marble)
 
         # Store current scale before configure
@@ -1138,15 +1152,26 @@ class PandaRenderer(ShowBase):
         )
         self._update_capture_marble_colliders()
 
-        # Clamp captured count
-        if captured_count >= len(self.capture_pool_coords[player.n]):
-            if captured_count > len(self.capture_pool_coords[player.n]):
-                logger.error(
-                    f"Captured marbles count ({captured_count}) exceeds available coords"
-                )
-            captured_count = len(self.capture_pool_coords[player.n]) - 1
+        # Find first available slot for this player
+        occupied_slots = self.capture_pool_occupied_slots[player.n]
+        available_slot_index = None
+        for slot_idx in range(len(self.capture_pool_coords[player.n])):
+            if slot_idx not in occupied_slots:
+                available_slot_index = slot_idx
+                break
 
-        capture_pool_coords = self.capture_pool_coords[player.n][captured_count]
+        # If no slots available, use last slot (shouldn't happen in normal play)
+        if available_slot_index is None:
+            logger.error(
+                f"No available capture pool slots for player {player.n} (all {len(self.capture_pool_coords[player.n])} slots occupied)"
+            )
+            available_slot_index = len(self.capture_pool_coords[player.n]) - 1
+
+        # Mark slot as occupied and track which slot this marble is in
+        occupied_slots.add(available_slot_index)
+        self.marble_to_capture_slot[id(captured_marble)] = (player.n, available_slot_index)
+
+        capture_pool_coords = self.capture_pool_coords[player.n][available_slot_index]
 
         # Either instant or animated
         if action_duration == 0:

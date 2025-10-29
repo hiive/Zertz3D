@@ -101,7 +101,6 @@ class ZertzGameController:
 
         # Load replay first to detect board size and variant if needed
         replay_actions = None
-        player_names = None
         loader = None
         if replay_file is not None:
             # Auto-detect file format (transcript or notation)
@@ -117,7 +116,17 @@ class ZertzGameController:
             # Use loader's authoritative configuration
             rings = loader.detected_rings
             blitz = loader.blitz
-            player_names = loader.player_names
+
+            # Extract player names from loader if available and merge with configs
+            if player1_config is None:
+                player1_config = PlayerConfig.random(name=loader.player1_name)
+            elif loader.player1_name and player1_config.name is None:
+                player1_config.name = loader.player1_name
+
+            if player2_config is None:
+                player2_config = PlayerConfig.random(name=loader.player2_name)
+            elif loader.player2_name and player2_config.name is None:
+                player2_config.name = loader.player2_name
 
         # Create game session (handles game instance, players, seed)
         self.session = GameSession(
@@ -131,7 +140,6 @@ class ZertzGameController:
             human_players=human_players,
             player1_config=player1_config,
             player2_config=player2_config,
-            player_names=player_names,
         )
 
         # Create logger with all configuration - it manages all writers internally

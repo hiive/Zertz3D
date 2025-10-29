@@ -38,6 +38,8 @@ class NotationLoader:
         self.blitz = False
         self.marbles = STANDARD_MARBLES
         self.win_condition = STANDARD_WIN_CONDITIONS
+        self.player1_name: str | None = None
+        self.player2_name: str | None = None
 
     def set_status_reporter(self, reporter: Callable[[str], None] | None) -> None:
         """Set or update the status reporter callback."""
@@ -71,7 +73,18 @@ class NotationLoader:
 
         for line_num, line in enumerate(lines[1:], start=2):
             line = line.strip()
-            if not line or line.startswith("#"):
+            if not line:
+                continue
+
+            # Parse player name comments
+            if line.startswith("# Player 1:"):
+                self.player1_name = line.split(":", 1)[1].strip()
+                continue
+            elif line.startswith("# Player 2:"):
+                self.player2_name = line.split(":", 1)[1].strip()
+                continue
+            elif line.startswith("#"):
+                # Other comments - skip
                 continue
 
             try:
