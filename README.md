@@ -1,6 +1,6 @@
 # Zèrtz 3D
 
-A sophisticated 3D implementation of the abstract board game Zèrtz using Panda3D, featuring a high-performance Rust-accelerated MCTS AI engine with advanced search techniques (RAVE, transposition tables, parallel search).
+A 3D implementation of the abstract board game Zèrtz using Panda3D, with a Rust-accelerated MCTS AI engine that includes RAVE, transposition tables, and parallel search.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
@@ -226,8 +226,7 @@ Zertz3D/
 │   ├── writers.py                  # Log file writers
 │   └── utils/                      # Diagram rendering & helpers
 ├── learner/                        # Machine learning components
-│   ├── mcts/                       # Python MCTS implementation
-│   └── backend.py                  # Backend detection (Python vs Rust)
+│   └── mcts/                       # Backend detection and utilities
 ├── renderer/                       # Rendering backends
 │   ├── panda_renderer.py           # Panda3D renderer entry point
 │   ├── text_renderer.py            # Console/text renderer
@@ -366,15 +365,27 @@ A faster, more aggressive variant designed for quick, tactical play. Enable with
 
 ## Replay System
 
-Replay files contain action dictionaries:
+The system supports multiple replay file formats:
 
+**Transcript Format (dictionary format):**
 ```
 Player 1: {'action': 'PUT', 'marble': 'g', 'dst': 'B5', 'remove': 'G3'}
 Player 2: {'action': 'CAP', 'marble': 'b', 'src': 'C4', 'dst': 'E6', 'capture': 'g', 'cap': 'D5'}
 Player 1: {'action': 'PASS'}
 ```
 
-Board size is automatically detected from coordinates in the replay file.
+**Official Notation Format:**
+```
+37
+Gb5,g3
+x c4Ge6
+-
+```
+
+**SGF Format (Boardspace.net):**
+The SGF loader can import games from [Boardspace.net](https://boardspace.net), enabling replay of games played on their platform. Board size and player names are automatically extracted from the SGF file metadata.
+
+All formats auto-detect board size and can be used with the `--replay` flag.
 
 ## Development
 
@@ -415,7 +426,7 @@ uv run pytest tests/test_rust_parity.py -v
 
 ### Testing
 
-The project includes a comprehensive test suite covering game logic, notation systems, and board mechanics across all supported board sizes.
+The project includes a test suite covering game logic, notation systems, and board mechanics across all supported board sizes.
 
 Run tests with pytest:
 
@@ -463,7 +474,7 @@ uv run pytest --cov=game --cov=controller --cov=shared --cov-report=html tests/
 - **ML Integration**: State separated into spatial (L×H×W board features) and global (10-element vector) components for machine learning applications
 - **Official Notation**: Game outputs moves in official Zèrtz notation format (e.g., `Wd4`, `x e3Wg3`, `-`) alongside internal dictionary format
 - **Unified Animation System**: Single animation queue handles both movement animations and highlight effects (material changes). Type discrimination (`'move'` vs `'highlight'`) allows different processing paths while maintaining consistent timing and lifecycle. Highlights apply instantly; moves interpolate over time
-- **Code Architecture**: Both Python and Rust follow delegation pattern - MCTS delegates to pure game logic functions (mcts.rs → game.rs, mcts_tree.py → zertz_logic.py) ensuring single source of truth for all game rules
+- **Code Architecture**: Rust provides core game logic and MCTS (mcts.rs → game.rs). Python's zertz_logic.py provides thin wrappers that delegate to Rust functions via PyO3
 
 ## Architecture Overview
 
@@ -489,7 +500,7 @@ Zertz3D follows **clean architecture principles** with clear separation of conce
                   │
 ┌─────────────────────────────────────────┐
 │      Infrastructure Layer               │
-│  (Renderers, File I/O, Rust Backend)   │
+│  (Renderers, File I/O, Rust Backend)    │
 └─────────────────────────────────────────┘
 ```
 
@@ -503,7 +514,7 @@ Zertz3D follows **clean architecture principles** with clear separation of conce
 
 ### Python-Rust Integration
 
-The system uses PyO3 for seamless Python-Rust integration:
+The system uses PyO3 for Python-Rust integration:
 
 ```
 Python Layer (High-level orchestration)
@@ -524,8 +535,8 @@ Rust Layer (performance-critical paths)
 
 **Benefits:**
 - Zero-copy numpy array transfer between Python and Rust
-- 10-100x performance improvement for MCTS
-- Fallback to pure Python if Rust extension unavailable
+- 10-100x performance improvement for MCTS over Python implementations
+- Thread-safe parallel MCTS with minimal overhead
 
 ### MCTS Architecture
 
@@ -543,14 +554,14 @@ The MCTS implementation features advanced techniques for competitive AI:
 ```
 ┌─────────────────────────────────────────┐
 │   Thread 1   Thread 2   ...   Thread N  │
-│       │          │               │       │
-│       └──────────┴───────────────┘       │
-│                  │                       │
-│                  ▼                       │
+│       │          │               │      │
+│       └──────────┴───────────────┘      │
+│                  │                      │
+│                  ▼                      │
 │     Shared Root Node (Arc + Atomics)    │
-│       visits: AtomicU32                  │
-│       value: AtomicU32                   │
-│       children: Mutex<Vec<...>>          │
+│       visits: AtomicU32                 │
+│       value: AtomicU32                  │
+│       children: Mutex<Vec<...>>         │
 └─────────────────────────────────────────┘
 ```
 

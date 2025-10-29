@@ -12,6 +12,7 @@ from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
 from game.loaders import TranscriptLoader, NotationLoader, SGFLoader
 from game.formatters.notation_formatter import NotationFormatter
 from game.player_config import PlayerConfig
+from game.utils.player_utils import format_player_name
 from controller.game_logger import GameLogger
 from controller.action_text_formatter import ActionTextFormatter
 from controller.action_processor import ActionProcessor
@@ -475,14 +476,18 @@ class ZertzGameController:
         if winner:
             # Convert winner constant to player number for display
             player_num = 1 if winner == PLAYER_1_WIN else 2
-            self._report(f"Winner: Player {player_num} ({reason})")
+            player = self.session.player1 if player_num == 1 else self.session.player2
+            player_display_name = format_player_name(player_num, player.name)
+            self._report(f"Winner: {player_display_name} ({reason})")
         else:
             self._report(f"Game ended in a tie ({reason})")
         # Note: Board state is written by TranscriptWriter.write_footer()
         # to avoid duplication
 
-        self._report(f"Player 1 captures: {self.session.player1.captured}")
-        self._report(f"Player 2 captures: {self.session.player2.captured}")
+        player1_display_name = format_player_name(1, self.session.player1.name)
+        player2_display_name = format_player_name(2, self.session.player2.name)
+        self._report(f"{player1_display_name} captures: {self.session.player1.captured}")
+        self._report(f"{player2_display_name} captures: {self.session.player2.captured}")
 
         # Record game time and outcome if statistics tracking is enabled
         if self.track_statistics and self.current_game_start_time is not None:
@@ -567,8 +572,10 @@ class ZertzGameController:
         print(f"Games played: {total_games}")
         print()
         print("Win/Loss/Tie:")
-        print(f"  Player 1 wins: {player1_wins} ({p1_pct:.1f}%)")
-        print(f"  Player 2 wins: {player2_wins} ({p2_pct:.1f}%)")
+        player1_display_name = format_player_name(1, self.session.player1.name)
+        player2_display_name = format_player_name(2, self.session.player2.name)
+        print(f"  {player1_display_name} wins: {player1_wins} ({p1_pct:.1f}%)")
+        print(f"  {player2_display_name} wins: {player2_wins} ({p2_pct:.1f}%)")
         print(f"  Ties: {ties} ({tie_pct:.1f}%)")
         print()
         print("Timing:")

@@ -1,5 +1,70 @@
 # Zertz3D TODO and Improvement Suggestions
 
+## Recently Completed (2025-10-29)
+
+### ✅ SGF Loader for Boardspace.net Games
+- **Implementation**: Added SGF loader to import games from Boardspace.net
+- **Features**:
+  - Parses Boardspace-style SGF transcripts with P0/P1 properties
+  - Auto-detects board size from game metadata
+  - Extracts player names from SGF file
+  - Converts Boardspace move notation to internal action dictionaries
+  - Supports replay via `--replay` flag with automatic format detection
+- **Files**: game/loaders/sgf_loader.py
+- **Integration**: Works alongside existing transcript and notation loaders
+- **Testing**: Verified with actual Boardspace.net game files
+
+### ✅ Player Name Display in Text Output
+- **Implementation**: Phase 3 of player names feature - display names in console output
+- **Changes**:
+  - Created `game/utils/player_utils.py` with `format_player_name()` helper function
+  - Format: `"Player 1"` or `"Player 1 (Alice)"` when name is specified
+  - Updated `controller/zertz_game_controller.py`:
+    - Winner announcements: `"Winner: Player 1 (Alice) (...)"`
+    - Capture reports: `"Player 1 (Alice) captures: {...}"`
+    - Statistics: `"Player 1 (Alice) wins: 5 (50.0%)"`
+  - Updated `game/writers.py` TranscriptWriter:
+    - Action logs: `"Player 1 (Alice): {'action': 'PUT', ...}"`
+    - Names stored from header and used throughout file
+- **Testing**: 6 tests in `test_player_name_display.py`
+- **Design**: DRY principle - single helper function used consistently across all output locations
+- **Files**: game/utils/player_utils.py, controller/zertz_game_controller.py, game/writers.py
+
+### ✅ Capture Pool Slot Tracking Fix
+- **Bug**: Marbles overlapped in capture pools when reused from pool before game end
+- **Problem**: Used `sum([len(k)...])` which decreased when marbles removed, causing slot reuse
+- **Solution**: Track individual slot occupancy
+- **Changes** (renderer/panda_renderer.py):
+  - Added `capture_pool_occupied_slots: dict[int, set]` to track occupied slot indices per player
+  - Added `marble_to_capture_slot: dict` to map marble IDs to (player_num, slot_index)
+  - Modified `_animate_captured_marble()` to find first available slot and mark occupied
+  - Modified `show_marble_placement()` to free slots when marbles removed from capture pool
+- **Testing**: 3 tests in `test_capture_pool_slots.py`
+- **Files**: renderer/panda_renderer.py
+
+### ✅ Position-Based Loop Detection
+- **Bug**: Draw-by-repetition not triggering because loop detection compared exact actions (including marble colors)
+- **Problem**: Repeating positions with different marble colors not detected as loops
+- **Solution**: Normalize moves to strip marble colors before comparison
+- **Changes** (game/zertz_game.py):
+  - Added `_normalize_move_for_loop_detection()` method
+  - PUT actions normalized to `("PUT", (0, put_pos, rem_pos))` - marble color replaced with 0
+  - CAP actions already position-only
+  - Modified `_has_move_loop()` to normalize moves before comparison
+- **Testing**: 7 tests in `test_position_based_loop_detection.py`
+- **Files**: game/zertz_game.py
+
+### ✅ Player Name Refactoring
+- **Change**: Refactored from `dict[int, str]` approach to explicit `player1_name`/`player2_name` fields
+- **Updates**:
+  - All loaders (SGFLoader, NotationLoader, TranscriptLoader) now have individual name fields
+  - Created ReplayLoader Protocol for uniform interface
+  - PlayerConfig now has `name` field
+  - Names flow through configs instead of post-hoc assignment
+  - GameSession no longer accepts `player_names` dict parameter
+- **Testing**: 7 tests in `test_player_names_round_trip.py`
+- **Files**: game/loaders/*.py, game/player_config.py, controller/game_session.py
+
 ## Recently Completed (2025-10-22)
 
 ### ✅ Blitz Mode Python-Rust Parity
@@ -655,7 +720,7 @@ policy = PolicyHead(combined)
 - ✅ Extract out SelectionHandler class from renderer - COMPLETED: InteractionHelper class in renderer/panda3d/interaction_helper.py handles all mouse picking, collision detection, hover state, and selection callbacks
 - ✅ Extract out "Materials" using for various forms of highlighting (base color, emission color) - COMPLETED: MaterialModifier dataclass in renderer/panda3d/material_modifier.py, material constants in shared/materials_modifiers.py, MaterialManager class in renderer/panda3d/material_manager.py handles all Panda3D material operations
 - ✅ Extract highlight state machine into its own module - COMPLETED: ActionVisualizationSequencer class in renderer/panda3d/action_sequencer.py handles all multi-phase highlighting sequences (tests still TODO)
-- Extract out game configurator (e.g. number of rings/marbles, win conditions, etc.)
+- ✅Extract out game configurator (e.g. number of rings/marbles, win conditions, etc.)
 - Look for examples of technical debt.
 - Edge ring stuff - simpler to add all rings to collection and just check that rather that just add edge rings and if switch.
 - Check if get_all_permutations also includes all possible translations? (Even if they are eliminated via grouping.)
@@ -675,8 +740,8 @@ policy = PolicyHead(combined)
 - Move zertz specific stuff into zertz subfolder in rust.
 - Module constants: PLAYER_1 and PLAYER_2 need to be used from Python
 - ✅check architecture_update_code_duplication_fix.md
-- rename global parameter as global_state (same for spatial -> spatial_state)
-
+- ✅rename global parameter as global_state (same for spatial -> spatial_state)
+- Once we've found a good hyperparameter range, see what effect increasing iterations has. (check for performance variance with multiple reps)
 ## Notes
 
 This seems to be promising:

@@ -51,6 +51,11 @@ def mock_session():
     session.player1.name = None
     session.player2 = Mock()
     session.player2.name = None
+    # Mock player configs with no names
+    session.player1_config = Mock()
+    session.player1_config.name = None
+    session.player2_config = Mock()
+    session.player2_config.name = None
     return session
 
 

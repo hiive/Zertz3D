@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import TextIO
 
 from game.formatters import NotationFormatter, TranscriptFormatter
+from game.utils.player_utils import format_player_name
 
 
 class GameWriter(ABC):
@@ -165,6 +166,8 @@ class TranscriptWriter(GameWriter):
         """
         super().__init__(output)
         self.formatter = TranscriptFormatter()
+        self.player1_name: str | None = None
+        self.player2_name: str | None = None
 
     def write_header(self, seed: int, rings: int, blitz: bool = False, player1_name: str | None = None, player2_name: str | None = None) -> None:
         """Write transcript file header.
@@ -184,6 +187,10 @@ class TranscriptWriter(GameWriter):
             player1_name: Optional name for player 1
             player2_name: Optional name for player 2
         """
+        # Store player names for use in write_action
+        self.player1_name = player1_name
+        self.player2_name = player2_name
+
         self.output.write(f"# Seed: {seed}\n")
         self.output.write(f"# Rings: {rings}\n")
         if blitz:
@@ -202,7 +209,7 @@ class TranscriptWriter(GameWriter):
     def write_action(self, player_num: int, action_dict: dict, action_result=None) -> None:
         """Write action in transcript format.
 
-        Format: "Player {player_num}: {action_dict}"
+        Format: "Player {player_num} [(name)]: {action_dict}"
 
         Args:
             player_num: Player number (1 or 2)
@@ -210,7 +217,9 @@ class TranscriptWriter(GameWriter):
             action_result: Not used in transcript format
         """
         transcript_str = self.formatter.action_to_transcript(action_dict)
-        self.output.write(f"Player {player_num}: {transcript_str}\n")
+        player_name = self.player1_name if player_num == 1 else self.player2_name
+        player_display_name = format_player_name(player_num, player_name)
+        self.output.write(f"{player_display_name}: {transcript_str}\n")
         self.flush()
 
     def write_comment(self, message: str) -> None:

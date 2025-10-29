@@ -3,6 +3,7 @@
 *A game by Kris Burm, part of the GIPF Project*  
 GIPF, TAMSK, ZÈRTZ, DVONN, YINSH and PÜNCT ® & © Don & Co NV. Content © Kris Burm.
 
+Sourced from:  http://www.gipf.com/zertz/rules/rules.html and http://www.gipf.com/zertz/faq/
 ---
 
 ## Introduction
