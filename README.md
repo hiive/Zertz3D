@@ -2,10 +2,17 @@
 
 A 3D implementation of the abstract board game Zèrtz using Panda3D, with a Rust-accelerated MCTS AI engine that includes RAVE, transposition tables, and parallel search.
 
+<img src="data/docs/visualizations/zertz3d_screenshot.png" style="max-width: 912px">
+
+- [Zèrtz rules](data/docs/reference/zertz_rules.md)
+- [Game state representation](data/docs/reference/game_state_representation.md)
+- [Canonicalisation reference](data/docs/reference/canonicalization.md)
+
+
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
-Full game rules: http://www.gipf.com/zertz/rules/rules.html
+Full game rules online @ http://www.gipf.com/zertz/rules/rules.html
 
 **THIS IS A WORK-IN-PROGRESS!**
 
@@ -360,8 +367,16 @@ A faster, more aggressive variant designed for quick, tactical play. Enable with
 ## Board Sizes
 
 - **37 rings**: 7×7 hex grid (standard)
+
+<img src="data/docs/visualizations/board_visualization_37.png" style="max-width: 912px">
+
 - **48 rings**: 8×8 hex grid
+
+<img src="data/docs/visualizations/board_visualization_48.png" style="max-width: 912px">
+
 - **61 rings**: 9×9 hex grid (uses ABCDEFGHJ coordinate scheme, skipping 'I')
+
+<img src="data/docs/visualizations/board_visualization_61.png" style="max-width: 912px">
 
 ## Replay System
 
