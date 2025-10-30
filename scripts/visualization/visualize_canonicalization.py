@@ -11,7 +11,6 @@ import sys
 from pathlib import Path
 from collections import defaultdict
 import numpy as np
-from PIL import Image
 import tempfile
 
 # Add project root to Python path
@@ -24,7 +23,8 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from game.utils.diagram import execute_notation_sequence, DiagramRenderer
-from game.loaders import NotationLoader
+from game.utils.grid_renderer import GridRenderer
+from game.loaders import AutoSelectLoader
 
 
 def state_to_key(state: np.ndarray) -> str:
@@ -32,7 +32,7 @@ def state_to_key(state: np.ndarray) -> str:
     return state.tobytes()
 
 
-def analyze_canonicalization(notation_path: str, save_images: bool = False, output_dir: str = None, show_all_transforms: bool = False, image_columns: int = 6):
+def analyze_canonicalization(notation_path: str, save_images: bool = False, output_dir: str = None, show_all_transforms: bool = False, image_columns: int = 6, separate_turns: bool = False, svg: bool = False, show_row_dividers: bool = False):
     """Analyze canonicalization from a notation file.
 
     Args:
@@ -40,11 +40,14 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
         save_images: If True, save visualization images
         output_dir: Directory to save images (default: canonicalization_output)
         show_all_transforms: If True, show all unique transformations in images
-        image_columns: Number of images per row in output (default: 6)
+        image_columns: Number of images per row in output (default: 6, grid mode)
+        separate_turns: Not used (each move gets separate output file)
+        svg: If True, use SVG format for combined grids instead of PNG
+        show_row_dividers: If True, draw thin dividers between rows in combined grid (default: False)
     """
 
-    # Load notation to count moves
-    loader = NotationLoader(notation_path)
+    # Load replay file (auto-detects format: notation, transcript, or SGF)
+    loader = AutoSelectLoader(notation_path)
     player1_actions, player2_actions = loader.load()
 
     # Total moves = sum of both players' actions
@@ -124,23 +127,24 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
         if save_images:
             from game.zertz_board import ZertzBoard
 
-            # Collect all images to concatenate
-            images_to_concat = []
+            # Resolution
+            board_width = 768
+
+            # Collect temp files with transparent backgrounds for grid
             temp_files = []
+            file_ext = '.svg' if svg else '.png'
 
             # 1. Original state (left-most)
-            tmp_orig = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            tmp_orig = tempfile.NamedTemporaryFile(suffix=file_ext, delete=False)
             temp_files.append(tmp_orig.name)
-            renderer.save_board(board, tmp_orig.name, title=f"Original ({inverse})", width=512)
-            images_to_concat.append(Image.open(tmp_orig.name))
+            renderer.save_board(board, tmp_orig.name, title=f"Original ({inverse})", width=board_width, transparent=True)
 
             # 2. Canonical state
-            tmp_canon = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            tmp_canon = tempfile.NamedTemporaryFile(suffix=file_ext, delete=False)
             temp_files.append(tmp_canon.name)
             canonical_board = ZertzBoard(loader.detected_rings)
             canonical_board.state = canonical_state.copy()
-            renderer.save_board(canonical_board, tmp_canon.name, title="Canonical (R0)", width=512)
-            images_to_concat.append(Image.open(tmp_canon.name))
+            renderer.save_board(canonical_board, tmp_canon.name, title="Canonical (R0)", width=board_width, transparent=True)
 
             # 3. Optionally add all other unique transformations
             if show_all_transforms:
@@ -162,45 +166,21 @@ def analyze_canonicalization(notation_path: str, save_images: bool = False, outp
                         continue
 
                     # Render this transformation
-                    tmp_transform = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                    tmp_transform = tempfile.NamedTemporaryFile(suffix=file_ext, delete=False)
                     temp_files.append(tmp_transform.name)
 
                     transform_board = ZertzBoard(loader.detected_rings)
                     transform_board.state = transformed_state.copy()
-                    renderer.save_board(transform_board, tmp_transform.name, title=transform_name, width=512)
-                    images_to_concat.append(Image.open(tmp_transform.name))
+                    renderer.save_board(transform_board, tmp_transform.name, title=transform_name, width=board_width, transparent=True)
 
-            # Arrange images in a grid with specified number of columns
-            num_images = len(images_to_concat)
-            num_cols = min(image_columns, num_images)  # Don't exceed actual number of images
-            num_rows = (num_images + num_cols - 1) // num_cols  # Ceiling division
+            # Create combined grid using GridRenderer
+            grid_renderer = GridRenderer(image_columns=image_columns, background_color=renderer.bg_color, show_row_dividers=show_row_dividers)
 
-            # Calculate grid dimensions
-            img_width = images_to_concat[0].width if images_to_concat else 0
-            img_height = images_to_concat[0].height if images_to_concat else 0
-            total_width = num_cols * img_width
-            total_height = num_rows * img_height
-
-            # Get background color from first image (top-left pixel)
-            bg_color = images_to_concat[0].getpixel((0, 0)) if images_to_concat else (255, 255, 255)
-            combined_img = Image.new('RGB', (total_width, total_height), bg_color)
-
-            # Paste images in grid layout
-            for idx, img in enumerate(images_to_concat):
-                row = idx // num_cols
-                col = idx % num_cols
-                x_offset = col * img_width
-                y_offset = row * img_height
-                combined_img.paste(img, (x_offset, y_offset))
-
-            # Save combined image
-            combined_filename = f"move_{move_num:03d}_{transform}.png"
+            # Create combined grid and clean up temp files
+            combined_filename = f"move_{move_num:03d}_{transform}.{('svg' if svg else 'png')}"
             combined_path = seed_dir / combined_filename
-            combined_img.save(combined_path)
 
-            # Clean up temp files
-            for temp_file in temp_files:
-                Path(temp_file).unlink()
+            grid_renderer.create_grid_from_temp_files(temp_files, str(combined_path), svg=svg)
 
         print("-" * 80)
 
@@ -281,7 +261,22 @@ def main():
         "--image-columns",
         type=int,
         default=6,
-        help="Number of images per row in grid layout (default: 6)"
+        help="Number of images per row in grid layout (default: 6, combined mode only)"
+    )
+    parser.add_argument(
+        "--separate-turns",
+        action="store_true",
+        help="(Not applicable to this script - each move already gets separate output)"
+    )
+    parser.add_argument(
+        "--svg",
+        action="store_true",
+        help="Use SVG format for combined grids instead of PNG"
+    )
+    parser.add_argument(
+        "--show-row-dividers",
+        action="store_true",
+        help="Draw thin dividers between rows in combined grid"
     )
 
     args = parser.parse_args()
@@ -298,7 +293,10 @@ def main():
         save_images=save_images,
         output_dir=args.output_dir,
         show_all_transforms=args.show_all_transforms,
-        image_columns=args.image_columns
+        image_columns=args.image_columns,
+        separate_turns=args.separate_turns,
+        svg=args.svg,
+        show_row_dividers=args.show_row_dividers,
     )
 
 

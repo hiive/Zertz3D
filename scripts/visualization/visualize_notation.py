@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Command-line utility to render Zèrtz board states from notation.
 
+Supports notation files, transcript files, and SGF format (auto-detected).
+
 Examples:
     # Render notation file to PNG
-    python render_notation.py game.txt --output board.png
+    python visualize_notation.py game.txt --output board.png
 
     # Display on screen with coordinates
-    python render_notation.py game.txt --show --coords
+    python visualize_notation.py game.txt --show --coords
 
-    # Render specific move number
-    python render_notation.py game.txt --output move_15.png --stop-at 15
+    # Render specific move number with capture counts
+    python visualize_notation.py game.txt --output move_15.png --stop-at 15 --show-captures
 
     # Custom size and title
-    python render_notation.py game.txt --output final.png --width 1200 --title "Final Position"
+    python visualize_notation.py game.txt --output final.png --width 1200 --title "Final Position"
 """
 
 import sys
@@ -108,6 +110,12 @@ def main():
         help="Background color in #RRGGBB or #RRGGBBAA format (default: #F5E6D3)"
     )
 
+    parser.add_argument(
+        "--show-captures",
+        action="store_true",
+        help="Display player capture counts at bottom corners"
+    )
+
     args = parser.parse_args()
 
     # Convert notation to Path if it's a file
@@ -124,9 +132,10 @@ def main():
             notation_input,
             output_path=args.output,
             show=args.show,
-            show_coords=args.coords,
+            internal_coords=args.coords,
             edge_coords=args.edge_coords,
             show_removed=args.show_removed,
+            show_captures=args.show_captures,
             title=args.title,
             width=args.width,
             height=args.height,

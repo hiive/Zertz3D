@@ -42,7 +42,7 @@ from game.zertz_game import ZertzGame
 from game.constants import STANDARD_MARBLES, BLITZ_MARBLES, STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS
 from game.zertz_board import ZertzBoard
 from game.formatters import NotationFormatter
-from game.loaders import NotationLoader
+from game.loaders import AutoSelectLoader
 
 
 class DiagramRenderer:
@@ -74,13 +74,14 @@ class DiagramRenderer:
 
     BACKGROUND_COLOR = "#F5E6D3"  # Light beige background
 
-    def __init__(self, internal_coords: bool = False, edge_coords: bool = False, show_removed: bool = False, bg_color: Optional[str] = None):
+    def __init__(self, internal_coords: bool = False, edge_coords: bool = False, show_removed: bool = False, show_captures: bool = False, bg_color: Optional[str] = None):
         """Initialize board renderer.
 
         Args:
             internal_coords: If True, display coordinate labels centered on rings
             edge_coords: If True, display coordinate labels at top/bottom edges of columns
             show_removed: If True, show removed rings with transparency
+            show_captures: If True, display player capture counts at bottom corners
             bg_color: Background color in #RRGGBB or #RRGGBBAA format (default: #F5E6D3)
 
         Note:
@@ -97,6 +98,7 @@ class DiagramRenderer:
         self.internal_coords = internal_coords
         self.edge_coords = edge_coords
         self.show_removed = show_removed
+        self.show_captures = show_captures
         self.bg_color = bg_color if bg_color is not None else self.BACKGROUND_COLOR
 
     def _yx_to_axial(self, y: int, x: int, width: int) -> tuple[float, float]:
@@ -171,6 +173,7 @@ class DiagramRenderer:
         title: Optional[str] = None,
         width: int = 1024,
         height: int = 1024,
+        transparent: bool = False,
     ) -> plt.Figure:
         """Render a board state as a matplotlib figure.
 
@@ -179,6 +182,7 @@ class DiagramRenderer:
             title: Optional title for the figure
             width: Figure width in pixels (default: 1024)
             height: Figure height in pixels (default: 1024)
+            transparent: If True, use transparent background (default: False)
 
         Returns:
             matplotlib Figure object
@@ -189,8 +193,14 @@ class DiagramRenderer:
 
         fig, ax = plt.subplots(figsize=figsize)
         ax.set_aspect('equal')
-        ax.set_facecolor(self.bg_color)
-        fig.patch.set_facecolor(self.bg_color)
+
+        # Set background colors (or transparent if requested)
+        if transparent:
+            ax.set_facecolor('none')
+            fig.patch.set_facecolor('none')
+        else:
+            ax.set_facecolor(self.bg_color)
+            fig.patch.set_facecolor(self.bg_color)
 
         # Get board dimensions
         board_width = board.width
@@ -348,8 +358,7 @@ class DiagramRenderer:
                 weight=weight,
             )
 
-        # Set axis limits based on ALL possible ring positions (not just existing ones)
-        # This ensures consistent image sizes across different board states
+        # Collect board extent for axis limits
         all_x_coords = []
         all_y_coords = []
         for y in range(board_width):
@@ -361,6 +370,104 @@ class DiagramRenderer:
                         all_y_coords.append(py)
                 except IndexError:
                     continue
+
+        # Render capture counts if enabled
+        if self.show_captures and all_x_coords and all_y_coords:
+            # Calculate positions for capture displays (bottom corners, outside board)
+            min_x = min(all_x_coords)
+            max_x = max(all_x_coords)
+            min_y = min(all_y_coords)
+
+            # Size of capture indicator marbles (2/3 of board marbles)
+            capture_marble_radius = self.MARBLE_RADIUS * 0.67
+
+            # Horizontal spacing between marble types (tighter packing)
+            horizontal_spacing = capture_marble_radius * 2.2
+
+            # Y position (closer to the board now)
+            capture_y = min_y - self.RING_RADIUS * 1.3
+
+            # Extract capture counts from global_state
+            # Player 1: indices 3-5 (w, g, b)
+            # Player 2: indices 6-8 (w, g, b)
+            p1_captures = {
+                'w': int(board.global_state[board.P1_CAP_W]),
+                'g': int(board.global_state[board.P1_CAP_G]),
+                'b': int(board.global_state[board.P1_CAP_B]),
+            }
+            p2_captures = {
+                'w': int(board.global_state[board.P2_CAP_W]),
+                'g': int(board.global_state[board.P2_CAP_G]),
+                'b': int(board.global_state[board.P2_CAP_B]),
+            }
+
+            # Render Player 1 captures (bottom left, angled at 30 degrees)
+            # Calculate vertical offset for 30-degree slope alignment
+            vertical_offset = horizontal_spacing * 0.577  # tan(30°) ≈ 0.577
+
+            p1_base_x = min_x
+            for idx, marble_type in enumerate(['w', 'g', 'b']):
+                count = p1_captures[marble_type]
+                marble_x = p1_base_x + (idx * horizontal_spacing)
+
+                # Black marble (idx=2) stays at base position, others offset upward
+                marble_y = capture_y + ((2 - idx) * vertical_offset)
+
+                # Draw marble circle
+                marble = patches.Circle(
+                    (marble_x, marble_y),
+                    radius=capture_marble_radius,
+                    facecolor=self.MARBLE_COLORS[marble_type],
+                    edgecolor=self.MARBLE_EDGE_COLOR,
+                    linewidth=1.5 * scale_factor,
+                    zorder=5,
+                )
+                ax.add_patch(marble)
+
+                # Draw count text inside marble (white on dark, black on light)
+                text_color = self.COORD_COLOR_ON_DARK if marble_type in ['g', 'b'] else self.COORD_COLOR
+                ax.text(
+                    marble_x, marble_y,
+                    str(count),
+                    ha='center', va='center',
+                    fontsize=self.COORD_FONT_SIZE * 0.9 * scale_factor,
+                    color=text_color,
+                    zorder=6,
+                    weight='bold',
+                )
+
+            # Render Player 2 captures (bottom right, angled at 30 degrees)
+            p2_base_x = max_x
+            for idx, marble_type in enumerate(['w', 'g', 'b']):
+                count = p2_captures[marble_type]
+                # Reverse order: start from right and go left
+                marble_x = p2_base_x - (idx * horizontal_spacing)
+
+                # Black marble (idx=2) stays at base position, others offset upward
+                marble_y = capture_y + ((2 - idx) * vertical_offset)
+
+                # Draw marble circle
+                marble = patches.Circle(
+                    (marble_x, marble_y),
+                    radius=capture_marble_radius,
+                    facecolor=self.MARBLE_COLORS[marble_type],
+                    edgecolor=self.MARBLE_EDGE_COLOR,
+                    linewidth=1.5 * scale_factor,
+                    zorder=5,
+                )
+                ax.add_patch(marble)
+
+                # Draw count text inside marble (white on dark, black on light)
+                text_color = self.COORD_COLOR_ON_DARK if marble_type in ['g', 'b'] else self.COORD_COLOR
+                ax.text(
+                    marble_x, marble_y,
+                    str(count),
+                    ha='center', va='center',
+                    fontsize=self.COORD_FONT_SIZE * 0.9 * scale_factor,
+                    color=text_color,
+                    zorder=6,
+                    weight='bold',
+                )
 
         if all_x_coords and all_y_coords:
             # Border = full ring radius + 1/4 hex width trim
@@ -393,6 +500,7 @@ class DiagramRenderer:
         title: Optional[str] = None,
         width: Optional[int] = None,
         height: Optional[int] = None,
+        transparent: bool = False,
     ) -> None:
         """Render and save a board state to a file.
 
@@ -402,6 +510,7 @@ class DiagramRenderer:
             title: Optional title for the figure
             width: Figure width in pixels (if None, defaults to 1024 or matches height)
             height: Figure height in pixels (if None, defaults to 1024 or matches width)
+            transparent: If True, use transparent background (default: False)
         """
         # Handle optional width/height - default to 1024, or match the provided dimension
         default_pixels = 1024
@@ -418,17 +527,23 @@ class DiagramRenderer:
             output_width = width
             output_height = height
 
-        fig = self.render_board(board, title=title, width=output_width, height=output_height)
+        fig = self.render_board(board, title=title, width=output_width, height=output_height, transparent=transparent)
 
         # Detect format from extension - matplotlib handles SVG natively
         # Use fixed DPI=100 internally for saving
         output_path = Path(output_path)
-        if output_path.suffix.lower() == '.svg':
-            # SVG is vector format - no DPI needed
-            fig.savefig(output_path, format='svg', bbox_inches='tight', facecolor=fig.get_facecolor())
+        if transparent:
+            # Transparent background
+            if output_path.suffix.lower() == '.svg':
+                fig.savefig(output_path, format='svg', bbox_inches='tight', transparent=True)
+            else:
+                fig.savefig(output_path, dpi=100, bbox_inches='tight', transparent=True)
         else:
-            # Raster formats (PNG, JPG, etc.) use DPI
-            fig.savefig(output_path, dpi=100, bbox_inches='tight', facecolor=fig.get_facecolor())
+            # Solid background
+            if output_path.suffix.lower() == '.svg':
+                fig.savefig(output_path, format='svg', bbox_inches='tight', facecolor=fig.get_facecolor())
+            else:
+                fig.savefig(output_path, dpi=100, bbox_inches='tight', facecolor=fig.get_facecolor())
 
         plt.close(fig)
 
@@ -562,8 +677,8 @@ def execute_notation_sequence(
     if isinstance(notation_input, (str, Path)):
         path = Path(notation_input)
         if path.exists() and path.is_file():
-            # Load from file
-            loader = NotationLoader(str(path))
+            # Load from file (auto-detects format: notation, transcript, or SGF)
+            loader = AutoSelectLoader(str(path))
             player1_actions, player2_actions = loader.load()
             rings = loader.detected_rings
             blitz = loader.blitz
@@ -580,31 +695,38 @@ def execute_notation_sequence(
     # Create game
     game = ZertzGame(rings, marbles, win_condition, t=5)
 
-    # Execute moves
+    # Execute moves (respecting turn order, not strict alternation)
+    # Chain captures result in multiple consecutive actions for one player
     move_count = 0
+    p1_idx = 0
+    p2_idx = 0
 
-    for i in range(max(len(player1_actions), len(player2_actions))):
-        # Player 1 move
-        if i < len(player1_actions):
-            if stop_at_move is not None and move_count >= stop_at_move:
-                break
+    while p1_idx < len(player1_actions) or p2_idx < len(player2_actions):
+        if stop_at_move is not None and move_count >= stop_at_move:
+            break
 
-            action_dict = player1_actions[i]
-            action_str = action_dict_to_str(action_dict)
-            action_type, action = game.str_to_action(action_str)
-            game.take_action(action_type, action)
-            move_count += 1
+        # Check whose turn it is (matches main replay system behavior)
+        current_player = game.get_cur_player_value()
 
-        # Player 2 move
-        if i < len(player2_actions):
-            if stop_at_move is not None and move_count >= stop_at_move:
-                break
+        if current_player == 1:
+            # Player 1's turn
+            if p1_idx >= len(player1_actions):
+                raise ValueError(f"Player 1 out of actions (move {move_count}, expected player 1)")
 
-            action_dict = player2_actions[i]
-            action_str = action_dict_to_str(action_dict)
-            action_type, action = game.str_to_action(action_str)
-            game.take_action(action_type, action)
-            move_count += 1
+            action_dict = player1_actions[p1_idx]
+            p1_idx += 1
+        else:
+            # Player 2's turn
+            if p2_idx >= len(player2_actions):
+                raise ValueError(f"Player 2 out of actions (move {move_count}, expected player 2)")
+
+            action_dict = player2_actions[p2_idx]
+            p2_idx += 1
+
+        action_str = action_dict_to_str(action_dict)
+        action_type, action = game.str_to_action(action_str)
+        game.take_action(action_type, action)
+        move_count += 1
 
         # Check if game ended
         if game.get_game_ended() is not None:
@@ -620,6 +742,7 @@ def render_board_from_notation(
     internal_coords: bool = True,
     edge_coords: bool = False,
     show_removed: bool = False,
+    show_captures: bool = False,
     title: Optional[str] = None,
     width: Optional[int] = None,
     height: Optional[int] = None,
@@ -639,6 +762,7 @@ def render_board_from_notation(
         internal_coords: If True, display coordinate labels centered on rings
         edge_coords: If True, display coordinate labels at top/bottom edges of columns
         show_removed: If True, show removed rings with transparency
+        show_captures: If True, display player capture counts at bottom corners
         title: Optional title for the figure
         width: Output width in pixels (if None, defaults to 1024)
         height: Output height in pixels (if None, defaults to 1024)
@@ -693,7 +817,7 @@ def render_board_from_notation(
     board = execute_notation_sequence(notation_input, stop_at_move=stop_at_move)
 
     # Create renderer
-    renderer = DiagramRenderer(internal_coords=internal_coords, edge_coords=edge_coords, show_removed=show_removed, bg_color=bg_color)
+    renderer = DiagramRenderer(internal_coords=internal_coords, edge_coords=edge_coords, show_removed=show_removed, show_captures=show_captures, bg_color=bg_color)
 
     # Save or show
     if output_path:

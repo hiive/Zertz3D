@@ -9,7 +9,7 @@ import time
 import numpy as np
 
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
-from game.loaders import TranscriptLoader, NotationLoader, SGFLoader
+from game.loaders import AutoSelectLoader
 from game.formatters.notation_formatter import NotationFormatter
 from game.player_config import PlayerConfig
 from game.utils.player_utils import format_player_name
@@ -25,36 +25,6 @@ from shared.interfaces import IRenderer, IRendererFactory
 class ZertzGameController:
     # Fraction of move_duration used for animations (leaves buffer before next turn)
     ANIMATION_DURATION_RATIO = 60.0 / 100.0  # 1% of 60fps
-
-    @staticmethod
-    def _detect_file_format(filepath: str) -> str:
-        """Detect whether a file is transcript or notation format.
-
-        Transcript files start with '# Seed' or 'Player'.
-        Notation files start with a digit (board size).
-
-        Args:
-            filepath: Path to the file to detect
-
-        Returns:
-            "transcript", "notation" or "sgf"
-        """
-        if filepath.lower().endswith(".sgf"):
-            return "sgf"
-
-        with open(filepath, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line:  # Skip empty lines
-                    continue
-                # Transcript files start with '#' (comments) or 'Player'
-                if line.startswith('#') or line.startswith('Player'):
-                    return "transcript"
-                # Notation files start with a digit (board size like "37" or "37 Blitz")
-                if line[0].isdigit():
-                    return "notation"
-        # Default to transcript if we can't determine
-        return "transcript"
 
     def __init__(
         self,
@@ -104,15 +74,8 @@ class ZertzGameController:
         replay_actions = None
         loader = None
         if replay_file is not None:
-            # Auto-detect file format (transcript or notation)
-            file_format = self._detect_file_format(replay_file)
-            if file_format == "notation":
-                loader = NotationLoader(replay_file, status_reporter=print)
-            elif file_format == "sgf":
-                loader = SGFLoader(replay_file, status_reporter=print)
-            else:  # transcript format
-                loader = TranscriptLoader(replay_file, status_reporter=print)
-
+            # Auto-detect file format (transcript, notation, or SGF) and load
+            loader = AutoSelectLoader(replay_file, status_reporter=print)
             replay_actions = loader.load()
             # Use loader's authoritative configuration
             rings = loader.detected_rings

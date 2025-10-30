@@ -5,8 +5,9 @@
 <img src="data/docs/visualizations/zertz3d_screenshot.png" style="max-width: 912px">
 
 - [Zèrtz rules](data/docs/reference/zertz_rules.md)
-- [Game state representation](data/docs/reference/game_state_representation.md)
-- [Canonicalisation reference](data/docs/reference/canonicalization.md)
+- [Game State representation](data/docs/reference/game_state_representation.md)
+- [Canonicalisation](data/docs/reference/canonicalization.md)
+- [Visualization tools reference](data/docs/reference/visualization_tools.md)
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
