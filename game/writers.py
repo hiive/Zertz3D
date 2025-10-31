@@ -142,6 +142,25 @@ class NotationWriter(GameWriter):
         self.output.write(f"{notation}\n")
         self.flush()
 
+    def write_footer(self, game=None) -> None:
+        """Write notation file footer with winner information.
+
+        Args:
+            game: ZertzGame instance to determine winner
+        """
+        if game is None:
+            return
+
+        # Get game outcome
+        outcome = game.get_game_ended()
+        if outcome == 1:
+            self.output.write("# Winner: Player 1\n")
+        elif outcome == -1:
+            self.output.write("# Winner: Player 2\n")
+        elif outcome == 0:
+            self.output.write("# Result: Tie\n")
+        self.flush()
+
 
 class TranscriptWriter(GameWriter):
     """Writes game actions in transcript file format.

@@ -42,6 +42,12 @@ DARK_BLUE_MATERIAL_MOD = MaterialModifier(
     emission_color=(0.0, 0.0, 0.08, 1),  # Subtle blue glow
 )
 
+# Light blue for capture thinking highlights (with score-based alpha)
+LIGHT_SKY_BLUE_MATERIAL_MOD = MaterialModifier(
+    highlight_color=(0.5, 0.7, 0.95, 1),  # Light sky blue for capture thinking
+    emission_color=(0.1, 0.14, 0.19, 1),  # Light blue glow
+)
+
 OLIVE_MATERIAL_MOD = MaterialModifier(
     highlight_color=(0.5, 0.5, 0.0, 1),  # Yellow/olive - distinct from blue MAX
     emission_color=(0.12, 0.12, 0.0, 1),   # Yellow glow

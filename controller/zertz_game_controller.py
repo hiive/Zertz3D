@@ -342,8 +342,11 @@ class ZertzGameController:
         # Execute action FIRST to get action_result
         action_result = self.session.game.take_action(ax, ay)
 
+        # DEBUG: Track captured marbles after each move
+        # print(f"[DEBUG] After move by Player {player.n}: P1={self.session.player1.captured}, P2={self.session.player2.captured}")
+
         # TEMPORARY: Call canonicalize_state for profiling - REMOVE AFTER PROFILING
-        self.session.game.board.canonicalize_state()
+        # self.session.game.board.canonicalize_state()
         # END TEMPORARY
 
         # Generate notation string for this action
@@ -458,6 +461,15 @@ class ZertzGameController:
             self.game_stats.append(game_duration)
             # Record win/loss/tie
             self.win_loss_stats[game_over] += 1
+
+            # Print one-line running total directly (bypasses logger to always show on screen)
+            games_so_far = len(self.game_stats)
+            p1_wins = self.win_loss_stats[PLAYER_1_WIN]
+            p2_wins = self.win_loss_stats[PLAYER_2_WIN]
+            ties = self.win_loss_stats[0]
+            p1_pct = (p1_wins / games_so_far * 100) if games_so_far > 0 else 0
+            p2_pct = (p2_wins / games_so_far * 100) if games_so_far > 0 else 0
+            print(f"Running total [{games_so_far} games]: P1: {p1_wins} ({p1_pct:.1f}%), P2: {p2_wins} ({p2_pct:.1f}%), Ties: {ties}")
 
         # Increment games played counter
         self.session.increment_games_played()

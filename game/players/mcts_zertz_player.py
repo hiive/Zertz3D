@@ -43,6 +43,10 @@ class MCTSZertzPlayer(ZertzPlayer):
         """
         super().__init__(game, n)
 
+        # DEBUG: Log player creation
+        # print(f"[DEBUG] Created MCTSZertzPlayer (n={n}, id={id(self)}, rng_seed={rng_seed})")
+        # print(f"  Game state at creation: cur_player={game.board.get_cur_player()}, global[9]={game.board.global_state[9]}")
+
         # Ensure Rust backend is available
         ensure_rust_backend()
 
@@ -65,7 +69,7 @@ class MCTSZertzPlayer(ZertzPlayer):
         self._rust_seed_initialized = False
         self.progress_callback = progress_callback
         self.progress_interval_ms = progress_interval_ms
-        self.player_name = f"MCTS {n}"
+        self.name = f"MCTS {n}"
 
         # Create Rust MCTS searcher
         self.rust_mcts = hiivelabs_zertz_mcts.MCTSSearch(
@@ -139,8 +143,22 @@ class MCTSZertzPlayer(ZertzPlayer):
         """Run MCTS search using Rust backend."""
         # Get current state
         state = self.game.get_current_state()
-        spatial = state['spatial'].astype(np.float32)
+        spatial_state = state['spatial'].astype(np.float32)
         global_state = state['global'].astype(np.float32)
+
+        # DEBUG: Verify player perspective
+        game_cur_player = self.game.board.get_cur_player()  # 0 or 1
+        state_cur_player = int(global_state[9])  # Should match
+        my_player_index = self.n - 1  # Convert from 1/2 to 0/1
+
+        # print(f"[DEBUG MCTS] Player {self.n} (idx={my_player_index}) searching, game_cur={game_cur_player}, state_cur={state_cur_player}")
+
+        if state_cur_player != game_cur_player:
+            print(f"  [BUG] State mismatch: game={game_cur_player}, state={state_cur_player}")
+
+        if state_cur_player != my_player_index:
+            print(f"  [BUG!!!] WRONG PLAYER! Player {self.n} but state has player {state_cur_player}!")
+            print(f"           MCTS will optimize for Player {state_cur_player + 1} not Player {self.n}!")
 
         if self.use_transposition_table and self.clear_table_each_move:
             self.rust_mcts.clear_transposition_table()
@@ -170,14 +188,14 @@ class MCTSZertzPlayer(ZertzPlayer):
         # Run search (serial or parallel)
         if self.num_workers > 1:
             action_type, action_data = self.rust_mcts.search_parallel(
-                spatial,
+                spatial_state,
                 global_state,
                 num_threads=self.num_workers,
                 **rust_kwargs,
             )
         else:  # Serial mode
             action_type, action_data = self.rust_mcts.search(
-                spatial,
+                spatial_state,
                 global_state,
                 **rust_kwargs,
             )
@@ -185,5 +203,21 @@ class MCTSZertzPlayer(ZertzPlayer):
         self._last_root_children = self.rust_mcts.last_root_children()
         self._last_root_visits = self.rust_mcts.last_root_visits()
         self._last_root_value = self.rust_mcts.last_root_value()
+
+        # DEBUG: Print search results
+        # print(f"[DEBUG MCTS] Player {self.n} (idx={my_player_index}) search complete:")
+        # print(f"  Root value: {self._last_root_value:.3f} (from current player's perspective)")
+        # print(f"  Root visits: {self._last_root_visits}, Children: {self._last_root_children}")
+        # print(f"  Chosen action: {action_type} {action_data}")
+
+        # Get action scores to find chosen action's score
+        child_stats = self.rust_mcts.last_child_statistics()
+        chosen_score = None
+        for act_type, act_data, score in child_stats:
+            if act_type == action_type and act_data == action_data:
+                chosen_score = score
+                break
+        # if chosen_score is not None:
+        #     print(f"  Chosen action score: {chosen_score:.3f}")
 
         return (action_type, action_data)

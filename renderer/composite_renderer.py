@@ -144,3 +144,11 @@ class CompositeRenderer(IRenderer):
                 if renderer.attach_update_loop(update_fn, interval):
                     handled = True
         return handled
+
+    @property
+    def action_visualization_sequencer(self):
+        """Return the action_visualization_sequencer from the first renderer that has one."""
+        for renderer in self._renderers:
+            if hasattr(renderer, "action_visualization_sequencer"):
+                return renderer.action_visualization_sequencer
+        return None

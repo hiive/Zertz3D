@@ -1,6 +1,7 @@
 import logging
 import math
 import sys
+from pathlib import Path
 
 from typing import Callable, Any, Optional
 
@@ -17,6 +18,8 @@ from panda3d.core import (
     loadPrcFileData,
     TextNode,
     NodePath,
+    Filename,
+    getModelPath,
 )
 
 from renderer.panda3d.action_sequencer import ActionVisualizationSequencer
@@ -112,6 +115,24 @@ class PandaRenderer(ShowBase):
         # Configure OpenGL version before initializing ShowBase
         loadPrcFileData("", "gl-version 3 2")
         super().__init__()
+
+        # Add project/package root to Panda3D model path
+        # Model names use "models/" prefix, so we need to add the parent directory
+        root_dir = None
+        cwd_models = Path.cwd() / "models"
+        if cwd_models.exists():
+            # Running from project directory
+            root_dir = Path.cwd()
+        else:
+            # Try relative to this file's location (for installed package)
+            package_root = Path(__file__).parent.parent
+            package_models = package_root / "models"
+            if package_models.exists():
+                root_dir = package_root
+
+        if root_dir:
+            model_path = getModelPath()
+            model_path.appendDirectory(Filename.fromOsSpecific(str(root_dir)))
 
         self.highlight_choices = highlight_choices
         self.update_callback = update_callback

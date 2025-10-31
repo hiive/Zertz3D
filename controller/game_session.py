@@ -187,6 +187,11 @@ class GameSession:
         # Create new game instance
         self.game = ZertzGame(self.rings, self.marbles, self.win_condition, self.t)
 
+        # DEBUG: Log game reset
+        game_num = getattr(self, '_game_count', 0) + 1
+        self._game_count = game_num
+        # print(f"[DEBUG] Starting game #{game_num}, cur_player={self.game.board.get_cur_player()}")
+
         # Create players based on mode
         if self.replay_mode:
             self._report("-- Replay Mode --")

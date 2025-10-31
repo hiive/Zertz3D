@@ -24,7 +24,6 @@ class PlayerConfig:
         mcts_clear_table_each_move: Clear transposition table between moves
         mcts_max_simulation_depth: Max rollout depth (None = full game)
         mcts_time_limit: Max search time per move in seconds (None = no limit)
-        mcts_parallel: Use parallel MCTS search
         mcts_num_workers: Number of threads for parallel search
         mcts_verbose: Print search statistics
         rng_seed: Random seed for this player (None = unseeded)
@@ -43,7 +42,6 @@ class PlayerConfig:
     mcts_clear_table_each_move: bool = True
     mcts_max_simulation_depth: int | None = None
     mcts_time_limit: float | None = None
-    mcts_parallel: bool = False
     mcts_num_workers: int = 16
     mcts_verbose: bool = False
 
@@ -75,7 +73,6 @@ class PlayerConfig:
         clear_table_each_move: bool = True,
         max_simulation_depth: int | None = None,
         time_limit: float | None = None,
-        parallel: bool = False,
         num_workers: int = 16,
         verbose: bool = False,
         seed: int | None = None,
@@ -112,7 +109,6 @@ class PlayerConfig:
             mcts_clear_table_each_move=clear_table_each_move,
             mcts_max_simulation_depth=max_simulation_depth,
             mcts_time_limit=time_limit,
-            mcts_parallel=parallel,
             mcts_num_workers=num_workers,
             mcts_verbose=verbose,
             rng_seed=seed,
@@ -174,7 +170,7 @@ def parse_player_spec(spec: str) -> PlayerConfig:
                 params[key] = int(value)
             elif key in ["exploration", "fpu", "widening", "rave", "time_limit"]:
                 params[key] = float(value)
-            elif key in ["transposition", "lookups", "clear", "parallel", "verbose"]:
+            elif key in ["transposition", "lookups", "clear", "verbose"]:
                 params[key] = value.lower() in ["1", "true", "yes", "on"]
             else:
                 raise ValueError(f"Unknown parameter: {key}")
@@ -197,7 +193,6 @@ def parse_player_spec(spec: str) -> PlayerConfig:
             "clear_table_each_move": params.get("clear", True),
             "max_simulation_depth": params.get("max_depth"),
             "time_limit": params.get("time_limit"),
-            "parallel": params.get("parallel", False),
             "num_workers": params.get("workers", 16),
             "verbose": params.get("verbose", False),
             "seed": params.get("seed"),

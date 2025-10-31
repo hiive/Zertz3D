@@ -4,6 +4,7 @@ from shared.materials_modifiers import (
     DARK_GREEN_MATERIAL_MOD,
     DARK_RED_MATERIAL_MOD,
     DARK_BLUE_MATERIAL_MOD,
+    LIGHT_SKY_BLUE_MATERIAL_MOD,
     CORNFLOWER_BLUE_MATERIAL_MOD,
     BRIGHT_YELLOW_MATERIAL_MOD,
 )
@@ -125,8 +126,14 @@ class ActionVisualizationSequencer:
         # Extract placement, removal, and capture scores by position
         placement_scores = {}  # {pos_str: max_score}
         removal_scores = {}    # {pos_str: max_score}
+        capture_scores = {}    # {src_pos_str: max_score}
+        capture_dest_scores = {}  # {dst_pos_str: max_score}
 
         width = event.get('board_width', 7)
+
+        # Get hexagonal directions from board (if available)
+        # Directions: 0=right, 1=down-right, 2=down-left, 3=left, 4=up-left, 5=up-right
+        directions = [(0, 1), (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1)]
 
         # Process action scores to extract position-level scores
         if hasattr(self.renderer, 'pos_array') and self.renderer.pos_array is not None:
@@ -146,6 +153,26 @@ class ActionVisualizationSequencer:
                         rem_pos = self._flat_to_pos_str(rem_flat, width, pos_array)
                         if rem_pos:
                             removal_scores[rem_pos] = max(removal_scores.get(rem_pos, 0.0), score)
+
+                elif action_type == 'CAP' and action_data:
+                    direction, start_y, start_x = action_data
+
+                    # Convert start position to position string
+                    start_flat = start_y * width + start_x
+                    src_pos = self._flat_to_pos_str(start_flat, width, pos_array)
+                    if src_pos:
+                        capture_scores[src_pos] = max(capture_scores.get(src_pos, 0.0), score)
+
+                    # Calculate destination position (start + 2 * direction vector)
+                    if direction < len(directions):
+                        dy, dx = directions[direction]
+                        dest_y = start_y + 2 * dy
+                        dest_x = start_x + 2 * dx
+                        if 0 <= dest_y < width and 0 <= dest_x < width:
+                            dest_flat = dest_y * width + dest_x
+                            dest_pos = self._flat_to_pos_str(dest_flat, width, pos_array)
+                            if dest_pos:
+                                capture_dest_scores[dest_pos] = max(capture_dest_scores.get(dest_pos, 0.0), score)
 
         # Update highlight materials based on scores
         # We need to update the context highlights with new brightness
@@ -225,11 +252,37 @@ class ActionVisualizationSequencer:
                 )
             # print(f"[DEBUG Progress] Applied {len(both_positions)} blended highlights with individual scores")
 
+        # Apply individual capture highlights (light blue for capture sources)
+        if capture_scores:
+            for pos_str in capture_scores.keys():
+                score = capture_scores.get(pos_str, 0.5) * overall_brightness
+                material_mod = self._interpolate_material(score, LIGHT_SKY_BLUE_MATERIAL_MOD)
+                self.renderer.highlighting_manager.set_context_highlights(
+                    f"thinking_capture_{pos_str}",
+                    [pos_str],
+                    material_mod,
+                )
+            # print(f"[DEBUG Progress] Applied {len(capture_scores)} blue capture highlights with individual scores")
+
+        # Apply individual capture destination highlights (light blue for capture targets)
+        if capture_dest_scores:
+            for pos_str in capture_dest_scores.keys():
+                score = capture_dest_scores.get(pos_str, 0.5) * overall_brightness
+                material_mod = self._interpolate_material(score, LIGHT_SKY_BLUE_MATERIAL_MOD)
+                self.renderer.highlighting_manager.set_context_highlights(
+                    f"thinking_capture_dest_{pos_str}",
+                    [pos_str],
+                    material_mod,
+                )
+            # print(f"[DEBUG Progress] Applied {len(capture_dest_scores)} blue destination highlights with individual scores")
+
         # Track highlighted positions for cleanup
         self.thinking_highlights = {
             'placement': only_placement,
             'removal': only_removal,
             'both': both_positions,
+            'capture': set(capture_scores.keys()),
+            'capture_dest': set(capture_dest_scores.keys()),
         }
 
     def _on_search_ended(self, event):
@@ -270,6 +323,7 @@ class ActionVisualizationSequencer:
         self.renderer.highlighting_manager.clear_context_highlights("thinking_placement")
         self.renderer.highlighting_manager.clear_context_highlights("thinking_removal")
         self.renderer.highlighting_manager.clear_context_highlights("thinking_both")
+        self.renderer.highlighting_manager.clear_context_highlights("thinking_capture")
 
         # Also clear all individual position highlights
         if 'placement' in self.thinking_highlights:
@@ -283,6 +337,14 @@ class ActionVisualizationSequencer:
         if 'both' in self.thinking_highlights:
             for pos_str in self.thinking_highlights['both']:
                 self.renderer.highlighting_manager.clear_context_highlights(f"thinking_both_{pos_str}")
+
+        if 'capture' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['capture']:
+                self.renderer.highlighting_manager.clear_context_highlights(f"thinking_capture_{pos_str}")
+
+        if 'capture_dest' in self.thinking_highlights:
+            for pos_str in self.thinking_highlights['capture_dest']:
+                self.renderer.highlighting_manager.clear_context_highlights(f"thinking_capture_dest_{pos_str}")
 
         self.thinking_highlights.clear()
 
