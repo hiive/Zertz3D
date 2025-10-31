@@ -1,0 +1,107 @@
+================================================================================
+MCTS HYPERPARAMETER TUNING RESULTS
+================================================================================
+Start time:  2025-10-31 12:07:12
+End time:    2025-10-31 12:07:12
+Duration:    0s
+Total time:  17m 14s (includes previous runs)
+
+================================================================================
+TOP 10 CONFIGURATIONS (by win rate)
+================================================================================
+
+#1: Win rate: 94.0% (94W/6L/0T)
+    Exploration constant: 0.350
+    FPU reduction: 0.500
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.476s
+    Timestamp: 2025-10-31 11:03:22
+
+#2: Win rate: 93.0% (93W/7L/0T)
+    Exploration constant: 0.200
+    FPU reduction: 0.200
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.484s
+    Timestamp: 2025-10-31 11:00:12
+
+#3: Win rate: 93.0% (93W/7L/0T)
+    Exploration constant: 0.350
+    FPU reduction: 0.300
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.483s
+    Timestamp: 2025-10-31 11:02:55
+
+#4: Win rate: 93.0% (93W/7L/0T)
+    Exploration constant: 0.500
+    FPU reduction: 0.100
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.499s
+    Timestamp: 2025-10-31 11:04:19
+
+#5: Win rate: 92.0% (92W/8L/0T)
+    Exploration constant: 0.200
+    FPU reduction: 0.100
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.477s
+    Timestamp: 2025-10-31 10:59:45
+
+#6: Win rate: 90.0% (90W/10L/0T)
+    Exploration constant: 0.350
+    FPU reduction: None
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.482s
+    Timestamp: 2025-10-31 11:01:33
+
+#7: Win rate: 90.0% (90W/10L/0T)
+    Exploration constant: 0.350
+    FPU reduction: 0.200
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.491s
+    Timestamp: 2025-10-31 11:02:28
+
+#8: Win rate: 90.0% (90W/10L/0T)
+    Exploration constant: 0.500
+    FPU reduction: 0.500
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.497s
+    Timestamp: 2025-10-31 11:05:42
+
+#9: Win rate: 90.0% (90W/10L/0T)
+    Exploration constant: 2.000
+    FPU reduction: None
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+    Avg time/game: 0.469s
+    Timestamp: 2025-10-31 11:10:40
+
+#10: Win rate: 89.0% (89W/11L/0T)
+    Exploration constant: 0.200
+    FPU reduction: 0.300
+    Max depth: Full game
+    Progressive widening: Yes (constant=8.0)
+    RAVE: No
+    Avg time/game: 0.421s
+    Timestamp: 2025-10-31 11:00:34
+
+================================================================================
+CODE VERSION
+================================================================================
+Git version: 1012514-dirty
+Code hash:   089312841c7381e9

@@ -1,0 +1,84 @@
+uv run python scripts/analysis/tune_mcts_hyperparams_finetune.py --method grid --processes 16 --iterations 5000 --output data/tuning/tuning_results_grid.json
+================================================================================
+TOP 10 CONFIGURATIONS (by win rate)
+================================================================================
+
+#1: Win rate: 83.0% (83W/17L/0T)
+    Exploration constant: 3.250
+    FPU reduction: 0.300
+    Max depth: Full game
+    Progressive widening: Yes (constant=10.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 12.309s
+
+#2: Win rate: 81.0% (81W/19L/0T)
+    Exploration constant: 3.230
+    FPU reduction: 0.400
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 12.656s
+
+#3: Win rate: 81.0% (81W/19L/0T)
+    Exploration constant: 3.230
+    FPU reduction: 0.450
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 12.864s
+
+#4: Win rate: 81.0% (81W/19L/0T)
+    Exploration constant: 3.250
+    FPU reduction: 0.350
+    Max depth: Full game
+    Progressive widening: Yes (constant=8.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 12.108s
+
+#5: Win rate: 80.0% (80W/20L/0T)
+    Exploration constant: 3.190
+    FPU reduction: 0.450
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 12.056s
+
+#6: Win rate: 80.0% (80W/20L/0T)
+    Exploration constant: 3.210
+    FPU reduction: 0.450
+    Max depth: Full game
+    Progressive widening: Yes (constant=10.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 11.691s
+
+#7: Win rate: 79.0% (79W/21L/0T)
+    Exploration constant: 3.150
+    FPU reduction: 0.450
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 12.871s
+
+#8: Win rate: 79.0% (79W/21L/0T)
+    Exploration constant: 3.170
+    FPU reduction: 0.500
+    Max depth: Full game
+    Progressive widening: Yes (constant=10.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 11.889s
+
+#9: Win rate: 79.0% (79W/21L/0T)
+    Exploration constant: 3.210
+    FPU reduction: 0.300
+    Max depth: Full game
+    Progressive widening: Yes (constant=8.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 11.800s
+
+#10: Win rate: 79.0% (79W/21L/0T)
+    Exploration constant: 3.210
+    FPU reduction: 0.300
+    Max depth: Full game
+    Progressive widening: Yes (constant=10.0)
+    RAVE: Yes (constant=1200)
+    Avg time/game: 11.798s

@@ -1,0 +1,59 @@
+================================================================================
+MCTS HYPERPARAMETER TUNING RESULTS
+================================================================================
+Start time:  2025-10-31 11:20:55
+End time:    2025-10-31 11:29:56
+Duration:    9m 1s
+
+================================================================================
+REPETITION MODE RESULTS
+================================================================================
+
+Configuration #1:
+  Hyperparameters:
+    Exploration constant: 0.350
+    FPU reduction: 0.500
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+
+  Statistics over 100 repetitions:
+    Mean win rate:    87.60% ± 3.16%
+    Median win rate:  87.00%
+    Mode win rate:    86.00% (occurred 16 times)
+    Min/Max:          80.00% / 95.00%
+    Quartiles:        Q1=86.00%, Q3=90.00%
+    95% CI:           [86.97%, 88.23%]
+    Avg time/game:    0.501s ± 0.025s
+
+  Win Rate Distribution (n=100):
+    80.0%:   1 rep  ( 1.0%)
+    81.0%:   2 reps ( 2.0%)
+    82.0%:   3 reps ( 3.0%)
+    83.0%:   4 reps ( 4.0%)
+    84.0%:   6 reps ( 6.0%)
+    85.0%:   5 reps ( 5.0%)
+    86.0%:  16 reps (16.0%) ← Mode
+    87.0%:  14 reps (14.0%) ← Median
+    88.0%:  13 reps (13.0%)
+    89.0%:  10 reps (10.0%)
+    90.0%:   7 reps ( 7.0%)
+    91.0%:   8 reps ( 8.0%)
+    92.0%:   4 reps ( 4.0%)
+    93.0%:   2 reps ( 2.0%)
+    94.0%:   4 reps ( 4.0%)
+    95.0%:   1 rep  ( 1.0%)
+
+  Interpretation:
+    - The configuration achieves approximately 88% win rate against random play
+    - With 95% confidence, the true win rate is between 87.0% and 88.2%
+    - Most common result is 86% (16 out of 100 runs)
+    - The distribution shows reasonable consistency with std dev of 3.16%
+    - Performance is notably lower than the run-quick-test result of 94%
+      (possibly due to different random seeds or game variance)
+
+================================================================================
+CODE VERSION
+================================================================================
+Git version: 1012514-dirty
+Code hash:   089312841c7381e9

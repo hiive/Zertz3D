@@ -1,0 +1,33 @@
+================================================================================
+MCTS HYPERPARAMETER TUNING RESULTS
+================================================================================
+Start time:  2025-10-31 12:06:57
+End time:    2025-10-31 12:06:57
+Duration:    0s
+Total time:  8m 56s (includes previous runs)
+
+================================================================================
+REPETITION MODE RESULTS
+================================================================================
+
+Configuration #1:
+  Hyperparameters:
+    Exploration constant: 0.350
+    FPU reduction: 0.500
+    Max depth: Full game
+    Progressive widening: Yes (constant=12.0)
+    RAVE: No
+
+  Statistics over 100 repetitions:
+    Mean (SD):        87.6% (3.2%)
+    95% CI:           [87.0%, 88.2%]
+    Median:           87.0%
+    Range:            [80.0%, 95.0%]
+    Avg time/game:    0.501s
+
+
+================================================================================
+CODE VERSION
+================================================================================
+Git version: 1012514-dirty
+Code hash:   089312841c7381e9

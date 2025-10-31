@@ -1,7 +1,7 @@
 {
   "results": [
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.380285722563966,
         "fpu_reduction": 0.43946339367881465,
         "max_simulation_depth": null,
@@ -16,7 +16,7 @@
       "mean_time_per_game": 20.76084049419733
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.346470458309974,
         "fpu_reduction": 0.4832290311184182,
         "max_simulation_depth": null,
@@ -31,7 +31,7 @@
       "mean_time_per_game": 28.79865251876414
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.8003115063364055,
         "fpu_reduction": 0.4469926038510866,
         "max_simulation_depth": null,
@@ -46,7 +46,7 @@
       "mean_time_per_game": 26.84055486593861
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.2099098641033557,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -61,7 +61,7 @@
       "mean_time_per_game": 28.361806774125434
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.3140703845572053,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -76,7 +76,7 @@
       "mean_time_per_game": 27.73270473250188
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 3.072123015435112,
         "fpu_reduction": 0.20530598446394663,
         "max_simulation_depth": null,
@@ -91,7 +91,7 @@
       "mean_time_per_game": 24.29900827500038
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.0063865008880857,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -106,7 +106,7 @@
       "mean_time_per_game": 27.364816269970035
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.198070764044508,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -121,7 +121,7 @@
       "mean_time_per_game": 24.095296013699844
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.9246844304357644,
         "fpu_reduction": 0.41868411173731185,
         "max_simulation_depth": null,
@@ -136,7 +136,7 @@
       "mean_time_per_game": 30.779760364680552
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.1580600944007258,
         "fpu_reduction": 0.49090879834256834,
         "max_simulation_depth": null,
@@ -151,7 +151,7 @@
       "mean_time_per_game": 26.459647409571335
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.1554709158757928,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -166,7 +166,7 @@
       "mean_time_per_game": 28.824044005412144
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.2170784332632993,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -181,7 +181,7 @@
       "mean_time_per_game": 28.48924860046478
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 3.108897907718663,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -196,7 +196,7 @@
       "mean_time_per_game": 25.253284099134618
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 3.1160702162124823,
         "fpu_reduction": 0.5705203514053395,
         "max_simulation_depth": null,
@@ -211,7 +211,7 @@
       "mean_time_per_game": 25.400170014619363
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 3.049319250731023,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -226,7 +226,7 @@
       "mean_time_per_game": 29.780882214179726
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.2244973703390802,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -241,7 +241,7 @@
       "mean_time_per_game": 27.399357963735238
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.1024273291045295,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -256,7 +256,7 @@
       "mean_time_per_game": 24.43690298334928
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.0125716742746937,
         "fpu_reduction": 0.32574239243053066,
         "max_simulation_depth": null,
@@ -271,7 +271,7 @@
       "mean_time_per_game": 28.23742370584281
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 3.0159364365206693,
         "fpu_reduction": null,
         "max_simulation_depth": null,
@@ -286,7 +286,7 @@
       "mean_time_per_game": 27.414300085024443
     },
     {
-      "hyperparams": {
+      "hyperparameters": {
         "exploration_constant": 2.0644885149016017,
         "fpu_reduction": 0.5232481518257668,
         "max_simulation_depth": null,
