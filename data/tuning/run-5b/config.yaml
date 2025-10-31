@@ -1,0 +1,59 @@
+# MCTS Hyperparameter Tuning Configuration for run-5b
+# ===================================================
+# Auto-generated from historical results
+#
+# NOTES/AMBIGUITIES:
+# - This is a GRID search testing rave_constant variations
+# - Iterations inferred from mean_time_per_game (~3s suggests ~600 iterations)
+# - Seed and num_processes unknown - using defaults
+# - Same exploration and fpu ranges as run-5
+# - Tests rave_constant: null, 600, 1200 (instead of fixed 1200)
+# - Much faster iterations (3s vs 11-13s in run-5)
+
+mode: grid
+
+game:
+  rings: 37
+  iterations: 600  # Inferred from mean_time ~3s per game
+  games_per_config: 100
+  seed: 42  # Unknown - using default
+  num_processes: 10  # Unknown - using default
+
+hyperparameters:
+  exploration_constant:
+    type: values
+    values: [3.15, 3.17, 3.19, 3.21, 3.23, 3.25]
+    # Fine-grained grid with 0.02 increments
+
+  fpu_reduction:
+    type: values
+    values: [0.3, 0.35, 0.4, 0.45, 0.5]
+
+  max_simulation_depth:
+    type: fixed
+    value: null
+
+  widening_constant:
+    type: values
+    values: [8.0, 10.0, 12.0]
+
+  rave_constant:
+    type: values
+    values: [null, 600.0, 1200.0]
+    # Testing rave_constant impact with lower iteration budget
+
+output:
+  directory: null
+  filename: tuning_results_grid.json
+
+display:
+  top_n: 10
+  verbose: true
+
+# STATISTICS (from results):
+# Total configurations tested: 270
+# Timestamp: Multiple timestamps in results (2025-10-31 01:53:55 observed)
+# Top win rate achieved: ~81%
+# Mean time per game range: 2.8s - 3.6s
+# Grid dimensions: 6 × 5 × 3 × 3 = 270 configs
+# This run explores rave_constant impact with faster/fewer iterations

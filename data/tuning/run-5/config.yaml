@@ -1,0 +1,59 @@
+# MCTS Hyperparameter Tuning Configuration for run-5
+# ===================================================
+# Auto-generated from historical results
+#
+# NOTES/AMBIGUITIES:
+# - This is a GRID search with fine-grained refinement
+# - Iterations inferred from mean_time_per_game (~11-13s suggests ~2000 iterations)
+# - Seed and num_processes unknown - using defaults
+# - Focused refinement: exploration 3.15-3.25, fpu 0.3-0.5
+# - Fixed rave_constant at 1200.0 (best from previous runs)
+# - Narrower widening range: 8-12 only
+
+mode: grid
+
+game:
+  rings: 37
+  iterations: 2000  # Inferred from mean_time ~11-13s per game
+  games_per_config: 100
+  seed: 42  # Unknown - using default
+  num_processes: 10  # Unknown - using default
+
+hyperparameters:
+  exploration_constant:
+    type: values
+    values: [3.15, 3.17, 3.19, 3.21, 3.23, 3.25]
+    # Fine-grained grid with 0.02 increments
+
+  fpu_reduction:
+    type: values
+    values: [0.3, 0.35, 0.4, 0.45, 0.5]
+
+  max_simulation_depth:
+    type: fixed
+    value: null
+
+  widening_constant:
+    type: values
+    values: [8.0, 10.0, 12.0]
+
+  rave_constant:
+    type: fixed
+    value: 1200.0  # Fixed at best value from previous runs
+
+output:
+  directory: null
+  filename: tuning_results_grid.json
+
+display:
+  top_n: 10
+  verbose: true
+
+# STATISTICS (from results):
+# Total configurations tested: 90
+# Timestamp: 2025-10-29 15:59:00
+# Top win rate achieved: 83%
+# Best config: exploration_constant=3.25, fpu_reduction=0.3, widening_constant=10.0
+# Mean time per game range: 11.1-13.8s
+# Grid dimensions: 6 × 5 × 3 × 1 = 90 configs
+# This run refined the search space around promising regions

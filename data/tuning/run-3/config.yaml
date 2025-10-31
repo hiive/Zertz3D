@@ -1,0 +1,57 @@
+# MCTS Hyperparameter Tuning Configuration for run-3
+# ===================================================
+# Auto-generated from historical results
+#
+# NOTES/AMBIGUITIES:
+# - This is a RANDOM search with continuous sampling (random2)
+# - Iterations inferred from mean_time_per_game (~14-22s suggests ~3000 iterations)
+# - Seed and num_processes unknown - using defaults
+# - Larger sample size (250 configs) than run-2 (20 configs)
+# - Similar parameter ranges to run-2 but more extensive exploration
+
+mode: random
+
+game:
+  rings: 37
+  iterations: 3000  # Inferred from mean_time ~14-22s per game
+  games_per_config: 100
+  seed: 42  # Unknown - using default
+  num_processes: 10  # Unknown - using default
+
+hyperparameters:
+  exploration_constant:
+    type: range
+    min: 2.0
+    max: 3.2
+    # Random sampling observed values between ~2.0 and ~3.2
+
+  fpu_reduction:
+    type: choice
+    values: [null, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]
+    # Approximating continuous sampling with discrete choices
+
+  max_simulation_depth:
+    type: fixed
+    value: null
+
+  widening_constant:
+    type: choice
+    values: [8.0, 10.0, 12.0, 16.0, 20.0]
+
+  rave_constant:
+    type: choice
+    values: [null, 600.0, 1200.0, 2400.0, 3000.0]
+
+output:
+  directory: null
+  filename: tuning_results_random2.json
+
+display:
+  top_n: 10
+  verbose: true
+
+# STATISTICS (from results):
+# Total configurations tested: 250
+# Timestamp: Unknown
+# Top win rate achieved: ~80%+ (file too large to fully analyze)
+# Mean time per game range: ~14-22s

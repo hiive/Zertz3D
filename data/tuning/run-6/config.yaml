@@ -1,0 +1,63 @@
+# MCTS Hyperparameter Tuning Configuration for run-6
+# ===================================================
+# Auto-generated from historical results
+#
+# NOTES/AMBIGUITIES:
+# - This is a GRID search with high iteration count for final validation
+# - Iterations inferred from mean_time_per_game (~55-70s suggests ~10000 iterations)
+# - Seed and num_processes unknown - using defaults
+# - Narrowed exploration range: 3.15-3.19 (best from run-5)
+# - Tests rave_constant variations with high iteration budget
+# - Achieved highest win rates: 95-96%!
+
+mode: grid
+
+game:
+  rings: 37
+  iterations: 10000  # Inferred from mean_time ~55-70s per game
+  games_per_config: 100
+  seed: 42  # Unknown - using default
+  num_processes: 10  # Unknown - using default
+
+hyperparameters:
+  exploration_constant:
+    type: values
+    values: [3.15, 3.17, 3.19]
+    # Narrowed to best range from previous runs
+
+  fpu_reduction:
+    type: values
+    values: [0.3, 0.35, 0.4, 0.45, 0.5]
+
+  max_simulation_depth:
+    type: fixed
+    value: null
+
+  widening_constant:
+    type: values
+    values: [8.0, 10.0, 12.0]
+
+  rave_constant:
+    type: values
+    values: [null, 600.0, 1200.0]
+
+output:
+  directory: null
+  filename: tuning_results_grid.json
+
+display:
+  top_n: 10
+  verbose: true
+
+# STATISTICS (from results):
+# Total configurations tested: 135 (3 × 5 × 3 × 3)
+# Timestamp: 2025-10-30 22:24:17
+# Top win rate achieved: 96%!
+# Best configs:
+#   - exploration=3.17, fpu=0.35, widening=12.0, rave=null (96% WR)
+#   - exploration=3.17, fpu=0.3, widening=8.0, rave=600.0 (95% WR)
+#   - exploration=3.19, fpu=0.4, widening=8.0, rave=null (95% WR)
+#   - exploration=3.19, fpu=0.45, widening=10.0, rave=null (96% WR)
+# Mean time per game range: 54s - 71s
+# Grid dimensions: 3 × 5 × 3 × 3 = 135 configs
+# Final validation run with high iteration count

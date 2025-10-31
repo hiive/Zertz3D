@@ -1,0 +1,54 @@
+# MCTS Hyperparameter Tuning Configuration for run-1
+# ===================================================
+# Auto-generated from historical results
+#
+# NOTES/AMBIGUITIES:
+# - Iterations inferred from mean_time_per_game (~7-8s suggests ~1500 iterations)
+# - Seed and num_processes unknown - using defaults
+# - This run appears to be a grid search focused on exploration_constant,
+#   fpu_reduction, and widening_constant interactions
+
+mode: grid
+
+game:
+  rings: 37
+  iterations: 1500  # Inferred from mean_time ~7-8s per game
+  games_per_config: 100
+  seed: 42  # Unknown - using default
+  num_processes: 10  # Unknown - using default
+
+hyperparameters:
+  exploration_constant:
+    type: values
+    values: [0.2, 0.35, 0.5, 1.0, 1.41, 2.0, 3.0]
+
+  fpu_reduction:
+    type: values
+    values: [null, 0.1, 0.2, 0.3, 0.5]
+
+  max_simulation_depth:
+    type: fixed
+    value: null
+
+  widening_constant:
+    type: values
+    values: [null, 8.0, 12.0, 16.0, 20.0]
+
+  rave_constant:
+    type: fixed
+    value: null
+
+output:
+  directory: null
+  filename: tuning_results.json
+
+display:
+  top_n: 10
+  verbose: true
+
+# STATISTICS (from results):
+# Total configurations tested: 140
+# Timestamp: 2025-10-27 15:37:21
+# Top win rate achieved: 89.0%
+# Best config: exploration_constant=2.0, widening_constant=20.0, fpu_reduction=null
+# Mean time per game range: 3.8s - 8.6s

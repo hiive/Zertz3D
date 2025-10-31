@@ -1,0 +1,60 @@
+# MCTS Hyperparameter Tuning Configuration for run-2
+# ===================================================
+# Auto-generated from historical results
+#
+# NOTES/AMBIGUITIES:
+# - This is a RANDOM search with continuous sampling
+# - Iterations inferred from mean_time_per_game (~24-30s suggests ~5000 iterations)
+# - Seed and num_processes unknown - using defaults
+# - exploration_constant sampled from continuous range ~2.0-3.1
+# - fpu_reduction sampled from continuous range ~0.2-0.57 or null
+# - rave_constant sampled from discrete values or null
+
+mode: random
+
+game:
+  rings: 37
+  iterations: 5000  # Inferred from mean_time ~24-30s per game
+  games_per_config: 100
+  seed: 42  # Unknown - using default
+  num_processes: 10  # Unknown - using default
+
+hyperparameters:
+  exploration_constant:
+    type: range
+    min: 2.0
+    max: 3.2
+    # Random sampling observed values between 2.006 and 3.116
+
+  fpu_reduction:
+    type: choice
+    values: [null, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]
+    # Approximating continuous sampling ~0.2-0.6 with discrete choices
+    # Actual observed: null or continuous 0.205-0.571
+
+  max_simulation_depth:
+    type: fixed
+    value: null
+
+  widening_constant:
+    type: choice
+    values: [8.0, 10.0, 12.0, 16.0, 20.0]
+
+  rave_constant:
+    type: choice
+    values: [null, 600.0, 1200.0, 2400.0, 3000.0]
+
+output:
+  directory: null
+  filename: tuning_results_random.json
+
+display:
+  top_n: 10
+  verbose: true
+
+# STATISTICS (from results):
+# Total configurations tested: 20
+# Timestamp: 2025-10-27 20:08:16
+# Top win rate achieved: 80.0%
+# Best config: exploration_constant=3.049, widening_constant=20.0, rave_constant=3000.0
+# Mean time per game range: 20.8s - 30.8s
