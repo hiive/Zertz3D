@@ -23,6 +23,8 @@ import pandas as pd
 from pandas.api import types as ptypes
 import seaborn as sns
 from matplotlib import pyplot as plt
+from scipy import stats as scipy_stats
+from collections import defaultdict
 
 try:
     import plotly.express as px
@@ -44,13 +46,13 @@ def load_results(path: Path) -> pd.DataFrame:
         raise ValueError(f"Unrecognised JSON structure in {path}")
 
     df = pd.json_normalize(records)
-    if "hyperparams.exploration_constant" not in df.columns:
+    if "hyperparameters.exploration_constant" not in df.columns:
         raise ValueError("Expected flattened hyperparameters in the JSON input.")
 
     # Promote hyperparameters to dedicated columns for convenience.
     df = df.rename(
-        columns=lambda name: name.replace("hyperparams.", "")
-        if name.startswith("hyperparams.")
+        columns=lambda name: name.replace("hyperparameters.", "")
+        if name.startswith("hyperparameters.")
         else name
     )
     df["fpu_label"] = df["fpu_reduction"].apply(
@@ -390,7 +392,7 @@ def plot_dark_heatmaps(df: pd.DataFrame, output_dir: Path) -> None:
             pivot,
             annot=True,
             fmt=".2f",
-            cmap="magma",
+            cmap="turbo",
             cbar=True,
             cbar_kws={"label": "Mean win rate"},
             linewidths=0.2,
@@ -431,7 +433,7 @@ def plot_dark_pareto(df: pd.DataFrame, output_dir: Path) -> None:
         ("rave_constant", "RAVE constant"),
     ]
 
-    cmap = plt.cm.magma
+    cmap = plt.cm.turbo
     norm = plt.Normalize(df["mean_time_per_game"].min(), df["mean_time_per_game"].max())
 
     for column, label in columns:
@@ -499,7 +501,7 @@ def plot_interactive(df: pd.DataFrame, output_dir: Path) -> tuple[Path | None, P
         df_numeric,
         dimensions=numeric_cols + [color_column],
         color=color_column,
-        color_continuous_scale=px.colors.sequential.Magma,
+        color_continuous_scale=px.colors.sequential.Turbo,
         labels={
             "exploration_constant": "Exploration",
             "fpu_reduction": "FPU",
@@ -558,7 +560,7 @@ def plot_hyperparam_scatter_3d(df: pd.DataFrame, output_dir: Path) -> None:
     }
 
     norm = plt.Normalize(df["win_rate"].min(), df["win_rate"].max())
-    cmap = plt.cm.magma
+    cmap = plt.cm.turbo
 
     fig = plt.figure(figsize=(9, 7))
     ax = fig.add_subplot(111, projection="3d")
@@ -627,7 +629,7 @@ def plot_isosurface(df: pd.DataFrame, output_dir: Path) -> Path | None:
             marker=dict(
                 size=4,
                 color=df["win_rate"],
-                colorscale="Magma",
+                colorscale="Turbo",
                 opacity=0.7,
                 colorbar=dict(title="Win rate"),
             ),
@@ -646,7 +648,7 @@ def plot_isosurface(df: pd.DataFrame, output_dir: Path) -> Path | None:
                 isomax=df["win_rate"].max(),
                 opacity=0.2,
                 surface_count=3,
-                colorscale="Magma",
+                colorscale="Turbo",
                 showscale=False,
             )
         )
@@ -672,6 +674,391 @@ def plot_isosurface(df: pd.DataFrame, output_dir: Path) -> Path | None:
     return output_path
 
 
+def detect_repetition_mode(df: pd.DataFrame) -> dict[tuple, pd.DataFrame]:
+    """Detect if data is from repetition mode by finding duplicate hyperparameter configurations.
+
+    Returns:
+        Dictionary mapping hyperparameter tuples to groups of results.
+        Empty dict if not in repetition mode (all configs unique).
+    """
+    config_groups = defaultdict(list)
+
+    for idx, row in df.iterrows():
+        # Create a hashable key from hyperparameters
+        key = (
+            row["exploration_constant"],
+            row.get("fpu_reduction"),
+            row.get("max_simulation_depth"),
+            row.get("widening_constant"),
+            row.get("rave_constant")
+        )
+        config_groups[key].append(idx)
+
+    # Only return groups if we have repetitions
+    repetition_groups = {}
+    for key, indices in config_groups.items():
+        if len(indices) > 1:
+            repetition_groups[key] = df.loc[indices]
+
+    return repetition_groups
+
+
+def plot_repetition_violin(df: pd.DataFrame, output_dir: Path) -> None:
+    """Plot violin plots showing win rate distribution for each configuration with individual points."""
+    repetition_groups = detect_repetition_mode(df)
+
+    if not repetition_groups:
+        return
+
+    # Create summary data for plotting
+    plot_data = []
+    for config_idx, (key, group_df) in enumerate(repetition_groups.items(), 1):
+        exploration, fpu, depth, widening, rave = key
+        config_label = f"Config {config_idx}\nExp={exploration:.2f}"
+
+        for _, row in group_df.iterrows():
+            plot_data.append({
+                "config": config_label,
+                "config_idx": config_idx,
+                "win_rate": row["win_rate"],
+                "exploration": exploration,
+            })
+
+    plot_df = pd.DataFrame(plot_data)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_facecolor("black")
+    ax.set_facecolor("black")
+
+    # Create violin plot
+    parts = ax.violinplot(
+        [plot_df[plot_df["config_idx"] == i]["win_rate"].values
+         for i in sorted(plot_df["config_idx"].unique())],
+        positions=sorted(plot_df["config_idx"].unique()),
+        widths=0.7,
+        showmeans=True,
+        showmedians=True,
+    )
+
+    # Style violin plot for dark mode
+    for pc in parts["bodies"]:
+        pc.set_facecolor("#8B008B")  # Dark magenta
+        pc.set_edgecolor("white")
+        pc.set_alpha(0.6)
+        pc.set_linewidth(0.8)
+
+    for partname in ("cbars", "cmins", "cmaxes", "cmedians", "cmeans"):
+        if partname in parts:
+            parts[partname].set_edgecolor("white")
+            parts[partname].set_linewidth(1.2)
+
+    # Overlay individual points with jitter
+    for config_idx in sorted(plot_df["config_idx"].unique()):
+        config_data = plot_df[plot_df["config_idx"] == config_idx]
+        y_values = config_data["win_rate"].values
+        x_values = config_idx + np.random.normal(0, 0.08, size=len(y_values))
+
+        ax.scatter(
+            x_values,
+            y_values,
+            c="cyan",
+            s=20,
+            alpha=0.5,
+            edgecolors="white",
+            linewidths=0.5,
+            zorder=3,
+        )
+
+    ax.set_title("Win Rate Distribution by Configuration (Repetition Mode)", color="white", fontsize=14)
+    ax.set_xlabel("Configuration", color="white")
+    ax.set_ylabel("Win Rate", color="white")
+    ax.tick_params(colors="white")
+
+    # Set x-axis labels
+    ax.set_xticks(sorted(plot_df["config_idx"].unique()))
+    ax.set_xticklabels(
+        [plot_df[plot_df["config_idx"] == i]["config"].iloc[0]
+         for i in sorted(plot_df["config_idx"].unique())],
+        rotation=0,
+        ha="center",
+        color="white",
+        fontsize=9
+    )
+
+    ax.grid(axis="y", alpha=0.2, color="white")
+    for spine in ax.spines.values():
+        spine.set_color("white")
+
+    plt.tight_layout()
+    plt.savefig(output_dir / "repetition_violin.png", dpi=200, facecolor="black")
+    plt.close(fig)
+
+
+def plot_repetition_qq(df: pd.DataFrame, output_dir: Path) -> None:
+    """Plot Q-Q plots to check normality of win rate distributions."""
+    repetition_groups = detect_repetition_mode(df)
+
+    if not repetition_groups:
+        return
+
+    n_configs = len(repetition_groups)
+    n_cols = min(3, n_configs)
+    n_rows = (n_configs + n_cols - 1) // n_cols
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
+    fig.patch.set_facecolor("black")
+
+    if n_configs == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+
+    for config_idx, ((key, group_df), ax) in enumerate(zip(repetition_groups.items(), axes), 1):
+        exploration, fpu, depth, widening, rave = key
+        win_rates = group_df["win_rate"].values
+
+        # Create Q-Q plot
+        scipy_stats.probplot(win_rates, dist="norm", plot=ax)
+
+        # Style for dark mode
+        ax.set_facecolor("black")
+        ax.get_lines()[0].set_markerfacecolor("cyan")
+        ax.get_lines()[0].set_markeredgecolor("white")
+        ax.get_lines()[0].set_markersize(6)
+        ax.get_lines()[0].set_markeredgewidth(0.5)
+        ax.get_lines()[1].set_color("magenta")
+        ax.get_lines()[1].set_linewidth(2)
+
+        config_label = f"Config {config_idx}: Exp={exploration:.2f}"
+        ax.set_title(config_label, color="white", fontsize=10)
+        ax.set_xlabel("Theoretical Quantiles", color="white")
+        ax.set_ylabel("Sample Quantiles (Win Rate)", color="white")
+        ax.tick_params(colors="white")
+        ax.grid(alpha=0.2, color="white")
+
+        for spine in ax.spines.values():
+            spine.set_color("white")
+
+    # Hide unused subplots
+    for idx in range(n_configs, len(axes)):
+        axes[idx].axis("off")
+
+    plt.tight_layout()
+    plt.savefig(output_dir / "repetition_qq_plots.png", dpi=200, facecolor="black")
+    plt.close(fig)
+
+
+def plot_repetition_histogram(df: pd.DataFrame, output_dir: Path) -> None:
+    """Plot histograms with KDE overlay for each configuration."""
+    repetition_groups = detect_repetition_mode(df)
+
+    if not repetition_groups:
+        return
+
+    n_configs = len(repetition_groups)
+    n_cols = min(3, n_configs)
+    n_rows = (n_configs + n_cols - 1) // n_cols
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows))
+    fig.patch.set_facecolor("black")
+
+    if n_configs == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+
+    for config_idx, ((key, group_df), ax) in enumerate(zip(repetition_groups.items(), axes), 1):
+        exploration, fpu, depth, widening, rave = key
+        win_rates = group_df["win_rate"].values
+
+        ax.set_facecolor("black")
+
+        # Histogram
+        n, bins, patches = ax.hist(
+            win_rates,
+            bins="auto",
+            density=True,
+            alpha=0.6,
+            color="magenta",
+            edgecolor="white",
+            linewidth=0.8,
+        )
+
+        # KDE overlay
+        if len(win_rates) > 1:
+            from scipy.stats import gaussian_kde
+            kde = gaussian_kde(win_rates)
+            x_range = np.linspace(win_rates.min(), win_rates.max(), 200)
+            ax.plot(x_range, kde(x_range), color="cyan", linewidth=2, label="KDE")
+
+        # Add vertical lines for mean and median
+        mean_val = np.mean(win_rates)
+        median_val = np.median(win_rates)
+        ax.axvline(mean_val, color="yellow", linestyle="--", linewidth=1.5, label=f"Mean: {mean_val:.1%}")
+        ax.axvline(median_val, color="lime", linestyle=":", linewidth=1.5, label=f"Median: {median_val:.1%}")
+
+        config_label = f"Config {config_idx}: Exp={exploration:.2f}"
+        ax.set_title(config_label, color="white", fontsize=10)
+        ax.set_xlabel("Win Rate", color="white")
+        ax.set_ylabel("Density", color="white")
+        ax.tick_params(colors="white")
+        ax.grid(alpha=0.2, color="white")
+
+        legend = ax.legend(facecolor="black", edgecolor="white", fontsize=8)
+        for text in legend.get_texts():
+            text.set_color("white")
+
+        for spine in ax.spines.values():
+            spine.set_color("white")
+
+    # Hide unused subplots
+    for idx in range(n_configs, len(axes)):
+        axes[idx].axis("off")
+
+    plt.tight_layout()
+    plt.savefig(output_dir / "repetition_histograms.png", dpi=200, facecolor="black")
+    plt.close(fig)
+
+
+def plot_repetition_timeseries(df: pd.DataFrame, output_dir: Path) -> None:
+    """Plot win rate vs repetition number to check for temporal trends."""
+    repetition_groups = detect_repetition_mode(df)
+
+    if not repetition_groups:
+        return
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    fig.patch.set_facecolor("black")
+    ax.set_facecolor("black")
+
+    colors = plt.cm.turbo(np.linspace(0.2, 0.9, len(repetition_groups)))
+
+    for config_idx, ((key, group_df), color) in enumerate(zip(repetition_groups.items(), colors), 1):
+        exploration, fpu, depth, widening, rave = key
+
+        # Sort by original index to preserve temporal order
+        group_sorted = group_df.sort_index()
+        win_rates = group_sorted["win_rate"].values
+        repetitions = np.arange(1, len(win_rates) + 1)
+
+        config_label = f"Config {config_idx}: Exp={exploration:.2f}"
+
+        # Plot individual points
+        ax.scatter(
+            repetitions,
+            win_rates,
+            c=[color],
+            s=30,
+            alpha=0.6,
+            edgecolors="white",
+            linewidths=0.5,
+            label=config_label,
+            zorder=2,
+        )
+
+        # Plot running average if enough points
+        if len(win_rates) >= 5:
+            window = min(10, len(win_rates) // 3)
+            running_avg = pd.Series(win_rates).rolling(window=window, center=True).mean()
+            ax.plot(
+                repetitions,
+                running_avg,
+                color=color,
+                linewidth=2,
+                alpha=0.8,
+                zorder=3,
+            )
+
+    ax.set_title("Win Rate vs Repetition Number (Temporal Trends)", color="white", fontsize=14)
+    ax.set_xlabel("Repetition Number", color="white")
+    ax.set_ylabel("Win Rate", color="white")
+    ax.tick_params(colors="white")
+    ax.grid(alpha=0.2, color="white")
+
+    legend = ax.legend(
+        facecolor="black",
+        edgecolor="white",
+        framealpha=0.8,
+        loc="best",
+    )
+    for text in legend.get_texts():
+        text.set_color("white")
+
+    for spine in ax.spines.values():
+        spine.set_color("white")
+
+    plt.tight_layout()
+    plt.savefig(output_dir / "repetition_timeseries.png", dpi=200, facecolor="black")
+    plt.close(fig)
+
+
+def plot_repetition_errorbar(df: pd.DataFrame, output_dir: Path) -> None:
+    """Plot mean with 95% confidence intervals for each configuration."""
+    repetition_groups = detect_repetition_mode(df)
+
+    if not repetition_groups:
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.patch.set_facecolor("black")
+    ax.set_facecolor("black")
+
+    config_labels = []
+    means = []
+    ci_lower = []
+    ci_upper = []
+
+    for config_idx, (key, group_df) in enumerate(repetition_groups.items(), 1):
+        exploration, fpu, depth, widening, rave = key
+        win_rates = group_df["win_rate"].values
+
+        n = len(win_rates)
+        mean_wr = np.mean(win_rates)
+        std_wr = np.std(win_rates, ddof=1) if n > 1 else 0.0
+
+        # Calculate 95% CI
+        if n > 1:
+            sem = std_wr / np.sqrt(n)
+            ci_95 = scipy_stats.t.interval(0.95, n - 1, loc=mean_wr, scale=sem)
+        else:
+            ci_95 = (mean_wr, mean_wr)
+
+        config_labels.append(f"Config {config_idx}\nExp={exploration:.2f}")
+        means.append(mean_wr)
+        ci_lower.append(mean_wr - ci_95[0])
+        ci_upper.append(ci_95[1] - mean_wr)
+
+    x_pos = np.arange(len(config_labels))
+
+    ax.errorbar(
+        x_pos,
+        means,
+        yerr=[ci_lower, ci_upper],
+        fmt="o",
+        markersize=10,
+        color="cyan",
+        ecolor="magenta",
+        elinewidth=2,
+        capsize=5,
+        capthick=2,
+        markeredgecolor="white",
+        markeredgewidth=0.8,
+    )
+
+    ax.set_title("Mean Win Rate with 95% Confidence Intervals", color="white", fontsize=14)
+    ax.set_xlabel("Configuration", color="white")
+    ax.set_ylabel("Win Rate", color="white")
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(config_labels, rotation=0, ha="center", color="white", fontsize=9)
+    ax.tick_params(colors="white")
+    ax.grid(axis="y", alpha=0.2, color="white")
+
+    for spine in ax.spines.values():
+        spine.set_color("white")
+
+    plt.tight_layout()
+    plt.savefig(output_dir / "repetition_ci_errorbar.png", dpi=200, facecolor="black")
+    plt.close(fig)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate visual summaries of MCTS tuning runs."
@@ -685,43 +1072,73 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("analysis_output/tuning_plots"),
-        help="Directory for saved visualisations.",
+        default=None,
+        help="Directory for saved visualisations. Defaults to 'plots' subdirectory next to input file.",
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    output_dir = args.output_dir
+
+    # Default output directory is 'plots' subdirectory next to input file
+    if args.output_dir is None:
+        output_dir = args.input.parent / "plots"
+    else:
+        output_dir = args.output_dir
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     df = load_results(args.input)
 
-    plot_heatmap(df, output_dir)
-    plot_rave_box(df, output_dir)
-    plot_pareto(df, output_dir)
-    plot_pareto_dark(df, output_dir)
-    plot_dark_heatmaps(df, output_dir)
-    plot_dark_pareto(df, output_dir)
-    plot_hyperparam_scatter_3d(df, output_dir)
+    # Detect if this is repetition mode
+    repetition_groups = detect_repetition_mode(df)
+    is_repetition = len(repetition_groups) > 0
 
-    interactive_path, parallel_path = plot_interactive(df, output_dir)
-    isosurface_path = plot_isosurface(df, output_dir)
+    if is_repetition:
+        print(f"Detected repetition mode: {len(repetition_groups)} configuration(s) with multiple trials")
+        print("Generating repetition-specific visualizations...")
 
-    print(f"Saved static figures to {output_dir}")
-    if interactive_path is not None:
-        print(f"Interactive HTML written to {interactive_path}")
+        # Repetition mode plots
+        plot_repetition_violin(df, output_dir)
+        plot_repetition_qq(df, output_dir)
+        plot_repetition_histogram(df, output_dir)
+        plot_repetition_timeseries(df, output_dir)
+        plot_repetition_errorbar(df, output_dir)
+
+        print("Saved repetition mode figures:")
+        print(f"  - {output_dir / 'repetition_violin.png'}")
+        print(f"  - {output_dir / 'repetition_qq_plots.png'}")
+        print(f"  - {output_dir / 'repetition_histograms.png'}")
+        print(f"  - {output_dir / 'repetition_timeseries.png'}")
+        print(f"  - {output_dir / 'repetition_ci_errorbar.png'}")
     else:
-        print("Plotly not available; skipped interactive output.")
-    if parallel_path is not None:
-        print(f"Parallel coordinates HTML written to {parallel_path}")
-    elif px is None:
-        print("Plotly not available; skipped parallel coordinates.")
-    if isosurface_path is not None:
-        print(f"Isosurface HTML written to {isosurface_path}")
-    elif go is None:
-        print("Plotly graph_objects not available; skipped isosurface plot.")
+        print("Detected search mode (unique configurations)")
+        print("Generating search-specific visualizations...")
+
+        # Search mode plots (dark theme only)
+        plot_pareto_dark(df, output_dir)
+        plot_dark_heatmaps(df, output_dir)
+        plot_dark_pareto(df, output_dir)
+        plot_hyperparam_scatter_3d(df, output_dir)
+
+        # Interactive plots (if available)
+        interactive_path, parallel_path = plot_interactive(df, output_dir)
+        isosurface_path = plot_isosurface(df, output_dir)
+
+        print(f"Saved static figures to {output_dir}")
+        if interactive_path is not None:
+            print(f"Interactive HTML written to {interactive_path}")
+        else:
+            print("Plotly not available; skipped interactive output.")
+        if parallel_path is not None:
+            print(f"Parallel coordinates HTML written to {parallel_path}")
+        elif px is None:
+            print("Plotly not available; skipped parallel coordinates.")
+        if isosurface_path is not None:
+            print(f"Isosurface HTML written to {isosurface_path}")
+        elif go is None:
+            print("Plotly graph_objects not available; skipped isosurface plot.")
 
 
 if __name__ == "__main__":

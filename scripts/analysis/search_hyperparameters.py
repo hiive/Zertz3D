@@ -407,6 +407,53 @@ def hash_source_files() -> tuple[str, str | None]:
     return hasher.hexdigest()[:16], last_modified_str
 
 
+def format_hyperparams(hp: MCTSHyperparams, indent: str = "    ") -> list[str]:
+    """Format hyperparameters as list of display strings.
+
+    Args:
+        hp: Hyperparameters to format
+        indent: Indentation prefix for each line
+
+    Returns:
+        List of formatted strings
+    """
+    lines = []
+    lines.append(f"{indent}Exploration constant: {hp.exploration_constant:.3f}")
+
+    fpu_str = f"{hp.fpu_reduction:.3f}" if hp.fpu_reduction is not None else "None"
+    lines.append(f"{indent}FPU reduction: {fpu_str}")
+
+    depth_str = str(hp.max_simulation_depth) if hp.max_simulation_depth is not None else "Full game"
+    lines.append(f"{indent}Max depth: {depth_str}")
+
+    pw_str = f"Yes (constant={hp.widening_constant})" if hp.widening_constant is not None else "No"
+    lines.append(f"{indent}Progressive widening: {pw_str}")
+
+    rave_str = f"Yes (constant={hp.rave_constant:.0f})" if hp.rave_constant is not None else "No"
+    lines.append(f"{indent}RAVE: {rave_str}")
+
+    return lines
+
+
+def format_duration(total_seconds: int) -> str:
+    """Format duration in seconds to human-readable string.
+
+    Args:
+        total_seconds: Duration in seconds
+
+    Returns:
+        Formatted string like "2h 15m 30s"
+    """
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}h {minutes}m {seconds}s"
+    elif minutes > 0:
+        return f"{minutes}m {seconds}s"
+    else:
+        return f"{seconds}s"
+
+
 def print_summary(
     results: list[TuningResult],
     top_n: int = 5,
@@ -532,19 +579,7 @@ def print_summary(
 
             summary_lines.append(f"Configuration #{config_idx}:")
             summary_lines.append(f"  Hyperparameters:")
-            summary_lines.append(f"    Exploration constant: {hp.exploration_constant:.3f}")
-
-            fpu_str = f"{hp.fpu_reduction:.3f}" if hp.fpu_reduction is not None else "None"
-            summary_lines.append(f"    FPU reduction: {fpu_str}")
-
-            depth_str = str(hp.max_simulation_depth) if hp.max_simulation_depth is not None else "Full game"
-            summary_lines.append(f"    Max depth: {depth_str}")
-
-            pw_str = f"Yes (constant={hp.widening_constant})" if hp.widening_constant is not None else "No"
-            summary_lines.append(f"    Progressive widening: {pw_str}")
-
-            rave_str = f"Yes (constant={hp.rave_constant:.0f})" if hp.rave_constant is not None else "No"
-            summary_lines.append(f"    RAVE: {rave_str}")
+            summary_lines.extend(format_hyperparams(hp))
 
             summary_lines.append(f"")
             summary_lines.append(f"  Statistics over {n} repetitions:")
@@ -566,19 +601,7 @@ def print_summary(
             hp = result.hyperparams
             summary_lines.append(f"\n#{i}: Win rate: {result.win_rate:.1%} "
                                f"({result.wins}W/{result.losses}L/{result.ties}T)")
-            summary_lines.append(f"    Exploration constant: {hp.exploration_constant:.3f}")
-
-            fpu_str = f"{hp.fpu_reduction:.3f}" if hp.fpu_reduction is not None else "None"
-            summary_lines.append(f"    FPU reduction: {fpu_str}")
-
-            depth_str = str(hp.max_simulation_depth) if hp.max_simulation_depth is not None else "Full game"
-            summary_lines.append(f"    Max depth: {depth_str}")
-
-            pw_str = f"Yes (constant={hp.widening_constant})" if hp.widening_constant is not None else "No"
-            summary_lines.append(f"    Progressive widening: {pw_str}")
-
-            rave_str = f"Yes (constant={hp.rave_constant:.0f})" if hp.rave_constant is not None else "No"
-            summary_lines.append(f"    RAVE: {rave_str}")
+            summary_lines.extend(format_hyperparams(hp))
 
             summary_lines.append(f"    Avg time/game: {result.mean_time_per_game:.3f}s")
 
