@@ -20,7 +20,6 @@ matplotlib.use("Agg")
 
 import numpy as np
 import pandas as pd
-from pandas.api import types as ptypes
 import seaborn as sns
 from matplotlib import pyplot as plt
 from scipy import stats as scipy_stats
@@ -1064,10 +1063,9 @@ def parse_args() -> argparse.Namespace:
         description="Generate visual summaries of MCTS tuning runs."
     )
     parser.add_argument(
-        "--input",
+        "input",
         type=Path,
-        default=Path("data/tuning/tuning_results.json"),
-        help="Path to tuning results JSON.",
+        help="Path to tuning results JSON (required).",
     )
     parser.add_argument(
         "--output-dir",

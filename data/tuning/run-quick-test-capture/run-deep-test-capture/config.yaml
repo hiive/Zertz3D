@@ -1,0 +1,32 @@
+# MCTS Hyperparameter Tuning Configuration - Repetition Test
+# ============================================================
+# Testing the best configuration from run-quick-test with 100 repetitions
+# to get robust statistics (mean and standard deviation)
+
+mode: repetition
+
+game:
+  rings: 37
+  iterations: 250
+  games_per_config: 100
+  seed: 42
+  num_processes: 10
+
+# Repetition configuration
+repetition:
+  num_repetitions: 100
+  configurations:
+    # Best configuration from run-quick-test (94.0% win rate)
+    - exploration_constant: 2.000
+      fpu_reduction: 0.5
+      widening_constant: 8.0
+      rave_constant: null
+      max_simulation_depth: null
+
+output:
+  directory: null  # Same as config file location
+  filename: tuning_results.json
+
+display:
+  top_n: 10
+  verbose: true
