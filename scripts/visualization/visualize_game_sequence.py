@@ -19,10 +19,12 @@ project_root = find_project_root(Path(__file__).parent)
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from game.utils.diagram import execute_notation_sequence, DiagramRenderer
+from game.utils.diagram import execute_notation_sequence, DiagramRenderer, action_dict_to_str
 from game.utils.grid_renderer import GridRenderer
 from game.loaders import AutoSelectLoader
 from game.formatters import NotationFormatter
+from game.zertz_game import ZertzGame
+from game.constants import STANDARD_MARBLES, BLITZ_MARBLES, STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS
 
 
 def render_game_sequence(
@@ -123,9 +125,6 @@ def render_game_sequence(
         renderer.save_board(board, tmp_file.name, title="Initial Position", width=board_width, transparent=True)
 
     # Build list of all moves in sequence with metadata
-    from game.zertz_game import ZertzGame
-    from game.constants import STANDARD_MARBLES, BLITZ_MARBLES, STANDARD_WIN_CONDITIONS, BLITZ_WIN_CONDITIONS
-
     marbles = BLITZ_MARBLES if loader.blitz else STANDARD_MARBLES
     win_condition = BLITZ_WIN_CONDITIONS if loader.blitz else STANDARD_WIN_CONDITIONS
     game = ZertzGame(loader.detected_rings, marbles, win_condition, t=5)
@@ -155,17 +154,16 @@ def render_game_sequence(
             player_name = player2_name
             p2_idx += 1
 
+        # Apply the action to get ActionResult
+        action_str = action_dict_to_str(action_dict)
+        action_type, action = game.str_to_action(action_str)
+        action_result = game.take_action(action_type, action)
+
         # Convert to notation
-        notation = NotationFormatter.action_to_notation(action_dict)
+        notation = NotationFormatter.action_to_notation(action_dict, action_result)
 
         # Store move info
         move_sequence.append((move_num, player_name, action_dict, notation))
-
-        # Apply the action to advance the game state
-        from game.utils.diagram import action_dict_to_str
-        action_str = action_dict_to_str(action_dict)
-        action_type, action = game.str_to_action(action_str)
-        game.take_action(action_type, action)
 
     # Now render each position with correct captions
     for move_num, player_name, action_dict, notation in move_sequence:
@@ -199,9 +197,8 @@ def render_game_sequence(
         grid_renderer = GridRenderer(image_columns=image_columns, background_color=renderer.bg_color, show_row_dividers=show_row_dividers)
 
         # Create combined grid and clean up temp files
-        output_path = base_dir / f"{replay_stem}_sequence.{('svg' if svg else 'png')}"
-
         if save_images:
+            output_path = base_dir / f"{replay_stem}_sequence.{('svg' if svg else 'png')}"
             grid_renderer.create_grid_from_temp_files(temp_files, str(output_path), svg=svg)
             print(f"\nSaved game sequence to: {output_path}")
         else:
@@ -215,12 +212,15 @@ def render_game_sequence(
                         pass
             else:
                 # For PNG display: create temp grid file, display it, then clean up
-                grid_renderer.create_grid_from_temp_files(temp_files, str(output_path), svg=False)
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_grid:
+                    grid_output_path = tmp_grid.name
+
+                grid_renderer.create_grid_from_temp_files(temp_files, grid_output_path, svg=False)
                 print("\nDisplaying game sequence...")
                 from PIL import Image
-                Image.open(output_path).show()
+                Image.open(grid_output_path).show()
                 # Clean up the grid file after displaying
-                output_path.unlink()
+                Path(grid_output_path).unlink()
 
     print("Done!")
 
