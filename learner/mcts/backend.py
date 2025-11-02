@@ -6,7 +6,7 @@ Ensures the Rust backend is available for MCTS operations.
 # Try to import Rust backend
 HAS_RUST = False
 try:
-    import hiivelabs_zertz_mcts
+    import hiivelabs_mcts
     HAS_RUST = True
 except ImportError:
     pass

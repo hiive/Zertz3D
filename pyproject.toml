@@ -35,7 +35,7 @@ build-backend = "maturin"
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"
-module-name = "hiivelabs_zertz_mcts"
+module-name = "hiivelabs_mcts"
 python-packages = ["cli", "controller", "factory", "game", "learner", "renderer", "shared", "scripts"]
 include = ["models/**/*"]
 

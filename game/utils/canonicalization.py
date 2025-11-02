@@ -55,7 +55,7 @@ These duplicates are acceptable because:
 import numpy as np
 
 # Import canonicalization functions and TransformFlags from Rust
-from hiivelabs_zertz_mcts import (
+from hiivelabs_mcts import (
     ax_rot60,
     ax_mirror_q_axis,
     canonicalize_state as rust_canonicalize_state,

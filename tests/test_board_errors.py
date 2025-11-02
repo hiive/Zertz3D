@@ -182,12 +182,14 @@ class TestCaptureActionErrors:
         board.state[white_layer, 3, 3] = 1
 
         # Try to capture "through" an empty position
-        # Action format: (direction, y, x) where (y, x) is source position
         # Direction 0 is (1, 0) - meaning neighbor is at (y+1, x)
         # This would try to capture the marble at (3+1, 3) = (4, 3)
         # But there's no marble at (4, 3)
 
-        action = (0, 3, 3)  # Try to capture in direction 0 from (3, 3)
+        # Convert from capture mask indices to action format using helper
+        action = ZertzBoard.capture_indices_to_action(
+            direction=0, y=3, x=3, width=board.width, directions=board.DIRECTIONS
+        )
 
         with pytest.raises(ValueError, match="Invalid capture: no marble at position"):
             board.take_action(action, "CAP")

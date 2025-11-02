@@ -88,7 +88,10 @@ class TestWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (c3_y + dy, c3_x + dx) == (d4_y, d4_x):
-                capture_action = (dir_idx, c3_y, c3_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, c3_y, c3_x, board.width, board.DIRECTIONS
+                )
                 break
 
         # Take the capture action
@@ -235,7 +238,10 @@ class TestWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (c3_y + dy, c3_x + dx) == (d4_y, d4_x):
-                capture_action = (dir_idx, c3_y, c3_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, c3_y, c3_x, board.width, board.DIRECTIONS
+                )
                 break
 
         # Take the capture action
@@ -451,7 +457,10 @@ class TestWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
-                capture_action = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         # Take the capture action
@@ -508,7 +517,10 @@ class TestWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
-                capture_action = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         # Take the capture action
@@ -791,7 +803,10 @@ class TestBlitzWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
-                capture_action = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         game.take_action("CAP", capture_action)
@@ -842,7 +857,10 @@ class TestBlitzWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
-                capture_action = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         game.take_action("CAP", capture_action)
@@ -893,7 +911,10 @@ class TestBlitzWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
-                capture_action = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         game.take_action("CAP", capture_action)
@@ -942,7 +963,10 @@ class TestBlitzWinConditions:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
-                capture_action = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                capture_action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         game.take_action("CAP", capture_action)

@@ -54,6 +54,9 @@ class ZertzPosition:
             object.__setattr__(self, "_cartesian", cart)
         return self._cartesian  # type: ignore[attr-defined]
 
+    def __repr__(self) -> str:
+        return f"ZertzPosition('{self.label}', y={self.y}, x={self.x})"
+
     @classmethod
     def from_yx(cls, board: "ZertzBoard", yx: Tuple[int, int]) -> "ZertzPosition":
         return cls(board=board, y=yx[0], x=yx[1])
@@ -115,9 +118,9 @@ class ZertzPositionCollection:
             return
 
         # Delegate axial coordinate computation to Rust
-        from hiivelabs_zertz_mcts import build_axial_maps, BoardConfig
+        from hiivelabs_mcts import build_axial_maps, BoardConfig
 
-        config = BoardConfig.standard_config(board.rings, board.t)
+        config = BoardConfig.standard_config(board.rings, t=board.t)
         layout = mask.tolist()  # Convert numpy bool array to Python list
         yx_to_ax_rust, ax_to_yx_rust = build_axial_maps(config, layout)
 

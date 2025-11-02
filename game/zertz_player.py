@@ -446,7 +446,7 @@ class HumanZertzPlayer(ZertzPlayer):
         dst: tuple[int, int],
         capture_mask: np.ndarray,
         board,
-    ) -> Optional[tuple[int, int, int]]:
+    ) -> Optional[tuple[None, int, int]]:
         y, x = src
         for direction in range(capture_mask.shape[0]):
             if not capture_mask[direction, y, x]:
@@ -455,7 +455,11 @@ class HumanZertzPlayer(ZertzPlayer):
             cap_index = (y + dy, x + dx)
             computed_dst = board.get_jump_destination(src, cap_index)
             if computed_dst == dst:
-                return (direction, y, x)
+                # Convert to (None, src_flat, dst_flat) format
+                src_flat = y * board.width + x
+                dst_y, dst_x = dst
+                dst_flat = dst_y * board.width + dst_x
+                return (None, src_flat, dst_flat)
         return None
 
     def on_turn_start(
@@ -517,19 +521,20 @@ class RandomZertzPlayer(ZertzPlayer):
         # Determine action type
         if c1.size > 0:
             # Capture available (and therefore mandatory)
-            ax = "CAP"
-            a1, a2, a3 = c1, c2, c3
+            ip = np.random.randint(c1.size)
+            direction, y, x = int(c1[ip]), int(c2[ip]), int(c3[ip])
+            from game.zertz_board import ZertzBoard
+            action_data = ZertzBoard.capture_indices_to_action(
+                direction, y, x, self.game.board.width, self.game.board.DIRECTIONS
+            )
+            return ("CAP", action_data)
         elif p1.size > 0:
             # Only placements available
-            ax = "PUT"
-            a1, a2, a3 = p1, p2, p3
+            ip = np.random.randint(p1.size)
+            return ("PUT", (int(p1[ip]), int(p2[ip]), int(p3[ip])))
         else:
             # No valid actions - player must pass
             return ("PASS", None)
-
-        ip = np.random.randint(a1.size)
-        action = ax, (a1[ip], a2[ip], a3[ip])
-        return action
 
     def get_last_action_scores(self):
         """Random player treats all moves equally (uniform scores).

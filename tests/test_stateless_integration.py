@@ -310,8 +310,11 @@ class TestBackwardCompatibility:
             capture_indices = np.argwhere(capture)
             direction, y, x = capture_indices[0]
 
-            # Execute capture
-            captured = board._take_capture_action((direction, y, x))
+            # Execute capture using helper to convert to action format
+            action = ZertzBoard.capture_indices_to_action(
+                direction, y, x, board.width, board.DIRECTIONS
+            )
+            captured = board._take_capture_action(action)
 
             # Should have captured a marble
             # (Either returned value or state should reflect capture)

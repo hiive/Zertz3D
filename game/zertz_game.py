@@ -548,16 +548,23 @@ class ZertzGame:
             }
 
         elif action_type == "CAP":
-            direction, y, x = action
-            src = (y, x)
-            src_str = self.board.position_from_yx(src).label
+            # New format: (None, src_flat, dst_flat)
+            _, src_flat, dst_flat = action
+            src_y, src_x = divmod(src_flat, self.board.width)
+            dst_y, dst_x = divmod(dst_flat, self.board.width)
 
-            dy, dx = self.board.DIRECTIONS[direction]
-            cap = (y + dy, x + dx)
+            # Calculate captured marble position (midpoint)
+            cap_y = (src_y + dst_y) // 2
+            cap_x = (src_x + dst_x) // 2
+            cap = (cap_y, cap_x)
             cap_marble = self.board.get_marble_type_at(cap)
-            cap_str = self.board.position_from_yx(cap).label
-            dst = self.board.get_jump_destination(src, cap)
-            dst_str = self.board.position_from_yx(dst).label
+
+            # Use Rust functions for coordinate conversion
+            config = self.board._get_config()
+            import hiivelabs_mcts
+            src_str = hiivelabs_mcts.coordinate_to_algebraic(src_y, src_x, config)
+            cap_str = hiivelabs_mcts.coordinate_to_algebraic(cap_y, cap_x, config)
+            dst_str = hiivelabs_mcts.coordinate_to_algebraic(dst_y, dst_x, config)
 
             action_str = "{} {} {} {}".format(
                 action_type, src_str, cap_marble, dst_str
@@ -622,7 +629,12 @@ class ZertzGame:
 
         for direction, src_y, src_x in capture_positions:
             try:
-                _, action_dict = self.action_to_str("CAP", (direction, src_y, src_x))
+                # Convert from capture mask indices to action format using helper
+                from game.zertz_board import ZertzBoard
+                action = ZertzBoard.capture_indices_to_action(
+                    direction, src_y, src_x, self.board.width, self.board.DIRECTIONS
+                )
+                _, action_dict = self.action_to_str("CAP", action)
                 capture_moves.append(action_dict)
             except (IndexError, KeyError):
                 continue
@@ -710,23 +722,16 @@ class ZertzGame:
         width = self.board.width
 
         for cap_dict in capture_moves:
-            # Reconstruct action tuple from dict
+            # Reconstruct action tuple from dict (new format: (None, src_flat, dst_flat))
             src_y, src_x = self.board.str_to_index(cap_dict['src'])
             dst_y, dst_x = self.board.str_to_index(cap_dict['dst'])
 
-            # Find direction from src to dst via captured marble
-            cap_y, cap_x = self.board.str_to_index(cap_dict['cap'])
-            direction = None
-            for dir_idx, (dy, dx) in enumerate(self.board.DIRECTIONS):
-                if (src_y + dy, src_x + dx) == (cap_y, cap_x):
-                    direction = dir_idx
-                    break
+            src_flat = src_y * width + src_x
+            dst_flat = dst_y * width + dst_x
 
-            if direction is not None:
-                action_key = ('CAP', (direction, src_y, src_x))
-                score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
-            else:
-                score = 0.0  # Fallback
+            # Create action key in new format
+            action_key = ('CAP', (None, src_flat, dst_flat))
+            score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
 
             # Add score to dict
             enriched_dict = dict(cap_dict)  # Copy

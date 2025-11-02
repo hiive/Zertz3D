@@ -14,7 +14,7 @@ from game.zertz_game import ZertzGame
 
 def test_crash_seed_1760910995_with_high_iterations():
     """Reproduce crash from log with exact seed and high iterations."""
-    import hiivelabs_zertz_mcts
+    import hiivelabs_mcts
 
     # Exact seed from crash
     np.random.seed(1760910995)
@@ -31,16 +31,16 @@ def test_crash_seed_1760910995_with_high_iterations():
 
     # Now Player 2's turn with high iterations (like in crash: 2500)
     state = game.get_current_state()
-    rust_search = hiivelabs_zertz_mcts.MCTSSearch()
+    rust_search = hiivelabs_mcts.ZertzMCTS(rings=37, t=1)
 
     # Use parallel mode with high iterations to match crash scenario
     action_type, action_data = rust_search.search_parallel(
         state['spatial'].astype(np.float32),
         state['global'].astype(np.float32),
-        rings=37,
+        # rings=37,
         iterations=2500,
-        t=1,
-        num_threads=16,
+        # t=1,
+        # num_threads=16,
         verbose=True
     )
 
@@ -48,16 +48,15 @@ def test_crash_seed_1760910995_with_high_iterations():
 
     # Verify the action is valid
     if action_type == "PUT":
-        marble_type, dst_flat, remove_flat = action_data
+        marble_type, dst_flat, rem_flat = action_data
         placement_mask, _ = game.get_valid_actions()
 
         # Check it's in the valid action mask
-        assert placement_mask[marble_type, dst_flat, remove_flat] > 0, \
-            f"Invalid placement: marble={marble_type}, dst={dst_flat}, remove={remove_flat}"
-
-        # Convert to coordinates
-        dst_y = dst_flat // width
         dst_x = dst_flat % width
+        dst_y = dst_flat // width
+
+        assert placement_mask[marble_type, dst_flat, rem_flat] > 0, \
+            f"Invalid placement: marble={marble_type}, dst={dst_flat}, remove={rem_flat}"
 
         print(f"Destination: ({dst_y}, {dst_x})")
 

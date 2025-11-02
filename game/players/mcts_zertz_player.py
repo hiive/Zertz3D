@@ -4,7 +4,7 @@ from game.zertz_player import ZertzPlayer
 from game.constants import BLITZ_WIN_CONDITIONS
 from learner.mcts.backend import ensure_rust_backend
 
-import hiivelabs_zertz_mcts
+import hiivelabs_mcts
 
 
 class MCTSZertzPlayer(ZertzPlayer):
@@ -72,13 +72,15 @@ class MCTSZertzPlayer(ZertzPlayer):
         self.name = f"MCTS {n}"
 
         # Create Rust MCTS searcher
-        self.rust_mcts = hiivelabs_zertz_mcts.MCTSSearch(
+        self.rust_mcts = hiivelabs_mcts.ZertzMCTS(
+            rings=self.game.initial_rings,
             exploration_constant=exploration_constant,
             widening_constant=widening_constant,
             fpu_reduction=fpu_reduction,
             rave_constant=rave_constant,
             use_transposition_table=use_transposition_table,
             use_transposition_lookups=use_transposition_lookups,
+            blitz=self._is_blitz_mode()
         )
         self.rust_mcts.set_transposition_table_enabled(use_transposition_table)
         self.rust_mcts.set_transposition_lookups(use_transposition_lookups)
@@ -97,7 +99,12 @@ class MCTSZertzPlayer(ZertzPlayer):
         c1, c2, c3 = capture_mask.nonzero()
         if c1.size == 1:
             # Exactly one capture - mandatory move, no decision needed
-            return ("CAP", (int(c1[0]), int(c2[0]), int(c3[0])))
+            direction, y, x = int(c1[0]), int(c2[0]), int(c3[0])
+            from game.zertz_board import ZertzBoard
+            action_data = ZertzBoard.capture_indices_to_action(
+                direction, y, x, self.game.board.width, self.game.board.DIRECTIONS
+            )
+            return ("CAP", action_data)
         elif c1.size > 1:
             # Multiple captures available - need MCTS to decide
             pass
@@ -167,22 +174,19 @@ class MCTSZertzPlayer(ZertzPlayer):
             self.rust_mcts.set_seed(self.rng_seed)
             self._rust_seed_initialized = True
 
-        # Detect game mode and pass to Rust
-        is_blitz = self._is_blitz_mode()
-
         rust_kwargs = dict(
-            rings=self.game.board.rings,
+            # rings=self.game.board.rings,
             iterations=self.iterations,
-            t=getattr(self.game.board, 't', 1),
+            # t=getattr(self.game.board, 't', 1),
             max_depth=self.max_simulation_depth,
             time_limit=self.time_limit,
             use_transposition_table=self.use_transposition_table,
             use_transposition_lookups=self.use_transposition_lookups,
             clear_table=self.clear_table_each_move,
             verbose=self.verbose,
-            blitz=is_blitz,
-            progress_callback=self.progress_callback,
-            progress_interval_ms=self.progress_interval_ms if self.progress_callback else None,
+            # blitz=is_blitz,
+            # progress_callback=self.progress_callback,
+            # progress_interval_ms=self.progress_interval_ms if self.progress_callback else None,
         )
 
         # Run search (serial or parallel)
@@ -190,7 +194,7 @@ class MCTSZertzPlayer(ZertzPlayer):
             action_type, action_data = self.rust_mcts.search_parallel(
                 spatial_state,
                 global_state,
-                num_threads=self.num_workers,
+                # num_threads=self.num_workers,
                 **rust_kwargs,
             )
         else:  # Serial mode

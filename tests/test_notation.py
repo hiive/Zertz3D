@@ -316,7 +316,10 @@ class TestNotationWorkflow:
 
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
-                action = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                action = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         # Execute capture
@@ -371,7 +374,10 @@ class TestNotationWorkflow:
         for dir_idx, (dy, dx) in enumerate(board.DIRECTIONS):
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
                 direction1 = dir_idx
-                action1 = (dir_idx, b2_y, b2_x)
+                # Convert from capture mask indices to action format using helper
+                action1 = ZertzBoard.capture_indices_to_action(
+                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                )
                 break
 
         assert direction1 is not None, "Should find direction from B2 to C3"
@@ -401,7 +407,10 @@ class TestNotationWorkflow:
                 # Check that this capture is available
                 if capture_mask[dir_idx, d4_y, d4_x]:
                     direction2 = dir_idx
-                    action2 = (dir_idx, d4_y, d4_x)
+                    # Convert from capture mask indices to action format using helper
+                    action2 = ZertzBoard.capture_indices_to_action(
+                        dir_idx, d4_y, d4_x, board.width, board.DIRECTIONS
+                    )
                     break
 
         assert direction2 is not None, (

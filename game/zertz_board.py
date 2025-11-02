@@ -360,6 +360,27 @@ class ZertzBoard:
         y2, x2 = dst
         return (y1 + y2) // 2, (x1 + x2) // 2
 
+    @staticmethod
+    def capture_indices_to_action(direction, y, x, width, directions):
+        """Convert capture mask indices to action tuple.
+
+        Args:
+            direction: Direction index from capture mask (0-5)
+            y: Source y coordinate from capture mask
+            x: Source x coordinate from capture mask
+            width: Board width
+            directions: Direction deltas (usually ZertzBoard.DIRECTIONS)
+
+        Returns:
+            Tuple (None, src_flat, dst_flat) for internal action format
+        """
+        src_flat = y * width + x
+        dy, dx = directions[direction]
+        dst_y = y + 2 * dy
+        dst_x = x + 2 * dx
+        dst_flat = dst_y * width + dst_x
+        return (None, src_flat, dst_flat)
+
     def get_neighbors(self, index):
         """Return list of neighboring indices (delegates to zertz_logic).
 
@@ -510,14 +531,20 @@ class ZertzBoard:
         return None
 
     def _take_capture_action(self, action):
-        # Capture actions have dimension (6 x w x w)
-        # Translate the action dimensions into src_index, marble_type, cap_index and dst_index
-        direction, y, x = action
-        src_index = (y, x)
+        # Capture actions: (None, src_flat, dst_flat)
+        # Unflatten both coordinates and calculate captured marble position as midpoint
+        _, src_flat, dst_flat = action
+        src_y, src_x = divmod(src_flat, self.width)
+        dst_y, dst_x = divmod(dst_flat, self.width)
+
+        src_index = (src_y, src_x)
+        dst_index = (dst_y, dst_x)
         marble_type = self.get_marble_type_at(src_index)
-        dy, dx = self.DIRECTIONS[direction]
-        cap_index = (y + dy, x + dx)
-        dst_index = self.get_jump_destination(src_index, cap_index)
+
+        # Calculate captured marble position (midpoint between src and dst)
+        cap_y = (src_y + dst_y) // 2
+        cap_x = (src_x + dst_x) // 2
+        cap_index = (cap_y, cap_x)
         y, x = cap_index
 
         # Reset the capture layer

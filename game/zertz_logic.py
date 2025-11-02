@@ -23,7 +23,7 @@ from typing import Dict, Tuple, List
 import numpy as np
 
 # Import Rust implementations
-from hiivelabs_zertz_mcts import (
+from hiivelabs_mcts import (
     BoardConfig,
     is_inbounds as rust_is_inbounds,
     get_neighbors as rust_get_neighbors,
