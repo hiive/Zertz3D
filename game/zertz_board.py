@@ -2,7 +2,25 @@ import numpy as np
 
 from game.zertz_position import ZertzPosition, ZertzPositionCollection
 from game.utils.canonicalization import TransformFlags, CanonicalizationManager
-from game import zertz_logic
+from hiivelabs_mcts import (
+    BoardConfig,
+    coordinate_to_algebraic,
+    generate_standard_layout_mask,
+    get_neighbors,
+    get_jump_destination,
+    is_inbounds,
+    get_regions,
+    get_supply_index,
+    get_captured_index,
+    get_marble_type_at,
+    get_valid_actions,
+    get_placement_moves,
+    get_capture_moves,
+    get_open_rings,
+    is_ring_removable,
+    get_removable_rings,
+    apply_placement_action,
+)
 
 
 class ZertzBoard:
@@ -135,77 +153,7 @@ class ZertzBoard:
     BOARD_LAYERS = slice(0, 4)  # Rings + all marbles (current state)
     LAYERS_PER_TIMESTEP = 4  # Number of layers per timestep (ring + 3 marble types)
 
-    @staticmethod
-    def generate_standard_board_layout(rings):
-        """
-        Generate board layout for standard ring configurations.
-
-        This is the canonical board layout algorithm, ported from the renderer.
-        Returns a 2D numpy array of position strings (e.g., "A1", "B2", etc.).
-        Empty positions are represented as empty strings.
-
-        Args:
-            rings: Number of rings (must be SMALL_BOARD_37, MEDIUM_BOARD_48, or LARGE_BOARD_61)
-
-        Returns:
-            2D numpy array of strings with shape (width, width)
-
-        Raises:
-            ValueError: If rings is not a supported standard size
-        """
-        # Map rings to letter sets
-        if rings == ZertzBoard.SMALL_BOARD_37:
-            letters = "ABCDEFG"
-        elif rings == ZertzBoard.MEDIUM_BOARD_48:
-            letters = "ABCDEFGH"
-        elif rings == ZertzBoard.LARGE_BOARD_61:
-            letters = "ABCDEFGHJ"
-        else:
-            raise ValueError(
-                f"Unsupported standard board size: {rings} rings. "
-                f"Supported sizes are {ZertzBoard.SMALL_BOARD_37}, {ZertzBoard.MEDIUM_BOARD_48}, and {ZertzBoard.LARGE_BOARD_61}."
-            )
-
-        # Algorithm ported from zertz_renderer.py _build_base() method
-        r_max = len(letters)
-        is_even = r_max % 2 == 0
-
-        # Lambda to calculate how many letters/positions each row uses
-        h_max = lambda xx: r_max - abs(letters.index(letters[xx]) - (r_max // 2))
-
-        # Calculate minimum number for positions
-        r_min = h_max(0)
-        if is_even:
-            r_min += 1
-
-        # Build position array
-        pos_array = []
-        for i in range(r_max):
-            hh = h_max(i)  # Number of letters this row uses
-
-            # Select which letters to use for this row
-            ll = letters[:hh] if i < hh / 2 else letters[-hh:]
-
-            # Calculate number range for this row
-            nn_max = r_max - i
-            nn_min = max(r_min - i, 1)
-
-            # Initialize row with empty strings
-            row = [""] * r_max
-
-            # Fill in positions for this row
-            for k in range(len(ll)):
-                ix = min(k + nn_min, nn_max)
-                lt = ll[k]
-                pa = letters.find(lt)
-                pos = f"{lt}{ix}"
-                row[pa] = pos
-
-            pos_array.append(row)
-
-        return np.array(pos_array)
-
-    def __init__(self, rings=37, marbles=None, t=1, clone=None, board_layout=None):
+    def __init__(self, rings=37, marbles=None, t=1, clone=None):
         """Initialize a Zèrtz board.
 
         The board maintains two separate state representations:
@@ -229,65 +177,35 @@ class ZertzBoard:
             marbles: Dict with 'w', 'g', 'b' keys for marble counts (default: {w:6, g:8, b:10})
             t: Time history depth (default: 1)
             clone: ZertzBoard instance to clone from
-            board_layout: Custom 2D array of position strings (for non-standard boards)
         """
-        # Initialize attributes that may be used before assignment
-        self.letter_layout = None
-        self.flattened_letters = None
-        self.board_layout = None
-
         # Position cache manager (built lazily)
         self.positions = ZertzPositionCollection(self)
 
         # Canonicalization manager for state transformations
         self.canonicalizer = CanonicalizationManager(self)
 
+
         if clone is not None:
             self.rings = clone.rings
-            self.width = clone.width
+            self.config = clone.config
             self.t = clone.t
             self.CAPTURE_LAYER = clone.CAPTURE_LAYER
             self.state = np.copy(clone.state)
             self.global_state = np.copy(clone.global_state)
             self.last_acting_player = clone.last_acting_player if hasattr(clone, "last_acting_player") else None
-            if hasattr(clone, "letter_layout") and clone.letter_layout is not None:
-                self.letter_layout = np.copy(clone.letter_layout)
-            if (
-                hasattr(clone, "flattened_letters")
-                and clone.flattened_letters is not None
-            ):
-                self.flattened_letters = np.copy(clone.flattened_letters)
-            if hasattr(clone, "board_layout") and clone.board_layout is not None:
-                self.board_layout = np.copy(clone.board_layout)
         else:
-            # Determine width of board from the number of rings
-            if board_layout is None:
-                # Use generated layout for standard board sizes
-                if rings in [
-                    self.SMALL_BOARD_37,
-                    self.MEDIUM_BOARD_48,
-                    self.LARGE_BOARD_61,
-                ]:
-                    board_layout = self.generate_standard_board_layout(rings)
-                    self.letter_layout = board_layout
-                    self.flattened_letters = np.reshape(
-                        board_layout, (board_layout.size,)
-                    )
-                    self.board_layout = self.letter_layout != ""
-                    self.rings = np.count_nonzero(board_layout)
-                    self.width = board_layout.shape[0]
-                else:
-                    raise ValueError(
-                        f"Unsupported board size: {rings} rings. "
-                        f"Use generate_standard_board_layout() for custom layouts."
-                    )
-            else:
-                # Custom board layout provided
-                self.letter_layout = board_layout
-                self.flattened_letters = np.reshape(board_layout, (board_layout.size,))
-                self.board_layout = self.letter_layout != ""
-                self.rings = np.count_nonzero(board_layout)
-                self.width = board_layout.shape[0]
+            # Validate board size
+            if rings not in [self.SMALL_BOARD_37, self.MEDIUM_BOARD_48, self.LARGE_BOARD_61]:
+                raise ValueError(
+                    f"Unsupported board size: {rings} rings. "
+                    f"Supported sizes are {self.SMALL_BOARD_37}, {self.MEDIUM_BOARD_48}, and {self.LARGE_BOARD_61}."
+                )
+
+            # Get boolean layout mask from Rust (no Python duplication)
+            self.config = BoardConfig.standard_config(rings, t=t)
+
+            board_layout = generate_standard_layout_mask(rings, self.config.width)
+            self.rings = int(board_layout.sum())
 
             # Calculate the number of layers for SPATIAL state
             # 4 * t layers for all pieces going back t steps, 1 for capture layer
@@ -305,7 +223,7 @@ class ZertzBoard:
             # Initialize SPATIAL state as 3d array
             # Use float32 for neural network compatibility (one-hot encoding)
             self.state = np.zeros(
-                (spatial_layers, self.width, self.width), dtype=np.float32
+                (spatial_layers, self.config.width, self.config.width), dtype=np.float32
             )
 
             # Initialize GLOBAL state as 1d array
@@ -317,15 +235,8 @@ class ZertzBoard:
             # Use float32 for neural network compatibility
             self.global_state = np.zeros(10, dtype=np.float32)
 
-            # Place rings
-            if self.board_layout is None:
-                middle = self.width // 2
-                for i in range(self.width):
-                    lb = max(0, i - middle)
-                    ub = min(self.width, middle + i + 1)
-                    self.state[self.RING_LAYER, lb:ub, i] = 1
-            else:
-                self.state[self.RING_LAYER, self.board_layout] = 1
+            # Place rings using layout mask from Rust
+            self.state[self.RING_LAYER, board_layout] = 1
 
             # Set the number of each type of marble available in the supply
             #   default: 6x white, 8x gray, 10x black
@@ -343,15 +254,6 @@ class ZertzBoard:
             self.last_acting_player = None
 
         # Coordinate maps are built lazily via PositionCollection
-
-    def _get_config(self):
-        """Create BoardConfig from current board state.
-
-        This allows delegation to pure stateless functions.
-        BoardConfig should be cached if performance becomes an issue.
-        """
-        # Use Rust BoardConfig constructor
-        return zertz_logic.BoardConfig.standard_config(rings=self.rings, t=self.t)
 
     @staticmethod
     def get_middle_ring(src, dst):
@@ -387,34 +289,24 @@ class ZertzBoard:
         The neighboring index may not be within the board space so it must be checked
         that it is inbounds (see _is_inbounds).
         """
-        config = self._get_config()
-        return zertz_logic.get_neighbors(index, config)
+        y, x = index
+        return get_neighbors(y, x, self.config)
 
     def _is_adjacent(self, l1, l2):
         # Return True if l1 and l2 are adjacent to each other on the hexagonal board
         return l2 in self.get_neighbors(l1)
 
-    @staticmethod
-    def get_jump_destination(start, cap):
-        """Return landing index after jump (delegates to zertz_logic).
-
-        The landing index may not be within the board space so it must be checked
-        that it is inbounds (see _is_inbounds).
-        """
-        return zertz_logic.get_jump_destination(start, cap)
-
     def _is_inbounds(self, index):
         """Check if index is in bounds (delegates to zertz_logic)."""
-        config = self._get_config()
-        return zertz_logic.is_inbounds(index, config)
+        y, x = index
+        return is_inbounds(y, x, self.config.width)
 
     def _get_regions(self):
         """Return list of connected regions on the board.
 
-        Delegates to zertz_logic.get_regions() for zero code duplication.
+        Delegates to get_regions() for zero code duplication.
         """
-        config = self._get_config()
-        return zertz_logic.get_regions(self.state, config)
+        return get_regions(self.state, self.config)
 
     def get_cur_player(self):
         return int(self.global_state[self.CUR_PLAYER])
@@ -425,19 +317,18 @@ class ZertzBoard:
         ) % self.NUM_PLAYERS
 
     def _get_supply_index(self, marble_type):
-        """Get global_state index for marble in supply (delegates to zertz_logic)."""
-        config = self._get_config()
-        return zertz_logic.get_supply_index(marble_type, config)
+        """Get global_state index for marble in supply (delegates to Rust)."""
+        return get_supply_index(marble_type)
 
     def _get_captured_index(self, marble_type, player):
-        """Get global_state index for captured marble (delegates to zertz_logic)."""
-        config = self._get_config()
-        return zertz_logic.get_captured_index(marble_type, player, config)
+        """Get global_state index for captured marble (delegates to Rust)."""
+        # Rust signature: get_captured_index(player: usize, marble_type: char)
+        return get_captured_index(player, marble_type)
 
     def get_marble_type_at(self, index):
-        """Get marble type at position (delegates to zertz_logic)."""
-        config = self._get_config()
-        return zertz_logic.get_marble_type_at(index, self.state, config)
+        """Get marble type at position (delegates to Rust)."""
+        y, x = index
+        return get_marble_type_at(self.state, y, x)
 
     def take_action(self, action, action_type):
         # Input: action is an index into the action space matrix
@@ -476,7 +367,7 @@ class ZertzBoard:
         """
         # Parse action for validation
         type_index, put_loc, rem_loc = action
-        put_y, put_x = divmod(put_loc, self.width)
+        put_y, put_x = divmod(put_loc, self.config.width)
 
         # Validate placement position before delegating to Rust
         if np.sum(self.state[self.BOARD_LAYERS, put_y, put_x]) != 1:
@@ -507,12 +398,24 @@ class ZertzBoard:
         # Delegate to Rust (which handles marble placement, ring removal,
         # isolation capture, supply/captured pool management, and player switching)
         # Returns list of captured marble positions from isolation
-        config = self._get_config()
-        captured_positions = zertz_logic.apply_placement_action(
+        # Unpack action tuple for Rust function signature
+        type_index, put_loc, rem_loc = action
+        put_y, put_x = divmod(put_loc, self.config.width)
+        if rem_loc == self.config.width**2:
+            # No removal - Rust uses None for Option<usize>
+            rem_y, rem_x = None, None
+        else:
+            rem_y, rem_x = divmod(rem_loc, self.config.width)
+
+        captured_positions = apply_placement_action(
             self.state,
             self.global_state,
-            action,  # Pass the full action tuple
-            config
+            type_index,
+            put_y,
+            put_x,
+            rem_y,
+            rem_x,
+            self.config
         )
 
         # Convert captured positions to expected format for ActionResult
@@ -534,8 +437,8 @@ class ZertzBoard:
         # Capture actions: (None, src_flat, dst_flat)
         # Unflatten both coordinates and calculate captured marble position as midpoint
         _, src_flat, dst_flat = action
-        src_y, src_x = divmod(src_flat, self.width)
-        dst_y, dst_x = divmod(dst_flat, self.width)
+        src_y, src_x = divmod(src_flat, self.config.width)
+        dst_y, dst_x = divmod(dst_flat, self.config.width)
 
         src_index = (src_y, src_x)
         dst_index = (dst_y, dst_x)
@@ -566,17 +469,18 @@ class ZertzBoard:
         # Update the capture layer if there is a forced chain capture
         neighbors = self.get_neighbors(dst_index)
         for neighbor in neighbors:
-            y, x = neighbor
+            ny, nx = neighbor
             # Check each neighbor to see if it has a marble
             if (
                 self._is_inbounds(neighbor)
-                and np.sum(self.state[self.MARBLE_LAYERS, y, x]) == 1
+                and np.sum(self.state[self.MARBLE_LAYERS, ny, nx]) == 1
             ):
-                next_dst = self.get_jump_destination(dst_index, neighbor)
-                y, x = next_dst
+                dy, dx = dst_index
+                next_dst = get_jump_destination(dy, dx, ny, nx)
+                ky, kx = next_dst
                 if (
                     self._is_inbounds(next_dst)
-                    and np.sum(self.state[self.BOARD_LAYERS, y, x]) == 1
+                    and np.sum(self.state[self.BOARD_LAYERS, ky, kx]) == 1
                 ):
                     # Set the captured layer to 1 at dst_index
                     self.state[self.CAPTURE_LAYER][dst_index] = 1
@@ -591,45 +495,41 @@ class ZertzBoard:
     def get_valid_moves(self):
         """Return valid placement and capture moves.
 
-        Delegates to zertz_logic.get_valid_actions() for zero code duplication.
+        Delegates to get_valid_actions() for zero code duplication.
         """
-        config = self._get_config()
-        return zertz_logic.get_valid_actions(self.state, self.global_state, config)
+        return get_valid_actions(self.state, self.global_state, self.config)
 
     #todo check
     def get_placement_shape(self):
         # get shape of placement moves as a tuple
-        return 3, self.width**2, self.width**2 + 1
+        return 3, self.config.width**2, self.config.width**2 + 1
 
     #todo check
     def get_capture_shape(self):
         # get shape of capture moves as a tuple
-        return 6, self.width, self.width
+        return 6, self.config.width, self.config.width
 
     def get_placement_moves(self):
         """Return valid placement moves.
 
-        Delegates to zertz_logic.get_placement_moves() for zero code duplication.
+        Delegates to get_placement_moves() for zero code duplication.
         """
-        config = self._get_config()
-        return zertz_logic.get_placement_moves(self.state, self.global_state, config)
+        return get_placement_moves(self.state, self.global_state, self.config)
 
     def get_capture_moves(self):
         """Return valid capture moves.
 
-        Delegates to zertz_logic.get_capture_moves() for zero code duplication.
+        Delegates to get_capture_moves() for zero code duplication.
         """
-        config = self._get_config()
-        return zertz_logic.get_capture_moves(self.state, self.global_state, config)
+        return get_capture_moves(self.state, self.global_state, self.config)
 
     #todo only used in test
     def _get_open_rings(self):
         """Return indices of all empty rings on the board.
 
-        Delegates to zertz_logic.get_open_rings() for zero code duplication.
+        Delegates to get_open_rings() for zero code duplication.
         """
-        config = self._get_config()
-        return zertz_logic.get_open_rings(self.state, config)
+        return get_open_rings(self.state, self.config)
 
     # todo unused
     def _is_removable(self, index):
@@ -637,29 +537,20 @@ class ZertzBoard:
 
         Delegates to zertz_logic.is_removable() for zero code duplication.
         """
-        config = self._get_config()
-        return zertz_logic.is_ring_removable(index, self.state, config)
+        return is_ring_removable(index, self.state, self.config)
 
     # todo unused
     def _get_removable_rings(self):
         """Return list of removable ring indices.
 
-        Delegates to zertz_logic.get_removable_rings() for zero code duplication.
+        Delegates to get_removable_rings() for zero code duplication.
         """
-        config = self._get_config()
-        return zertz_logic.get_removable_rings(self.state, config)
+        return get_removable_rings(self.state, self.config)
 
     def _compute_label(self, index: tuple[int, int]) -> str:
+        """Generate position label using Rust coordinate conversion."""
         y, x = index
-        if self.letter_layout is not None:
-            label = self.letter_layout[y][x]
-            if label:
-                return label
-        letter = chr(x + 65)
-        mid = self.width // 2
-        offset = max(mid - x, 0)
-        number = (self.width - y) - offset
-        return f"{letter}{number}"
+        return coordinate_to_algebraic(y, x, self.config)
 
     def _ensure_positions_built(self) -> None:
         self.positions.ensure()

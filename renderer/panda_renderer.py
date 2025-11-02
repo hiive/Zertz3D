@@ -100,11 +100,10 @@ class PandaRenderer(ShowBase):
 
     def __init__(
         self,
-        board_layout,
+        rings=37,
         white_marbles=6,
         grey_marbles=8,
         black_marbles=10,
-        rings=37,
         show_coords=False,
         highlight_choices: str | None = None,
         update_callback=None,
@@ -157,7 +156,6 @@ class PandaRenderer(ShowBase):
         self.removed_bases = []
         self.pos_to_coords = {}
         self.pos_to_label = {}  # Maps position strings to text labels
-        self.pos_array = None
         self.show_coords = show_coords
         self._action_context = None  # Tracks in-flight action for completion callbacks
 
@@ -233,7 +231,7 @@ class PandaRenderer(ShowBase):
 
         # anim: vx, vy, scale, skip
 
-        self._build_base(board_layout)
+        self._build_base()
 
         # Calculate geometric center and position board_node
         self._position_board_node()
@@ -454,35 +452,25 @@ class PandaRenderer(ShowBase):
         first_letter = self.letters[0]
         last_letter = self.letters[-1]
 
-        # Find the highest row for each corner
-        # [pos for pos in self.pos_to_coords.keys() if pos.startswith(first_letter)]
-        # [pos for pos in self.pos_to_coords.keys() if pos.startswith(last_letter)]
+        # Find top-left and top-right positions by querying pos_to_coords
+        # Get all positions starting with first and last letters
+        left_positions = [pos for pos in self.pos_to_coords.keys() if pos.startswith(first_letter)]
+        right_positions = [pos for pos in self.pos_to_coords.keys() if pos.startswith(last_letter)]
 
-        # Get positions with max number (top of board)
-        # Rightmost non-empty value in the first row
-        first_row = self.pos_array[0]
-        top_right = first_row[first_row != ""][-1]
-
-        # First value in the first row
-        top_left = first_row[0]
+        # Sort by number to find highest
+        top_left = max(left_positions, key=lambda p: int(p[1:]))
+        top_right = max(right_positions, key=lambda p: int(p[1:]))
 
         logger.debug(f"Board: top_left={top_left}, top_right={top_right}")
-        # Get adjacent positions to calculate board direction vectors
-        # Find a neighbor position to determine the board's edge direction
-        # second_letter = self.letters[1]
-        # second_from_top_left = [pos for pos in self.pos_to_coords.keys()
-        #                         if pos.startswith(second_letter) and int(pos[1:]) == int(top_left[1:])]
 
-        # second_last_letter = self.letters[-2]
-        # second_from_top_right = [pos for pos in self.pos_to_coords.keys()
-        #                          if pos.startswith(second_last_letter) and int(pos[1:]) == int(top_right[1:])]
+        # Find second-highest positions for calculating direction vectors
+        # Second from top left
+        left_sorted = sorted(left_positions, key=lambda p: int(p[1:]), reverse=True)
+        second_from_top_left = left_sorted[1] if len(left_sorted) > 1 else None
 
-        # Rightmost non-empty value in the second row
-        second_row = self.pos_array[1]
-        second_from_top_right = second_row[second_row != ""][-2]
-
-        # first value in second row
-        second_from_top_left = second_row[1]
+        # Second from top right (second-highest in last column)
+        right_sorted = sorted(right_positions, key=lambda p: int(p[1:]), reverse=True)
+        second_from_top_right = right_sorted[1] if len(right_sorted) > 1 else None
 
         # logger.debug(f"Board: second_from_top_left={second_from_top_left}, second_from_top_right={second_from_top_right}")
         # Get coordinates
@@ -544,11 +532,16 @@ class PandaRenderer(ShowBase):
     def _init_pos_coords(self):
         self.pos_to_base.clear()
         self.pos_to_coords.clear()
-        self.pos_array = None
 
-    def _build_base(self, board_layout):
+    def _build_base(self):
+        """Build board base using Rust layout generation and coordinate conversion."""
+        from hiivelabs_mcts import BoardConfig, generate_standard_layout_mask, coordinate_to_algebraic
+
         self._init_pos_coords()
-        self.pos_array = board_layout
+
+        # Get layout mask and config from Rust
+        config = BoardConfig.standard_config(self.rings, t=1)
+        layout_mask = generate_standard_layout_mask(self.rings, config.width)
 
         # Calculate 3D positions for rendering
         r_max = len(self.letters)
@@ -572,9 +565,12 @@ class PandaRenderer(ShowBase):
             for k in range(len(ll)):
                 lt = ll[k]
                 pa = self.letters.find(lt)
-                pos = self.pos_array[i][pa]
 
-                if pos != "":  # Only create pieces for non-empty positions
+                # Check if this position exists in the layout mask
+                if layout_mask[i, pa]:
+                    # Generate position label using Rust
+                    pos = coordinate_to_algebraic(i, pa, config)
+
                     # Pass board_node as parent so rings rotate with the board
                     base_piece = BasePiece(self, parent=self.board_node)
                     x = x_center + (k * self.x_base_size) - x_row_offset
@@ -584,8 +580,6 @@ class PandaRenderer(ShowBase):
                     base_piece.configure_as_ring(pos)
                     self.pos_to_base[pos] = base_piece
                     self.pos_to_coords[pos] = coords
-
-            logger.debug(f"Board row {i}: {self.pos_array[i]}")
 
     def _position_board_node(self):
         """Calculate geometric center and offset all ring positions to center the board at origin.
@@ -1528,7 +1522,7 @@ class PandaRenderer(ShowBase):
 
     def apply_context_masks(self, board, placement_mask, capture_mask) -> None:
         """Translate action masks into highlight sets for the current board."""
-        width = board.width
+        width = board.config.width
 
         if placement_mask is None or capture_mask is None:
             self.clear_highlight_context()

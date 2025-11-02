@@ -48,12 +48,8 @@ class ZertzFactory:
             renderers: list[IRenderer] = []
 
             if not headless:
-                board_layout = ZertzBoard.generate_standard_board_layout(
-                    controller.session.rings
-                )
                 renderer = PandaRenderer(
                     rings=controller.session.rings,
-                    board_layout=board_layout,
                     show_coords=controller.show_coords,
                     highlight_choices=controller.highlight_choices,
                     update_callback=controller.update_game,

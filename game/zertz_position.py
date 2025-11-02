@@ -104,13 +104,8 @@ class ZertzPositionCollection:
         """Build position maps by delegating to Rust for axial coordinate computation."""
         board = self.board
 
-        # Determine the mask of valid positions
-        if board.board_layout is not None:
-            mask = board.board_layout.astype(bool)
-        elif board.letter_layout is not None:
-            mask = board.letter_layout != ""
-        else:
-            mask = board.state[board.RING_LAYER] != 0
+        # Determine the mask of valid positions from ring layer
+        mask = board.state[board.RING_LAYER] != 0
 
         ys, xs = np.where(mask)
         if len(ys) == 0:

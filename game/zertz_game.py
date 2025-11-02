@@ -25,7 +25,6 @@ class ZertzGame:
         marbles=None,
         win_con=None,
         t=1,
-        board_layout=None,
         clone=None,
         clone_state=None,
     ):
@@ -38,7 +37,6 @@ class ZertzGame:
             self.win_con = copy.copy(clone.win_con)
             self.board = ZertzBoard(clone=clone.board)
             self.board.state = np.copy(clone_state)
-            self.board_layout = np.copy(clone.board_layout)
             self.move_history = list(clone.move_history)  # Copy history
             self.loop_detection_pairs = clone.loop_detection_pairs
             assert clone.board.state.shape[0] == clone_state.shape[0]
@@ -48,10 +46,9 @@ class ZertzGame:
             self.initial_rings = rings
             self.t = t
             self.marbles = marbles
-            self.board_layout = board_layout
 
             self.board = ZertzBoard(
-                self.initial_rings, self.marbles, self.t, board_layout=self.board_layout
+                self.initial_rings, self.marbles, self.t
             )
 
             # The win conditions (amount of each marble needed)
@@ -219,7 +216,7 @@ class ZertzGame:
 
     def get_capture_action_size(self):
         # Return the number of possible capture actions
-        return 6 * self.board.width**2
+        return 6 * self.board.config.width**2
 
     def get_capture_action_shape(self):
         # Return the shape of the capture actions as a tuple
@@ -227,7 +224,7 @@ class ZertzGame:
 
     def get_placement_action_size(self):
         # Return the number of possible placement actions
-        return 3 * self.board.width**2 * (self.board.width**2 + 1)
+        return 3 * self.board.config.width**2 * (self.board.config.width**2 + 1)
 
     def get_placement_action_shape(self):
         # Return the shape of the placement actions as a tuple
@@ -483,12 +480,12 @@ class ZertzGame:
                 return "", None
             layer = self.board.MARBLE_TO_LAYER[marble_type] - 1
             y, x = self.board.str_to_index(put_str)
-            put = y * self.board.width + x
+            put = y * self.board.config.width + x
             if rem_str is not None:
                 y, x = self.board.str_to_index(rem_str)
-                rem = y * self.board.width + x
+                rem = y * self.board.config.width + x
             else:
-                rem = self.board.width**2
+                rem = self.board.config.width**2
             action = (layer, put, rem)
         elif action_type == "CAP":
             if len(args) == 4:
@@ -527,14 +524,14 @@ class ZertzGame:
             marble_type, put, rem = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
 
-            put_index = (put // self.board.width, put % self.board.width)
+            put_index = (put // self.board.config.width, put % self.board.config.width)
             put_pos = self.board.position_from_yx(put_index)
             put_str = put_pos.label
 
-            if rem == self.board.width**2:
+            if rem == self.board.config.width**2:
                 rem_str = ""
             else:
-                rem_index = rem // self.board.width, rem % self.board.width
+                rem_index = rem // self.board.config.width, rem % self.board.config.width
                 rem_pos = self.board.position_from_yx(rem_index)
                 rem_str = rem_pos.label
             action_str = "{} {} {} {}".format(
@@ -550,8 +547,8 @@ class ZertzGame:
         elif action_type == "CAP":
             # New format: (None, src_flat, dst_flat)
             _, src_flat, dst_flat = action
-            src_y, src_x = divmod(src_flat, self.board.width)
-            dst_y, dst_x = divmod(dst_flat, self.board.width)
+            src_y, src_x = divmod(src_flat, self.board.config.width)
+            dst_y, dst_x = divmod(dst_flat, self.board.config.width)
 
             # Calculate captured marble position (midpoint)
             cap_y = (src_y + dst_y) // 2
@@ -560,11 +557,10 @@ class ZertzGame:
             cap_marble = self.board.get_marble_type_at(cap)
 
             # Use Rust functions for coordinate conversion
-            config = self.board._get_config()
             import hiivelabs_mcts
-            src_str = hiivelabs_mcts.coordinate_to_algebraic(src_y, src_x, config)
-            cap_str = hiivelabs_mcts.coordinate_to_algebraic(cap_y, cap_x, config)
-            dst_str = hiivelabs_mcts.coordinate_to_algebraic(dst_y, dst_x, config)
+            src_str = hiivelabs_mcts.coordinate_to_algebraic(src_y, src_x, self.board.config)
+            cap_str = hiivelabs_mcts.coordinate_to_algebraic(cap_y, cap_x, self.board.config)
+            dst_str = hiivelabs_mcts.coordinate_to_algebraic(dst_y, dst_x, self.board.config)
 
             action_str = "{} {} {} {}".format(
                 action_type, src_str, cap_marble, dst_str
@@ -607,8 +603,8 @@ class ZertzGame:
 
         placement_positions = []
         for dst_idx in dest_indices:
-            dst_y = dst_idx // self.board.width
-            dst_x = dst_idx % self.board.width
+            dst_y = dst_idx // self.board.config.width
+            dst_x = dst_idx % self.board.config.width
             pos = self.board.position_from_yx((dst_y, dst_x))
             if self.board.state[self.board.RING_LAYER, dst_y, dst_x]:
                 placement_positions.append(pos.label)
@@ -632,7 +628,7 @@ class ZertzGame:
                 # Convert from capture mask indices to action format using helper
                 from game.zertz_board import ZertzBoard
                 action = ZertzBoard.capture_indices_to_action(
-                    direction, src_y, src_x, self.board.width, self.board.DIRECTIONS
+                    direction, src_y, src_x, self.board.config.width, self.board.DIRECTIONS
                 )
                 _, action_dict = self.action_to_str("CAP", action)
                 capture_moves.append(action_dict)
@@ -657,7 +653,7 @@ class ZertzGame:
             return []
 
         marble_idx, dst, rem = action
-        width = self.board.width
+        width = self.board.config.width
 
         # Get the removal dimension for this specific (marble, destination) pair
         removal_mask = placement_array[marble_idx, dst, :]
@@ -687,7 +683,7 @@ class ZertzGame:
             List of dicts with position and score: [{'pos': 'A1', 'score': 0.8}, ...]
         """
         enriched = []
-        width = self.board.width
+        width = self.board.config.width
 
         for pos_str in placement_positions:
             # Convert position string to y, x
@@ -719,7 +715,7 @@ class ZertzGame:
             List of dicts with score added: [{'action': 'CAP', ..., 'score': 0.9}, ...]
         """
         enriched = []
-        width = self.board.width
+        width = self.board.config.width
 
         for cap_dict in capture_moves:
             # Reconstruct action tuple from dict (new format: (None, src_flat, dst_flat))
@@ -758,7 +754,7 @@ class ZertzGame:
 
         enriched = []
         marble_idx, dst_flat, _ = action
-        width = self.board.width
+        width = self.board.config.width
 
         for pos_str in removal_positions:
             # Convert position string to flat index

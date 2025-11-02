@@ -45,6 +45,7 @@ from hiivelabs_mcts import (
     check_for_isolation_capture as rust_check_isolation,
     ax_rot60,
     ax_mirror_q_axis,
+    generate_standard_layout_mask as rust_generate_standard_layout_mask,
 )
 
 from .constants import PLAYER_1_WIN, PLAYER_2_WIN, BOTH_LOSE
@@ -147,43 +148,16 @@ _AXIAL_CACHE: Dict[Tuple[int, int, bytes | None], Tuple[Dict[Tuple[int, int], Tu
 
 
 def _generate_standard_layout_mask(rings: int) -> np.ndarray:
-    """Generate boolean layout mask for standard boards (37/48/61)."""
+    """Generate boolean layout mask for standard boards (37/48/61).
+
+    Delegates to Rust implementation for performance.
+    """
     width_map = {37: 7, 48: 8, 61: 9}
     if rings not in width_map:
         raise ValueError(f"Unsupported board size for standard layout: {rings}")
 
     width = width_map[rings]
-    mask = np.zeros((width, width), dtype=bool)
-
-    if rings == 37:
-        letters = "ABCDEFG"
-    elif rings == 48:
-        letters = "ABCDEFGH"
-    else:  # 61
-        letters = "ABCDEFGHJ"
-
-    r_max = len(letters)
-    is_even = r_max % 2 == 0
-
-    def h_max(idx: int) -> int:
-        return r_max - abs(letters.index(letters[idx]) - (r_max // 2))
-
-    r_min = h_max(0)
-    if is_even:
-        r_min += 1
-
-    for row_idx in range(r_max):
-        hh = h_max(row_idx)
-        letters_row = letters[:hh] if row_idx < hh / 2 else letters[-hh:]
-        num_max = r_max - row_idx
-        num_min = max(r_min - row_idx, 1)
-
-        for k, letter in enumerate(letters_row):
-            col = min(k + num_min, num_max)
-            col_idx = letters.find(letter)
-            mask[row_idx, col_idx] = True
-
-    return mask
+    return rust_generate_standard_layout_mask(rings, width)
 
 
 def _get_layout_mask(config: BoardConfig) -> np.ndarray:

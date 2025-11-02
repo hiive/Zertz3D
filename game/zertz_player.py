@@ -525,7 +525,7 @@ class RandomZertzPlayer(ZertzPlayer):
             direction, y, x = int(c1[ip]), int(c2[ip]), int(c3[ip])
             from game.zertz_board import ZertzBoard
             action_data = ZertzBoard.capture_indices_to_action(
-                direction, y, x, self.game.board.width, self.game.board.DIRECTIONS
+                direction, y, x, self.game.board.config.width, self.game.board.DIRECTIONS
             )
             return ("CAP", action_data)
         elif p1.size > 0:
