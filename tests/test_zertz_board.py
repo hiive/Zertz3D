@@ -67,40 +67,43 @@ class TestCoordinateConversion:
     def test_flat_to_2d_conversion(self, board):
         """Test conversion from flat index to 2D coordinates."""
         # Test corner positions
-        y, x = divmod(0, board.width)
+        y, x = divmod(0, board.config.width)
         assert y == 0 and x == 0
 
         # Test that conversion is consistent
-        for flat_idx in [0, 5, 10, board.width - 1]:
-            y, x = divmod(flat_idx, board.width)
-            assert 0 <= y < board.width
-            assert 0 <= x < board.width
+        for flat_idx in [0, 5, 10, board.config.width - 1]:
+            y, x = divmod(flat_idx, board.config.width)
+            assert 0 <= y < board.config.width
+            assert 0 <= x < board.config.width
 
     def test_2d_to_flat_conversion(self, board):
         """Test conversion from 2D coordinates to flat index."""
         # Test corner
-        flat = 0 * board.width + 0
+        flat = 0 * board.config.width + 0
         assert flat == 0
 
         # Test roundtrip conversion
-        for y in range(board.width):
-            for x in range(board.width):
-                flat = y * board.width + x
-                y2, x2 = divmod(flat, board.width)
+        for y in range(board.config.width):
+            for x in range(board.config.width):
+                flat = y * board.config.width + x
+                y2, x2 = divmod(flat, board.config.width)
                 assert y == y2 and x == x2
 
     def test_str_to_index_and_back(self, board):
         """Test string to index conversion and back."""
-        # Get all valid positions from the board layout
-        if board.letter_layout is not None:
-            valid_positions = board.letter_layout[board.letter_layout != ""]
-            for pos_str in valid_positions:
-                # Convert to index and back
-                idx = board.str_to_index(pos_str)
-                # Only test roundtrip if ring still exists
-                if board.state[board.RING_LAYER, idx[0], idx[1]] == 1:
-                    result_str = board.index_to_str(idx)
-                    assert result_str == pos_str, f"Failed roundtrip for {pos_str}"
+        # Iterate over all positions where rings exist
+        for y in range(board.config.width):
+            for x in range(board.config.width):
+                # Only test positions that have rings
+                if board.state[board.RING_LAYER, y, x] == 1:
+                    # Get the position label
+                    pos_str = board.index_to_str((y, x))
+                    if pos_str:  # Skip if empty string (removed ring)
+                        # Convert to index and back
+                        idx = board.str_to_index(pos_str)
+                        result_str = board.index_to_str(idx)
+                        assert result_str == pos_str, f"Failed roundtrip for {pos_str}: got {result_str} from {idx}"
+                        assert idx == (y, x), f"Failed index roundtrip for {pos_str}: expected {(y, x)}, got {idx}"
 
 
 # ============================================================================
@@ -135,7 +138,7 @@ class TestBoardMethods:
     def test_get_neighbors(self, board):
         """Test neighbor calculation for hexagonal grid."""
         # Test a center position - should have 6 neighbors
-        center_pos = (board.width // 2, board.width // 2)
+        center_pos = (board.config.width // 2, board.config.width // 2)
         neighbors = board.get_neighbors(center_pos)
         assert len(neighbors) == 6, "Hexagonal board center should have 6 neighbors"
 
@@ -168,10 +171,10 @@ class TestBoardMethods:
         """Test boundary checking for all board positions."""
         # Valid corner positions
         assert board._is_inbounds((0, 0))
-        assert board._is_inbounds((board.width - 1, board.width - 1))
+        assert board._is_inbounds((board.config.width - 1, board.config.width - 1))
 
         # Out of bounds positions
-        assert not board._is_inbounds((board.width, board.width))
+        assert not board._is_inbounds((board.config.width, board.config.width))
         assert not board._is_inbounds((-1, 0))
         assert not board._is_inbounds((0, -1))
 
@@ -187,12 +190,12 @@ class TestBoardMethods:
     def test_get_placement_moves_shape(self, board):
         """Test that placement moves array has correct shape."""
         moves = board.get_placement_moves()
-        assert moves.shape == (3, board.width**2, board.width**2 + 1)
+        assert moves.shape == (3, board.config.width**2, board.config.width**2 + 1)
 
     def test_get_capture_moves_shape(self, board):
         """Test that capture moves array has correct shape."""
         moves = board.get_capture_moves()
-        assert moves.shape == (6, board.width, board.width)
+        assert moves.shape == (6, board.config.width, board.config.width)
 
 
 def test_capture_sequence_continues_with_same_marble():

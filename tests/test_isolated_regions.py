@@ -47,8 +47,8 @@ class TestIsolatedRegionCaptureRules:
         # Place on D4 (safe location), remove F2
         put_action = (
             0,
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("D4")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("F2")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("D4")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("F2")),
         )
 
         p1_white_before = small_board.global_state[small_board.P1_CAP_W]
@@ -77,8 +77,8 @@ class TestIsolatedRegionCaptureRules:
         # Place marble on D4, remove F2 to isolate G1
         put_action = (
             0,
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("D4")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("F2")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("D4")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("F2")),
         )
 
         p1_captures_before = small_board.global_state[small_board.P1_CAP_SLICE].copy()
@@ -124,8 +124,8 @@ class TestIsolatedRegionCaptureRules:
         # Place marble on D4, remove G3 to complete isolation
         put_action = (
             0,
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("D4")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("G3")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("D4")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("G3")),
         )
 
         p1_white_before = small_board.global_state[small_board.P1_CAP_W]
@@ -166,8 +166,8 @@ class TestIsolatedRegionCaptureRules:
         # Place marble on D4, remove G3 to isolate
         put_action = (
             0,
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("D4")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("G3")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("D4")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("G3")),
         )
 
         p1_white_before = small_board.global_state[small_board.P1_CAP_W]
@@ -226,8 +226,8 @@ class TestIsolatedRegionCaptureRules:
         # Place on C3, remove any removable ring
         put_action = (
             0,  # white marble
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("C3")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("G1")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("C3")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("G1")),
         )
 
         p1_white_before = small_board.global_state[small_board.P1_CAP_W]
@@ -263,8 +263,8 @@ class TestPartiallyIsolatedRegionProperties:
 
         put_action = (
             0,
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("D4")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("F2")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("D4")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("F2")),
         )
         small_board._take_placement_action(put_action)
 
@@ -293,8 +293,8 @@ class TestPartiallyIsolatedRegionProperties:
 
         put_action = (
             0,
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("D4")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("F2")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("D4")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("F2")),
         )
         small_board._take_placement_action(put_action)
 
@@ -302,7 +302,7 @@ class TestPartiallyIsolatedRegionProperties:
         placement_moves, _ = small_board.get_valid_moves()
 
         # G1 should be a valid placement location
-        g1_flat = (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("G1"))
+        g1_flat = (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("G1"))
 
         assert placement_moves[:, g1_flat, :].any(), "Isolated ring G1 should remain placeable"
 
@@ -323,8 +323,8 @@ class TestNoIsolation:
         # Remove a ring that doesn't cause isolation (G1 is far from D4/E4)
         put_action = (
             0,
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("C3")),
-            (lambda pos: pos[0] * small_board.width + pos[1])(small_board.str_to_index("G1")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("C3")),
+            (lambda pos: pos[0] * small_board.config.width + pos[1])(small_board.str_to_index("G1")),
         )
 
         p1_captures_before = small_board.global_state[small_board.P1_CAP_SLICE].copy()

@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from game.zertz_game import ZertzGame, PLAYER_1_WIN, PLAYER_2_WIN, BOTH_LOSE
 from game.zertz_board import ZertzBoard
-from game.zertz_logic import BoardConfig, get_game_outcome
+from hiivelabs_mcts import BoardConfig, get_game_outcome
 
 
 # ============================================================================

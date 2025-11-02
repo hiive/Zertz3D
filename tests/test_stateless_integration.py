@@ -20,7 +20,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from game.zertz_game import ZertzGame
 from game.zertz_board import ZertzBoard
-from game import zertz_logic
+from hiivelabs_mcts import (
+    is_inbounds,
+    get_neighbors,
+    get_jump_destination,
+    get_marble_type_at,
+    get_supply_index,
+    get_captured_index,
+    get_valid_actions,
+    get_placement_moves,
+    get_capture_moves,
+    get_regions,
+)
 
 
 # ============================================================================
@@ -50,19 +61,19 @@ class TestHelperFunctionDelegation:
 
     def test_is_inbounds_delegation(self, board):
         """Test _is_inbounds() produces same results as stateless version."""
-        config = board._get_config()
+        config = board.config
 
         # Test in-bounds positions
         test_cases = [
             ((0, 0), True),
             ((3, 3), True),
-            ((board.width - 1, board.width - 1), True),
+            ((config.width - 1, config.width - 1), True),
             # Out of bounds
             ((-1, 0), False),
             ((0, -1), False),
-            ((board.width, 0), False),
-            ((0, board.width), False),
-            ((board.width, board.width), False),
+            ((config.width, 0), False),
+            ((0, config.width), False),
+            ((config.width, config.width), False),
         ]
 
         for index, expected in test_cases:
@@ -70,7 +81,8 @@ class TestHelperFunctionDelegation:
             stateful_result = board._is_inbounds(index)
 
             # Call stateless function directly
-            stateless_result = zertz_logic.is_inbounds(index, config)
+            y, x = index
+            stateless_result = is_inbounds(y, x, config.width)
 
             # They should match
             assert stateful_result == stateless_result == expected, \
@@ -79,13 +91,13 @@ class TestHelperFunctionDelegation:
 
     def test_get_neighbors_delegation(self, board):
         """Test get_neighbors() produces same results as stateless version."""
-        config = board._get_config()
+        config = board.config
 
         # Test center position
         test_positions = [
             (0, 0),
             (3, 3),
-            (board.width - 1, board.width - 1),
+            (config.width - 1, config.width - 1),
             (2, 4),
         ]
 
@@ -94,7 +106,8 @@ class TestHelperFunctionDelegation:
             stateful_neighbors = board.get_neighbors(pos)
 
             # Call stateless function directly
-            stateless_neighbors = zertz_logic.get_neighbors(pos, config)
+            y, x = pos
+            stateless_neighbors = get_neighbors(y, x, config)
 
             # They should match exactly
             assert stateful_neighbors == stateless_neighbors, \
@@ -114,7 +127,7 @@ class TestHelperFunctionDelegation:
             stateful_dst = board.get_jump_destination(start, cap)
 
             # Call stateless function directly
-            stateless_dst = zertz_logic.get_jump_destination(start, cap)
+            stateless_dst = get_jump_destination(start, cap)
 
             # They should both match expected
             assert stateful_dst == stateless_dst == expected_dst, \
@@ -122,7 +135,7 @@ class TestHelperFunctionDelegation:
 
     def test_get_marble_type_at_delegation(self, board):
         """Test get_marble_type_at() produces same results as stateless version."""
-        config = board._get_config()
+        config = board.config
 
         # Place some marbles on the board
         test_marbles = [
@@ -140,7 +153,8 @@ class TestHelperFunctionDelegation:
             stateful_type = board.get_marble_type_at(pos)
 
             # Call stateless function directly
-            stateless_type = zertz_logic.get_marble_type_at(pos, board.state, config)
+            y, x = pos
+            stateless_type = get_marble_type_at(board.state, y, x)
 
             # They should match
             assert stateful_type == stateless_type == marble_type, \
@@ -148,7 +162,7 @@ class TestHelperFunctionDelegation:
 
     def test_get_supply_index_delegation(self, board):
         """Test _get_supply_index() produces same results as stateless version."""
-        config = board._get_config()
+        config = board.config
 
         marble_types = ['w', 'g', 'b']
         expected_indices = [
@@ -162,7 +176,7 @@ class TestHelperFunctionDelegation:
             stateful_idx = board._get_supply_index(marble_type)
 
             # Call stateless function directly
-            stateless_idx = zertz_logic.get_supply_index(marble_type, config)
+            stateless_idx = get_supply_index(marble_type)
 
             # They should match
             assert stateful_idx == stateless_idx == expected_idx, \
@@ -170,7 +184,7 @@ class TestHelperFunctionDelegation:
 
     def test_get_captured_index_delegation(self, board):
         """Test _get_captured_index() produces same results as stateless version."""
-        config = board._get_config()
+        config = board.config
 
         test_cases = [
             ('w', board.PLAYER_1, board.P1_CAP_W),
@@ -186,7 +200,7 @@ class TestHelperFunctionDelegation:
             stateful_idx = board._get_captured_index(marble_type, player)
 
             # Call stateless function directly
-            stateless_idx = zertz_logic.get_captured_index(marble_type, player, config)
+            stateless_idx = get_captured_index(marble_type, player)
 
             # They should match
             assert stateful_idx == stateless_idx == expected_idx, \
@@ -206,14 +220,14 @@ class TestMoveGenerationDelegation:
 
     def test_get_valid_moves_delegation(self, board):
         """Test get_valid_moves() uses zertz_logic."""
-        config = board._get_config()
+        config = board.config
 
         # Call stateful method
         placement_stateful, capture_stateful = board.get_valid_moves()
 
         # Call stateless function directly
         placement_stateless, capture_stateless = \
-            zertz_logic.get_valid_actions(
+            get_valid_actions(
                 board.state, board.global_state, config
             )
 
@@ -226,13 +240,13 @@ class TestMoveGenerationDelegation:
 
     def test_get_placement_moves_delegation(self, board):
         """Test get_placement_moves() uses zertz_logic."""
-        config = board._get_config()
+        config = board.config
 
         # Call stateful method
         placement_stateful = board.get_placement_moves()
 
         # Call stateless function directly
-        placement_stateless = zertz_logic.get_placement_moves(
+        placement_stateless = get_placement_moves(
             board.state, board.global_state, config
         )
 
@@ -242,14 +256,12 @@ class TestMoveGenerationDelegation:
 
     def test_get_capture_moves_delegation(self, board):
         """Test get_capture_moves() uses zertz_logic."""
-        config = board._get_config()
-
         # Call stateful method
         capture_stateful = board.get_capture_moves()
 
         # Call stateless function directly
-        capture_stateless = zertz_logic.get_capture_moves(
-            board.state, board.global_state, config
+        capture_stateless = get_capture_moves(
+            board.state, board.config
         )
 
         # They should match
@@ -312,7 +324,7 @@ class TestBackwardCompatibility:
 
             # Execute capture using helper to convert to action format
             action = ZertzBoard.capture_indices_to_action(
-                direction, y, x, board.width, board.DIRECTIONS
+                direction, y, x, board.config.width, board.DIRECTIONS
             )
             captured = board._take_capture_action(action)
 
@@ -326,13 +338,13 @@ class TestBackwardCompatibility:
 
     def test_regions_function_delegation(self, board):
         """Test _get_regions() correctly delegates to stateless version."""
-        config = board._get_config()
+        config = board.config
 
         # Call stateful method
         regions_stateful = board._get_regions()
 
         # Call stateless function directly
-        regions_stateless = zertz_logic.get_regions(board.state, config)
+        regions_stateless = get_regions(board.state, config)
 
         # Should have same number of regions
         assert len(regions_stateful) == len(regions_stateless), \

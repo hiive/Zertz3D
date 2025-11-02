@@ -50,7 +50,7 @@ class TestCanonicalizeCaptureMask:
     def test_canonicalize_with_identity_transform(self, small_board):
         """Test that identity transform preserves capture mask."""
         # Create a simple capture mask
-        cap_mask = np.zeros((6, small_board.width, small_board.width), dtype=bool)
+        cap_mask = np.zeros((6, small_board.config.width, small_board.config.width), dtype=bool)
         cap_mask[0, 3, 3] = True
 
         # Canonicalize with identity
@@ -270,7 +270,7 @@ class TestCanonicalizePutMask:
         """Test that no-removal index is preserved correctly."""
         put_mask = small_board.get_placement_moves()
 
-        no_removal_idx = small_board.width ** 2
+        no_removal_idx = small_board.config.width ** 2
         original_no_removal = np.sum(put_mask[:, :, no_removal_idx])
 
         canonical, _, _ = small_board.canonicalizer.canonicalize_put_mask(put_mask, "R60")

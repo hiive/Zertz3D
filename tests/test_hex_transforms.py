@@ -90,8 +90,7 @@ class TestHexRotation:
     )
     def test_rotate_positions(self, small_board, start_pos, k, expected_pos):
         """Test that rotation by k*60° produces expected position."""
-        board = copy.deepcopy(small_board)
-        board._build_axial_maps()
+        board = small_board
 
         # Place a marble at start position
         y, x = board.str_to_index(start_pos)
@@ -156,8 +155,7 @@ class TestHexMirror:
     )
     def test_mirror_positions(self, small_board, start_pos, expected_pos):
         """Test that mirror reflection produces expected position."""
-        board = copy.deepcopy(small_board)
-        board._build_axial_maps()
+        board = small_board
 
         y, x = board.str_to_index(start_pos)
         test_state = np.zeros_like(board.state)
@@ -275,7 +273,7 @@ class TestAllBoardSizes:
         board._ensure_positions_built()
 
         # Find position closest to board center
-        center_y, center_x = board.width // 2, board.width // 2
+        center_y, center_x = board.config.width // 2, board.config.width // 2
         min_dist = float("inf")
         center_pos = None
 
@@ -543,8 +541,8 @@ class TestSymmetryPatterns:
 
         # Get all valid positions
         valid_positions = []
-        for y in range(small_board.width):
-            for x in range(small_board.width):
+        for y in range(small_board.config.width):
+            for x in range(small_board.config.width):
                 if small_board.state[small_board.RING_LAYER, y, x] == 1:  # Has ring
                     valid_positions.append((y, x))
 
@@ -855,10 +853,10 @@ class TestTranslationCanonicalization:
 
         min_y, max_y, min_x, max_x = bbox
         # 37-ring board is 7x7, but corners are empty
-        assert 0 <= min_y < small_board.width
-        assert 0 <= max_y < small_board.width
-        assert 0 <= min_x < small_board.width
-        assert 0 <= max_x < small_board.width
+        assert 0 <= min_y < small_board.config.width
+        assert 0 <= max_y < small_board.config.width
+        assert 0 <= min_x < small_board.config.width
+        assert 0 <= max_x < small_board.config.width
 
     def test_bounding_box_after_ring_removal(self, small_board):
         """Test bounding box after removing edge rings."""
@@ -873,7 +871,7 @@ class TestTranslationCanonicalization:
         # Bounding box should be smaller than full board now
         min_y, max_y, min_x, max_x = bbox
         # After removing edges, bbox should be reduced
-        assert (max_y - min_y) < (small_board.width - 1) or (max_x - min_x) < (small_board.width - 1), \
+        assert (max_y - min_y) < (small_board.config.width - 1) or (max_x - min_x) < (small_board.config.width - 1), \
             f"Expected reduced bounding box, got ({min_y}, {max_y}, {min_x}, {max_x})"
 
     def test_bounding_box_empty_board(self, small_board):
@@ -1468,7 +1466,7 @@ def test_center_equidistant_from_three_middle_rings(medium_board):
     # Helper to get Cartesian coordinates from array indices using pointy-top hex geometry
     def coord(y, x):
         # Convert to axial first (standard formula from visualize_board_coords.py)
-        c = medium_board.width // 2
+        c = medium_board.config.width // 2
         q = x - c
         r = y - x
         # Then to Cartesian (pointy-top)

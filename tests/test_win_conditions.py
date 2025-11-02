@@ -90,7 +90,7 @@ class TestWinConditions:
             if (c3_y + dy, c3_x + dx) == (d4_y, d4_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, c3_y, c3_x, board.width, board.DIRECTIONS
+                    dir_idx, c3_y, c3_x, board.config.width, board.DIRECTIONS
                 )
                 break
 
@@ -170,8 +170,8 @@ class TestWinConditions:
         e4_y, e4_x = e4_idx
         d3_y, d3_x = d3_idx
 
-        e4_flat = e4_y * board.width + e4_x
-        d3_flat = d3_y * board.width + d3_x
+        e4_flat = e4_y * board.config.width + e4_x
+        d3_flat = d3_y * board.config.width + d3_x
 
         # Use white marble for placement (index 0)
         placement_action = (0, e4_flat, d3_flat)
@@ -240,7 +240,7 @@ class TestWinConditions:
             if (c3_y + dy, c3_x + dx) == (d4_y, d4_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, c3_y, c3_x, board.width, board.DIRECTIONS
+                    dir_idx, c3_y, c3_x, board.config.width, board.DIRECTIONS
                 )
                 break
 
@@ -308,8 +308,8 @@ class TestWinConditions:
         e4_y, e4_x = e4_idx
         d3_y, d3_x = d3_idx
 
-        e4_flat = e4_y * board.width + e4_x
-        d3_flat = d3_y * board.width + d3_x
+        e4_flat = e4_y * board.config.width + e4_x
+        d3_flat = d3_y * board.config.width + d3_x
 
         # Use white marble for placement (index 0)
         placement_action = (0, e4_flat, d3_flat)
@@ -459,7 +459,7 @@ class TestWinConditions:
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                    dir_idx, b2_y, b2_x, board.config.width, board.DIRECTIONS
                 )
                 break
 
@@ -519,7 +519,7 @@ class TestWinConditions:
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                    dir_idx, b2_y, b2_x, board.config.width, board.DIRECTIONS
                 )
                 break
 
@@ -581,10 +581,10 @@ class TestWinConditions:
 
         # Player 1 places a marble on the last empty ring (D5)
         d5_y, d5_x = d5_idx
-        d5_flat = d5_y * board.width + d5_x
+        d5_flat = d5_y * board.config.width + d5_x
 
         # Use black marble for placement (index 2), no removal (board is too small)
-        placement_action = (2, d5_flat, board.width**2)
+        placement_action = (2, d5_flat, board.config.width**2)
         game.take_action("PUT", placement_action)
 
         # Board should now be full
@@ -644,10 +644,10 @@ class TestWinConditions:
 
         # Player 2 places a marble on the last empty ring (D5)
         d5_y, d5_x = d5_idx
-        d5_flat = d5_y * board.width + d5_x
+        d5_flat = d5_y * board.config.width + d5_x
 
         # Use gray marble for placement (index 1), no removal
-        placement_action = (1, d5_flat, board.width**2)
+        placement_action = (1, d5_flat, board.config.width**2)
         game.take_action("PUT", placement_action)
 
         # Board should now be full
@@ -805,7 +805,7 @@ class TestBlitzWinConditions:
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                    dir_idx, b2_y, b2_x, board.config.width, board.DIRECTIONS
                 )
                 break
 
@@ -859,7 +859,7 @@ class TestBlitzWinConditions:
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                    dir_idx, b2_y, b2_x, board.config.width, board.DIRECTIONS
                 )
                 break
 
@@ -913,7 +913,7 @@ class TestBlitzWinConditions:
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                    dir_idx, b2_y, b2_x, board.config.width, board.DIRECTIONS
                 )
                 break
 
@@ -965,7 +965,7 @@ class TestBlitzWinConditions:
             if (b2_y + dy, b2_x + dx) == (c3_y, c3_x):
                 # Convert from capture mask indices to action format using helper
                 capture_action = ZertzBoard.capture_indices_to_action(
-                    dir_idx, b2_y, b2_x, board.width, board.DIRECTIONS
+                    dir_idx, b2_y, b2_x, board.config.width, board.DIRECTIONS
                 )
                 break
 

@@ -21,7 +21,7 @@ def test_crash_seed_1760910995_with_high_iterations():
     game = ZertzGame(rings=37)
 
     # Player 1 move from crash log: PUT w at E1, remove A4
-    width = game.board.width
+    width = game.board.config.width
     e1_yx = game.board.str_to_index("E1")
     a4_yx = game.board.str_to_index("A4")
     e1_flat = e1_yx[0] * width + e1_yx[1]
@@ -84,7 +84,7 @@ def test_crash_seed_1760910995_with_high_iterations():
 def test_position_0_6_validity():
     """Check if position (0, 6) is valid on a 37-ring board."""
     game = ZertzGame(rings=37)
-    width = game.board.width  # 7
+    width = game.board.config.width  # 7
 
     # Position (0, 6) from crash log
     y, x = 0, 6

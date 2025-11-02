@@ -199,8 +199,8 @@ def generate_random_board_state(rings=37, num_marbles=0, num_removed_rings=0, se
 
     # Get valid positions
     valid_positions = []
-    for y in range(board.width):
-        for x in range(board.width):
+    for y in range(board.config.width):
+        for x in range(board.config.width):
             if board.state[0, y, x] == 1:  # Ring exists
                 valid_positions.append((y, x))
 

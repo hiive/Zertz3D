@@ -187,7 +187,7 @@ class TestMCTSCorrectness:
         # Give Player 1 (index 0) marbles close to winning
         # Win condition: 3 of each color, OR 4w/5g/6b
         # Set Player 1 to have: 2w, 2g, 2b (one capture away from 3-3-3 win)
-        config = game.board._get_config()
+        config = game.board.config
         game.board.global_state[config.p1_cap_slice] = np.array([2, 2, 2])
 
         # Put white marbles on the board that Player 1 can capture
@@ -229,7 +229,7 @@ class TestMCTSCorrectness:
         game = ZertzGame(rings=37)
 
         # Set up position where Player 2 is one capture from winning
-        config = game.board._get_config()
+        config = game.board.config
         game.board.global_state[config.p2_cap_slice] = np.array([2, 2, 2])
 
         # Set current player to Player 1 (who should NOT give Player 2 a winning capture)

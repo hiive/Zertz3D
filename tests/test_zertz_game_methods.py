@@ -325,7 +325,7 @@ class TestActionStringConversion:
         # Action should be (marble_idx, dst, rem)
         # rem should be width² when no removal specified
         marble_idx, dst, rem = action
-        assert rem == game.board.width**2
+        assert rem == game.board.config.width**2
 
 
 class TestHasValidMoves:

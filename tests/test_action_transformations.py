@@ -150,7 +150,7 @@ class TestTransformCaptureMask:
     def test_identity_preserves_mask(self, small_board):
         """Identity transform should preserve capture mask exactly."""
         # Create a simple capture mask with one valid capture
-        cap_mask = np.zeros((6, small_board.width, small_board.width), dtype=bool)
+        cap_mask = np.zeros((6, small_board.config.width, small_board.config.width), dtype=bool)
 
         # Set a valid capture at position (3, 3) in direction 0
         cap_mask[0, 3, 3] = True
@@ -224,7 +224,7 @@ class TestTransformCaptureMask:
 
     def test_empty_mask_remains_empty(self, small_board):
         """Transforming an empty mask should keep it empty."""
-        cap_mask = np.zeros((6, small_board.width, small_board.width), dtype=bool)
+        cap_mask = np.zeros((6, small_board.config.width, small_board.config.width), dtype=bool)
 
         for k in range(6):
             for mirror in [False, True]:
@@ -236,11 +236,11 @@ class TestTransformCaptureMask:
     def test_full_mask_remains_full(self, small_board):
         """Transforming a full mask should preserve the count."""
         # Create mask with captures at all valid board positions
-        cap_mask = np.zeros((6, small_board.width, small_board.width), dtype=bool)
+        cap_mask = np.zeros((6, small_board.config.width, small_board.config.width), dtype=bool)
 
         # Mark all positions that have rings
-        for y in range(small_board.width):
-            for x in range(small_board.width):
+        for y in range(small_board.config.width):
+            for x in range(small_board.config.width):
                 if small_board.state[small_board.RING_LAYER, y, x] == 1:
                     # Mark all directions as valid (even if not realistic)
                     cap_mask[:, y, x] = True
@@ -260,8 +260,8 @@ class TestTransformCaptureMask:
         board = request.getfixturevalue(board_fixture)
 
         # Create a simple mask
-        cap_mask = np.zeros((6, board.width, board.width), dtype=bool)
-        cap_mask[0, board.width // 2, board.width // 2] = True
+        cap_mask = np.zeros((6, board.config.width, board.config.width), dtype=bool)
+        cap_mask[0, board.config.width // 2, board.config.width // 2] = True
 
         # Test identity
         transformed = board.canonicalizer._transform_capture_mask(cap_mask, rot60_k=0, mirror=False)
@@ -310,7 +310,7 @@ class TestTransformPutMask:
         put_mask = small_board.get_placement_moves()
 
         # Get count of placements with no removal
-        no_removal_idx = small_board.width ** 2
+        no_removal_idx = small_board.config.width ** 2
         original_no_removal = np.sum(put_mask[:, :, no_removal_idx])
 
         # Transform
@@ -358,7 +358,7 @@ class TestTransformPutMask:
 
     def test_empty_mask_remains_empty(self, small_board):
         """Transforming an empty mask should keep it empty."""
-        put_mask = np.zeros((3, small_board.width**2, small_board.width**2 + 1), dtype=bool)
+        put_mask = np.zeros((3, small_board.config.width**2, small_board.config.width**2 + 1), dtype=bool)
 
         for k in range(6):
             transformed = small_board.canonicalizer._transform_put_mask(put_mask, rot60_k=k, mirror=False)

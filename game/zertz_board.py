@@ -521,7 +521,7 @@ class ZertzBoard:
 
         Delegates to get_capture_moves() for zero code duplication.
         """
-        return get_capture_moves(self.state, self.global_state, self.config)
+        return get_capture_moves(self.state, self.config)
 
     #todo only used in test
     def _get_open_rings(self):
@@ -580,16 +580,22 @@ class ZertzBoard:
         Convert a coordinate string like 'A1' (bottom numbering) to array indices (y, x).
         In this official layout, row numbers count upward from the bottom of the board.
         """
-        return self.label_to_yx(index_str)
+        from hiivelabs_mcts import algebraic_to_coordinate
+        return algebraic_to_coordinate(index_str, self.config)
 
     def index_to_str(self, index):
+        """
+        Convert array indices (y, x) to coordinate string like 'A1'.
+        Returns empty string for removed rings.
+        """
         y, x = index
         if not self._is_inbounds(index):
             raise IndexError(f"Position ({y}, {x}) is out of bounds")
-        pos = self.position_from_yx(index)
+        # Return empty string for removed rings
         if self.state[self.RING_LAYER, y, x] == 0:
             return ""
-        return pos.label
+        from hiivelabs_mcts import coordinate_to_algebraic
+        return coordinate_to_algebraic(y, x, self.config)
 
     def position_from_yx(self, index: tuple[int, int]) -> ZertzPosition:
         self._ensure_positions_built()

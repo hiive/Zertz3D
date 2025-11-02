@@ -96,11 +96,13 @@ class CanonicalizationManager:
 
     def flat_to_2d(self, flat_index):
         """Convert flat index to 2D board coordinates (y, x)."""
-        return flat_index // self.board.width, flat_index % self.board.width
+        width = self.board.config.width
+        return divmod(flat_index, width)
 
     def _2d_to_flat(self, y, x):
         """Convert 2D board coordinates to flat index."""
-        return y * self.board.width + x
+        width = self.board.config.width
+        return y * width + x
 
     # =========================  AXIAL COORDINATES  =========================
 
@@ -241,8 +243,8 @@ class CanonicalizationManager:
 
         # Try all possible translations that might keep rings on board
         # Limit search to reasonable bounds
-        for dy in range(-min_y, self.board.width - max_y):
-            for dx in range(-min_x, self.board.width - max_x):
+        for dy in range(-min_y, self.board.config.width - max_y):
+            for dx in range(-min_x, self.board.config.width - max_x):
                 # Test if this translation is valid
                 translated = self.translate_state(state, dy, dx)
                 if translated is not None:
@@ -938,7 +940,8 @@ class CanonicalizationManager:
             y2, x2 = dst
 
             # Map flat indices: original (y,x) → final (y2,x2)
-            flat_map[y * self.board.width + x] = y2 * self.board.width + x2
+            width = self.board.config.width
+            flat_map[y * width + x] = y2 * width + x2
 
         M, P, R = put_mask.shape
         last = R - 1  # "no ring removed" slot stays put

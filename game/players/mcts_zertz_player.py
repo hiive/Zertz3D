@@ -102,7 +102,7 @@ class MCTSZertzPlayer(ZertzPlayer):
             direction, y, x = int(c1[0]), int(c2[0]), int(c3[0])
             from game.zertz_board import ZertzBoard
             action_data = ZertzBoard.capture_indices_to_action(
-                direction, y, x, self.game.board.width, self.game.board.DIRECTIONS
+                direction, y, x, self.game.board.config.width, self.game.board.DIRECTIONS
             )
             return ("CAP", action_data)
         elif c1.size > 1:

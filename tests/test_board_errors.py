@@ -23,9 +23,11 @@ class TestBoardInitializationErrors:
     """Test error handling during board initialization."""
 
     def test_generate_standard_board_layout_invalid_size(self):
-        """Test that generate_standard_board_layout raises ValueError for invalid size."""
-        with pytest.raises(ValueError, match="Unsupported standard board size: 42 rings"):
-            ZertzBoard.generate_standard_board_layout(42)
+        """Test that generate_standard_layout_mask raises ValueError for invalid size."""
+        from hiivelabs_mcts import generate_standard_layout_mask
+        with pytest.raises(ValueError, match="Unsupported ring count"):
+            # This should fail because 42 is not a valid board size (only 37, 48, 61)
+            generate_standard_layout_mask(42, 7)
 
     def test_unsupported_board_size_without_layout(self):
         """Test that creating board with unsupported size raises ValueError."""
@@ -56,8 +58,8 @@ class TestPlacementActionErrors:
         # Action format: (marble_type_idx, put_loc, rem_loc)
         # marble_type_idx: 0=white, 1=gray, 2=black
         # put_loc: flat index = y * width + x
-        put_loc = 3 * board.width + 3
-        rem_loc = board.width**2  # No removal
+        put_loc = 3 * board.config.width + 3
+        rem_loc = board.config.width**2  # No removal
 
         first_action = (0, put_loc, rem_loc)
         board.take_action(first_action, "PUT")
@@ -88,7 +90,7 @@ class TestPlacementActionErrors:
         action_with_removal = None
         for action in valid_placements:
             marble_idx, put_loc, rem_loc = action
-            if rem_loc != board.width**2:  # Has a removal
+            if rem_loc != board.config.width**2:  # Has a removal
                 action_with_removal = tuple(action)
                 break
 
@@ -102,7 +104,7 @@ class TestPlacementActionErrors:
         board._next_player()
 
         # Try to place a marble on the removed ring
-        invalid_action = (0, rem_loc, board.width**2)
+        invalid_action = (0, rem_loc, board.config.width**2)
 
         with pytest.raises(ValueError, match="Invalid placement: position .* is not an empty ring"):
             board.take_action(invalid_action, "PUT")
@@ -129,8 +131,8 @@ class TestMarbleSupplyErrors:
         board.global_state[board.P1_CAP_W] = 2
 
         # Try to place a white marble
-        put_loc = 3 * board.width + 3
-        rem_loc = board.width**2
+        put_loc = 3 * board.config.width + 3
+        rem_loc = board.config.width**2
         action = (0, put_loc, rem_loc)  # 0 = white
 
         with pytest.raises(ValueError, match="No w marbles in supply. Cannot use captured marbles until entire pool is empty"):
@@ -156,8 +158,8 @@ class TestMarbleSupplyErrors:
         board.global_state[board.P1_CAP_B] = 1
 
         # Try to place a white marble
-        put_loc = 3 * board.width + 3
-        rem_loc = board.width**2
+        put_loc = 3 * board.config.width + 3
+        rem_loc = board.config.width**2
         action = (0, put_loc, rem_loc)  # 0 = white
 
         with pytest.raises(ValueError, match="No w marbles available in supply or captured by player"):
@@ -188,7 +190,7 @@ class TestCaptureActionErrors:
 
         # Convert from capture mask indices to action format using helper
         action = ZertzBoard.capture_indices_to_action(
-            direction=0, y=3, x=3, width=board.width, directions=board.DIRECTIONS
+            direction=0, y=3, x=3, width=board.config.width, directions=board.DIRECTIONS
         )
 
         with pytest.raises(ValueError, match="Invalid capture: no marble at position"):
@@ -215,7 +217,7 @@ class TestBoardEdgeCases:
         action_with_removal = None
         for action in valid_placements:
             marble_idx, put_loc, rem_loc = action
-            if rem_loc != board.width**2:  # Has a removal
+            if rem_loc != board.config.width**2:  # Has a removal
                 action_with_removal = tuple(action)
                 break
 
@@ -225,8 +227,8 @@ class TestBoardEdgeCases:
         marble_idx, put_loc, rem_loc = action_with_removal
 
         # Convert rem_loc to (y, x)
-        rem_y = rem_loc // board.width
-        rem_x = rem_loc % board.width
+        rem_y = rem_loc // board.config.width
+        rem_x = rem_loc % board.config.width
         rem_index = (rem_y, rem_x)
 
         # Take the action to remove the ring
@@ -286,8 +288,8 @@ class TestBoardEdgeCases:
         board.global_state[board.P1_CAP_W] = initial_captured
 
         # Place a white marble
-        put_loc = 3 * board.width + 3
-        rem_loc = board.width**2
+        put_loc = 3 * board.config.width + 3
+        rem_loc = board.config.width**2
         action = (0, put_loc, rem_loc)  # 0 = white
 
         board.take_action(action, "PUT")
