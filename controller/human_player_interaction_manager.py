@@ -62,7 +62,11 @@ class HumanPlayerInteractionManager:
                 return None
             y, x = idx
             try:
-                label = board.index_to_str((y, x))
+                # Check if ring is removed before converting
+                if board.state[board.RING_LAYER, y, x] == 0:
+                    return None
+                from hiivelabs_mcts import coordinate_to_algebraic
+                label = coordinate_to_algebraic(y, x, board.config)
             except (IndexError, ValueError):
                 return None
             return label or None
@@ -196,7 +200,8 @@ class HumanPlayerInteractionManager:
         label = selection.get("label")
         if label:
             try:
-                payload["index"] = self.session.game.board.str_to_index(label)
+                from hiivelabs_mcts import algebraic_to_coordinate
+                payload["index"] = algebraic_to_coordinate(label, self.session.game.board.config)
             except ValueError:
                 payload["index"] = None
 
@@ -223,7 +228,8 @@ class HumanPlayerInteractionManager:
             label = hover.get("label")
             if label:
                 try:
-                    payload["index"] = self.session.game.board.str_to_index(label)
+                    from hiivelabs_mcts import algebraic_to_coordinate
+                    payload["index"] = algebraic_to_coordinate(label, self.session.game.board.config)
                 except ValueError:
                     payload["index"] = None
             index = payload.get("index")

@@ -5,6 +5,7 @@ import numpy as np
 from game.zertz_game import ZertzGame
 from game.players.mcts_zertz_player import MCTSZertzPlayer
 from game.zertz_player import RandomZertzPlayer
+from hiivelabs_mcts import algebraic_to_coordinate
 
 #TODO fill in test stubs
 class TestMCTSZertzPlayer:
@@ -192,9 +193,9 @@ class TestMCTSCorrectness:
 
         # Put white marbles on the board that Player 1 can capture
         # Place marbles to create a capture opportunity: D3 (w) -> D4 (w) -> D5 (empty)
-        d3_idx = game.board.str_to_index("D3")
-        d4_idx = game.board.str_to_index("D4")
-        d5_idx = game.board.str_to_index("D5")
+        d3_idx = algebraic_to_coordinate("D3", game.board.config)
+        d4_idx = algebraic_to_coordinate("D4", game.board.config)
+        d5_idx = algebraic_to_coordinate("D5", game.board.config)
 
         # Ensure rings exist (they should by default on a fresh board)
         game.board.state[game.board.RING_LAYER, d3_idx[0], d3_idx[1]] = 1

@@ -203,7 +203,7 @@ class DiagramRenderer:
             fig.patch.set_facecolor(self.bg_color)
 
         # Get board dimensions
-        board_width = board.width
+        board_width = board.config.width
 
         # Calculate scale factor for line widths based on figure size
         # Default is 1024 pixels, scale linewidths proportionally
@@ -223,7 +223,8 @@ class DiagramRenderer:
             for y in range(board_width):
                 for x in range(board_width):
                     try:
-                        if board.letter_layout is not None and board.letter_layout[y][x]:
+                        pos_label = board.yx_to_label((y, x))
+                        if pos_label:
                             if x not in columns:
                                 columns[x] = []
                             columns[x].append(y)
@@ -242,17 +243,12 @@ class DiagramRenderer:
         for y in range(board_width):
             for x in range(board_width):
                 # Get position string (empty if not a valid board position)
-                pos_str = ""
                 try:
-                    if board.letter_layout is not None and board.letter_layout[y][x]:
-                        pos_str = board.letter_layout[y][x]
-                        ring_exists = board.state[board.RING_LAYER, y, x] == 1
-                    else:
+                    pos_str = board.yx_to_label((y, x))
+                    if not pos_str:
                         continue
+                    ring_exists = board.state[board.RING_LAYER, y, x] == 1
                 except IndexError:
-                    continue
-
-                if not pos_str:
                     continue
 
                 # Get hexagonal position
@@ -364,7 +360,8 @@ class DiagramRenderer:
         for y in range(board_width):
             for x in range(board_width):
                 try:
-                    if board.letter_layout is not None and board.letter_layout[y][x]:
+                    pos_label = board.yx_to_label((y, x))
+                    if pos_label:
                         px, py = self._get_hex_position(y, x, board_width)
                         all_x_coords.append(px)
                         all_y_coords.append(py)

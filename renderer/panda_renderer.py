@@ -1535,9 +1535,12 @@ class PandaRenderer(ShowBase):
             for direction in range(capture_mask.shape[0]):
                 ys, xs = np.where(capture_mask[direction])
                 for y, x in zip(ys, xs):
-                    label_src = board.index_to_str((y, x))
-                    if label_src:
-                        capture_sources.add(label_src)
+                    # Check if ring is removed before converting
+                    if board.state[board.RING_LAYER, y, x] == 0:
+                        continue
+                    from hiivelabs_mcts import coordinate_to_algebraic
+                    label_src = coordinate_to_algebraic(y, x, board.config)
+                    capture_sources.add(label_src)
                     dy, dx = board.DIRECTIONS[direction]
                     cap_index = (y + dy, x + dx)
                     dst_index = board.get_jump_destination((y, x), cap_index)
@@ -1549,9 +1552,8 @@ class PandaRenderer(ShowBase):
                         and 0 <= dst_x < width
                         and board.state[board.RING_LAYER, dst_y, dst_x] == 1
                     ):
-                        label_dst = board.index_to_str(dst_index)
-                        if label_dst:
-                            capture_destinations.add(label_dst)
+                        label_dst = coordinate_to_algebraic(dst_y, dst_x, board.config)
+                        capture_destinations.add(label_dst)
 
             if capture_sources:
                 self.highlight_context("capture_sources", capture_sources)
@@ -1578,13 +1580,16 @@ class PandaRenderer(ShowBase):
                 valid_colors.add(marble_idx)
             for put, rem in zip(put_indices, rem_indices):
                 put_y, put_x = divmod(put, width)
-                label_put = board.index_to_str((put_y, put_x))
-                if label_put:
+                # Check if ring is removed before converting
+                if board.state[board.RING_LAYER, put_y, put_x] != 0:
+                    from hiivelabs_mcts import coordinate_to_algebraic
+                    label_put = coordinate_to_algebraic(put_y, put_x, board.config)
                     placement_rings.add(label_put)
                 if rem != width**2:
                     rem_y, rem_x = divmod(rem, width)
-                    label_rem = board.index_to_str((rem_y, rem_x))
-                    if label_rem:
+                    # Check if ring is removed before converting
+                    if board.state[board.RING_LAYER, rem_y, rem_x] != 0:
+                        label_rem = coordinate_to_algebraic(rem_y, rem_x, board.config)
                         removal_rings.add(label_rem)
 
         # Show only placement rings (not removal rings) in apply_context_masks

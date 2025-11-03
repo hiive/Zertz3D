@@ -425,9 +425,10 @@ class ZertzBoard:
                 # Convert marble layer to marble type
                 marble_type = self.LAYER_TO_MARBLE[marble_layer]
                 # Convert (y, x) to board position string
-                # Note: Don't use index_to_str() because the ring has already been removed
-                # by the Rust code, so we need to get the label directly
-                pos = self.position_from_yx((y, x)).label
+                # Use Rust coordinate_to_algebraic() instead of position_from_yx()
+                # because position_from_yx() only works for positions in the standard
+                # layout collection, and tests may create custom topologies
+                pos = coordinate_to_algebraic(y, x, self.config)
                 # print(f"[DEBUG] Isolation capture: marble_layer={marble_layer}, y={y}, x={x}, pos={pos}, marble_type={marble_type}")
                 captured_marbles.append({"marble": marble_type, "pos": pos})
             return captured_marbles
@@ -574,28 +575,6 @@ class ZertzBoard:
     @property
     def _positions_by_axial(self):
         return self.positions.by_axial
-
-    def str_to_index(self, index_str):
-        """
-        Convert a coordinate string like 'A1' (bottom numbering) to array indices (y, x).
-        In this official layout, row numbers count upward from the bottom of the board.
-        """
-        from hiivelabs_mcts import algebraic_to_coordinate
-        return algebraic_to_coordinate(index_str, self.config)
-
-    def index_to_str(self, index):
-        """
-        Convert array indices (y, x) to coordinate string like 'A1'.
-        Returns empty string for removed rings.
-        """
-        y, x = index
-        if not self._is_inbounds(index):
-            raise IndexError(f"Position ({y}, {x}) is out of bounds")
-        # Return empty string for removed rings
-        if self.state[self.RING_LAYER, y, x] == 0:
-            return ""
-        from hiivelabs_mcts import coordinate_to_algebraic
-        return coordinate_to_algebraic(y, x, self.config)
 
     def position_from_yx(self, index: tuple[int, int]) -> ZertzPosition:
         self._ensure_positions_built()

@@ -78,9 +78,10 @@ class ActionTextFormatter:
                         f"  - CAP {marble} {src} -> {dst} capturing {captured} at {cap_pos}"
                     )
                 except (IndexError, KeyError):
-                    src_pos = game.board.position_from_yx((y, x))
+                    from hiivelabs_mcts import coordinate_to_algebraic
+                    src_label = coordinate_to_algebraic(y, x, game.board.config)
                     lines.append(
-                        f"  - Jump from {src_pos.label} (direction {direction})"
+                        f"  - Jump from {src_label} (direction {direction})"
                     )
 
             if len(capture_positions) > 10:
@@ -107,10 +108,11 @@ class ActionTextFormatter:
             removals_set = set()  # Track all possible removals
 
             for marble_idx, dst, rem in placement_positions:
+                from hiivelabs_mcts import coordinate_to_algebraic
                 marble = MARBLE_TYPES[marble_idx]
                 dst_y = dst // game.board.width
                 dst_x = dst % game.board.width
-                dst_str = game.board.position_from_yx((dst_y, dst_x)).label
+                dst_str = coordinate_to_algebraic(dst_y, dst_x, game.board.config)
 
                 key = (marble, dst_str)
                 if key not in placements:
@@ -119,7 +121,7 @@ class ActionTextFormatter:
                 if rem != game.board.width**2:
                     rem_y = rem // game.board.width
                     rem_x = rem % game.board.width
-                    rem_str = game.board.position_from_yx((rem_y, rem_x)).label
+                    rem_str = coordinate_to_algebraic(rem_y, rem_x, game.board.config)
                     placements[key].append(rem_str)
                     removals_set.add(rem_str)
 

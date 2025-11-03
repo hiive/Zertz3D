@@ -11,6 +11,7 @@ import pytest
 import numpy as np
 import sys
 from pathlib import Path
+from hiivelabs_mcts import algebraic_to_coordinate
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -164,8 +165,8 @@ class TestTransformCaptureMask:
     def test_preserves_capture_count(self, small_board):
         """Transformation should preserve the total number of valid captures."""
         # Get actual valid capture moves from the board
-        small_board.state[1, *small_board.str_to_index("D4")] = 1  # White at center
-        small_board.state[2, *small_board.str_to_index("E4")] = 1  # Gray to the right
+        small_board.state[1, *algebraic_to_coordinate("D4", small_board.config)] = 1  # White at center
+        small_board.state[2, *algebraic_to_coordinate("E4", small_board.config)] = 1  # Gray to the right
 
         cap_mask = small_board.get_capture_moves()
         original_count = np.sum(cap_mask)
@@ -185,8 +186,8 @@ class TestTransformCaptureMask:
         """Rotating the mask should move captures to rotated positions."""
         # Place marbles to create a capture opportunity
         # White at D4 (center), gray at E4 (to the right)
-        small_board.state[1, *small_board.str_to_index("D4")] = 1
-        small_board.state[2, *small_board.str_to_index("E4")] = 1
+        small_board.state[1, *algebraic_to_coordinate("D4", small_board.config)] = 1
+        small_board.state[2, *algebraic_to_coordinate("E4", small_board.config)] = 1
 
         # Get the state and capture mask
         original_state = small_board.state.copy()
@@ -209,8 +210,8 @@ class TestTransformCaptureMask:
     def test_mirror_transformation_valid(self, small_board):
         """Mirror transformation should produce valid capture mask."""
         # Create a capture scenario
-        small_board.state[1, *small_board.str_to_index("A4")] = 1
-        small_board.state[2, *small_board.str_to_index("B4")] = 1
+        small_board.state[1, *algebraic_to_coordinate("A4", small_board.config)] = 1
+        small_board.state[2, *algebraic_to_coordinate("B4", small_board.config)] = 1
 
         cap_mask = small_board.get_capture_moves()
 
@@ -419,9 +420,9 @@ class TestActionTransformationIntegration:
     def test_symmetrical_positions_have_symmetrical_actions(self, small_board):
         """Symmetrically equivalent board states should have equivalent action counts."""
         # Place marbles in a pattern
-        small_board.state[1, *small_board.str_to_index("D4")] = 1
-        small_board.state[2, *small_board.str_to_index("E4")] = 1
-        small_board.state[3, *small_board.str_to_index("D3")] = 1
+        small_board.state[1, *algebraic_to_coordinate("D4", small_board.config)] = 1
+        small_board.state[2, *algebraic_to_coordinate("E4", small_board.config)] = 1
+        small_board.state[3, *algebraic_to_coordinate("D3", small_board.config)] = 1
 
         # Get action masks
         put_mask = small_board.get_placement_moves()
@@ -491,7 +492,7 @@ class TestActionTransformationIntegration:
         """Transformations should work correctly when rings have been removed."""
         # Remove some edge rings
         for pos in ["A4", "D7", "G1"]:
-            y, x = small_board.str_to_index(pos)
+            y, x = algebraic_to_coordinate(pos, small_board.config)
             small_board.state[small_board.RING_LAYER, y, x] = 0
 
         # Get action masks

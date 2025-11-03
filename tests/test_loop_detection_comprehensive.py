@@ -7,6 +7,7 @@ in repeating patterns after the supply is exhausted.
 import numpy as np
 import sys
 from pathlib import Path
+from hiivelabs_mcts import algebraic_to_coordinate
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -38,8 +39,8 @@ class TestLoopDetectionWithGameStates:
         white_layer = board.MARBLE_TO_LAYER["w"]
         all_rings = np.argwhere(board.state[board.RING_LAYER] == 1)
 
-        d4_pos = board.str_to_index("D4")
-        e4_pos = board.str_to_index("E4")
+        d4_pos = algebraic_to_coordinate("D4", board.config)
+        e4_pos = algebraic_to_coordinate("E4", board.config)
 
         for y, x in all_rings:
             if (y, x) != d4_pos and (y, x) != e4_pos:

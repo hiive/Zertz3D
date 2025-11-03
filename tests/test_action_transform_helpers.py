@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from hiivelabs_mcts import algebraic_to_coordinate
 
 import numpy as np
 import pytest
@@ -35,8 +36,8 @@ def test_transform_action_put_matches_canonicalizer(transform):
     width = config.width
 
     marble_idx = 0
-    put_y, put_x = board.str_to_index("C3")
-    rem_y, rem_x = board.str_to_index("E5")
+    put_y, put_x = algebraic_to_coordinate("C3", board.config)
+    rem_y, rem_x = algebraic_to_coordinate("E5", board.config)
     action = ("PUT", (marble_idx, put_y * width + put_x, rem_y * width + rem_x))
 
     new_action = transform_action(action[0], action[1], transform, config)
@@ -67,7 +68,7 @@ def test_transform_action_cap_matches_canonicalizer(transform):
     width = config.width
 
     direction = 0
-    y, x = board.str_to_index("D4")
+    y, x = algebraic_to_coordinate("D4", board.config)
     action = ("CAP", (direction, y, x))
 
     new_action = transform_action(action[0], action[1], transform, config)

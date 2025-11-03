@@ -9,6 +9,7 @@ import pytest
 import numpy as np
 import sys
 from pathlib import Path
+from hiivelabs_mcts import algebraic_to_coordinate
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -63,8 +64,8 @@ class TestCanonicalizeCaptureMask:
     def test_canonicalize_with_rotation(self, small_board):
         """Test canonicalizing with rotation transforms."""
         # Get actual capture mask from board
-        small_board.state[1, *small_board.str_to_index("D4")] = 1
-        small_board.state[2, *small_board.str_to_index("E4")] = 1
+        small_board.state[1, *algebraic_to_coordinate("D4", small_board.config)] = 1
+        small_board.state[2, *algebraic_to_coordinate("E4", small_board.config)] = 1
         cap_mask = small_board.get_capture_moves()
 
         # Canonicalize with R60
@@ -122,8 +123,8 @@ class TestCanonicalizeCaptureMask:
     def test_round_trip_with_various_transforms(self, small_board):
         """Test canonicalize + decanonicalize round trip with various transforms."""
         # Place marbles to create captures
-        small_board.state[1, *small_board.str_to_index("D4")] = 1
-        small_board.state[2, *small_board.str_to_index("E4")] = 1
+        small_board.state[1, *algebraic_to_coordinate("D4", small_board.config)] = 1
+        small_board.state[2, *algebraic_to_coordinate("E4", small_board.config)] = 1
         cap_mask = small_board.get_capture_moves()
 
         # Test only rotation/mirror transforms (no translation) as they're always valid
@@ -307,8 +308,8 @@ class TestMaskCanonicalizationIntegration:
     def test_mask_and_state_use_same_transform(self, small_board):
         """Test that masks and states can be canonicalized with the same transform."""
         # Place marbles
-        small_board.state[1, *small_board.str_to_index("D4")] = 1
-        small_board.state[2, *small_board.str_to_index("E4")] = 1
+        small_board.state[1, *algebraic_to_coordinate("D4", small_board.config)] = 1
+        small_board.state[2, *algebraic_to_coordinate("E4", small_board.config)] = 1
 
         # Get state and masks
         original_state = small_board.state.copy()
@@ -341,8 +342,8 @@ class TestMaskCanonicalizationIntegration:
     def test_decanonicalize_recovers_original_masks(self, small_board):
         """Test that decanonicalization recovers original masks."""
         # Setup
-        small_board.state[1, *small_board.str_to_index("D4")] = 1
-        small_board.state[2, *small_board.str_to_index("B3")] = 1
+        small_board.state[1, *algebraic_to_coordinate("D4", small_board.config)] = 1
+        small_board.state[2, *algebraic_to_coordinate("B3", small_board.config)] = 1
 
         cap_mask = small_board.get_capture_moves()
         put_mask = small_board.get_placement_moves()

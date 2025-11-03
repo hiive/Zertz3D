@@ -10,6 +10,7 @@ The crash occurred with:
 import pytest
 import numpy as np
 from game.zertz_game import ZertzGame
+from hiivelabs_mcts import algebraic_to_coordinate
 
 
 def test_crash_seed_1760910995_with_high_iterations():
@@ -22,8 +23,8 @@ def test_crash_seed_1760910995_with_high_iterations():
 
     # Player 1 move from crash log: PUT w at E1, remove A4
     width = game.board.config.width
-    e1_yx = game.board.str_to_index("E1")
-    a4_yx = game.board.str_to_index("A4")
+    e1_yx = algebraic_to_coordinate("E1", game.board.config)
+    a4_yx = algebraic_to_coordinate("A4", game.board.config)
     e1_flat = e1_yx[0] * width + e1_yx[1]
     a4_flat = a4_yx[0] * width + a4_yx[1]
 
@@ -66,10 +67,11 @@ def test_crash_seed_1760910995_with_high_iterations():
 
         # This should not raise ValueError
         try:
-            pos = game.board.position_from_yx((dst_y, dst_x))
-            print(f"Position string: {pos}")
+            from hiivelabs_mcts import coordinate_to_algebraic
+            pos_str = coordinate_to_algebraic(dst_y, dst_x, game.board.config)
+            print(f"Position string: {pos_str}")
         except ValueError as e:
-            pytest.fail(f"position_from_yx failed: {e}, coords=({dst_y}, {dst_x}), flat={dst_flat}")
+            pytest.fail(f"coordinate_to_algebraic failed: {e}, coords=({dst_y}, {dst_x}), flat={dst_flat}")
 
         # Try to apply the action - this is where the crash occurred
         try:
@@ -96,7 +98,8 @@ def test_position_0_6_validity():
     # Check if it's a valid ring position
     if game.board.state[0, y, x] == 1:
         try:
-            pos_str = game.board.position_from_yx((y, x))
+            from hiivelabs_mcts import coordinate_to_algebraic
+            pos_str = coordinate_to_algebraic(y, x, game.board.config)
             print(f"Position ({y}, {x}) = {pos_str}")
         except ValueError as e:
             print(f"Position ({y}, {x}) raises ValueError: {e}")
@@ -104,12 +107,13 @@ def test_position_0_6_validity():
         print(f"Position ({y}, {x}) is not a ring on the board")
 
     # Check what positions are valid rings
+    from hiivelabs_mcts import coordinate_to_algebraic
     print("\nValid ring positions on row 0:")
     valid_positions = []
     for x in range(width):
         if game.board.state[0, 0, x] == 1:
             try:
-                pos_str = game.board.position_from_yx((0, x))
+                pos_str = coordinate_to_algebraic(0, x, game.board.config)
                 valid_positions.append(f"(0,{x})={pos_str}")
             except ValueError:
                 valid_positions.append(f"(0,{x})=ERROR")

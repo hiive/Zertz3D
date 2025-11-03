@@ -858,12 +858,21 @@ class CanonicalizationManager:
         dmap = self._dir_index_map(rot60_k, mirror, mirror_first)
 
         for (y, x), (q, r) in self.board.positions.yx_to_ax.items():
+            # Skip positions where ring has been removed
+            if self.board.state[self.board.RING_LAYER, y, x] == 0:
+                continue
+
             # Apply translation to get translated position
             y_trans, x_trans = y + dy, x + dx
 
             # Get axial coordinates of translated position
             if (y_trans, x_trans) not in self.board.positions.yx_to_ax:
                 continue  # Translated position is not on the board
+
+            # Skip if the translated position has a removed ring
+            if self.board.state[self.board.RING_LAYER, y_trans, x_trans] == 0:
+                continue
+
             q_trans, r_trans = self.board.positions.yx_to_ax[(y_trans, x_trans)]
 
             # Apply rotation/mirror to translated axial coordinates
@@ -911,12 +920,21 @@ class CanonicalizationManager:
         # Build flat-index permutation for valid cells
         flat_map = {}  # src_flat -> dst_flat
         for (y, x) in self.board.positions.yx_to_ax.keys():
+            # Skip positions where ring has been removed
+            if self.board.state[self.board.RING_LAYER, y, x] == 0:
+                continue
+
             # Apply translation to get translated position
             y_trans, x_trans = y + dy, x + dx
 
             # Get axial coordinates of translated position
             if (y_trans, x_trans) not in self.board.positions.yx_to_ax:
                 continue  # Translated position is not on the board
+
+            # Skip if the translated position has a removed ring
+            if self.board.state[self.board.RING_LAYER, y_trans, x_trans] == 0:
+                continue
+
             q_trans, r_trans = self.board.positions.yx_to_ax[(y_trans, x_trans)]
 
             # Apply rotation/mirror to translated axial coordinates

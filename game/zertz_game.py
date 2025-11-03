@@ -478,33 +478,29 @@ class ZertzGame:
                 rem_str = None
             else:
                 return "", None
+            from hiivelabs_mcts import algebraic_to_coordinate
             layer = self.board.MARBLE_TO_LAYER[marble_type] - 1
-            y, x = self.board.str_to_index(put_str)
+            y, x = algebraic_to_coordinate(put_str, self.board.config)
             put = y * self.board.config.width + x
             if rem_str is not None:
-                y, x = self.board.str_to_index(rem_str)
+                y, x = algebraic_to_coordinate(rem_str, self.board.config)
                 rem = y * self.board.config.width + x
             else:
                 rem = self.board.config.width**2
             action = (layer, put, rem)
         elif action_type == "CAP":
+            from hiivelabs_mcts import algebraic_to_coordinate
             if len(args) == 4:
                 src_str, _b, dst_str = args[1:]
             else:
                 return "", None
-            src = self.board.str_to_index(src_str)
-            dst = self.board.str_to_index(dst_str)
-            cap = self.board.get_middle_ring(src, dst)
+            src = algebraic_to_coordinate(src_str, self.board.config)
+            dst = algebraic_to_coordinate(dst_str, self.board.config)
 
-            # Find direction by calculating offset and matching to DIRECTIONS
-            dy = cap[0] - src[0]
-            dx = cap[1] - src[1]
-            try:
-                direction = self.board.DIRECTIONS.index((dy, dx))
-            except ValueError:
-                raise ValueError(f"Invalid capture: {src_str} to {dst_str} via {cap}")
-
-            action = (direction, src[0], src[1])
+            # Convert to internal format: (None, src_flat, dst_flat)
+            src_flat = src[0] * self.board.config.width + src[1]
+            dst_flat = dst[0] * self.board.config.width + dst[1]
+            action = (None, src_flat, dst_flat)
         else:
             action = None
         return action_type, action
@@ -521,19 +517,18 @@ class ZertzGame:
             return action_str, action_dict
 
         if action_type == "PUT":
+            from hiivelabs_mcts import coordinate_to_algebraic
             marble_type, put, rem = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
-
-            put_index = (put // self.board.config.width, put % self.board.config.width)
-            put_pos = self.board.position_from_yx(put_index)
-            put_str = put_pos.label
+            width = self.board.config.width
+            put_y, put_x = divmod(put, width)
+            put_str = coordinate_to_algebraic(put_y, put_x, self.board.config)
 
             if rem == self.board.config.width**2:
                 rem_str = ""
             else:
-                rem_index = rem // self.board.config.width, rem % self.board.config.width
-                rem_pos = self.board.position_from_yx(rem_index)
-                rem_str = rem_pos.label
+                rem_y, rem_x = divmod(rem, width)
+                rem_str = coordinate_to_algebraic(rem_y, rem_x, self.board.config)
             action_str = "{} {} {} {}".format(
                 action_type, marble_type, put_str, rem_str
             ).rstrip()
@@ -601,13 +596,13 @@ class ZertzGame:
         valid_dests = np.any(placement_array, axis=(0, 2))
         dest_indices = np.argwhere(valid_dests).flatten()
 
+        from hiivelabs_mcts import coordinate_to_algebraic
         placement_positions = []
         for dst_idx in dest_indices:
-            dst_y = dst_idx // self.board.config.width
-            dst_x = dst_idx % self.board.config.width
-            pos = self.board.position_from_yx((dst_y, dst_x))
+            dst_y, dst_x = divmod(dst_idx, self.board.config.width)
             if self.board.state[self.board.RING_LAYER, dst_y, dst_x]:
-                placement_positions.append(pos.label)
+                pos_label = coordinate_to_algebraic(dst_y, dst_x, self.board.config)
+                placement_positions.append(pos_label)
 
         return placement_positions
 
@@ -659,15 +654,15 @@ class ZertzGame:
         removal_mask = placement_array[marble_idx, dst, :]
         removable_indices = np.argwhere(removal_mask).flatten()
 
+        from hiivelabs_mcts import coordinate_to_algebraic
         removable_positions = []
         for rem_idx in removable_indices:
             # Skip the "no removal" option (width²) and the destination itself
             if rem_idx != width**2 and rem_idx != dst:
-                rem_y = rem_idx // width
-                rem_x = rem_idx % width
+                rem_y, rem_x = divmod(rem_idx, width)
                 if self.board.state[self.board.RING_LAYER, rem_y, rem_x]:
-                    rem_pos = self.board.position_from_yx((rem_y, rem_x))
-                    removable_positions.append(rem_pos.label)
+                    rem_label = coordinate_to_algebraic(rem_y, rem_x, self.board.config)
+                    removable_positions.append(rem_label)
 
         return removable_positions
 
@@ -685,9 +680,10 @@ class ZertzGame:
         enriched = []
         width = self.board.config.width
 
+        from hiivelabs_mcts import algebraic_to_coordinate
         for pos_str in placement_positions:
             # Convert position string to y, x
-            y, x = self.board.str_to_index(pos_str)
+            y, x = algebraic_to_coordinate(pos_str, self.board.config)
             dst_flat = y * width + x
 
             # Find the best score for any marble type and removal at this destination
@@ -717,10 +713,11 @@ class ZertzGame:
         enriched = []
         width = self.board.config.width
 
+        from hiivelabs_mcts import algebraic_to_coordinate
         for cap_dict in capture_moves:
             # Reconstruct action tuple from dict (new format: (None, src_flat, dst_flat))
-            src_y, src_x = self.board.str_to_index(cap_dict['src'])
-            dst_y, dst_x = self.board.str_to_index(cap_dict['dst'])
+            src_y, src_x = algebraic_to_coordinate(cap_dict['src'], self.board.config)
+            dst_y, dst_x = algebraic_to_coordinate(cap_dict['dst'], self.board.config)
 
             src_flat = src_y * width + src_x
             dst_flat = dst_y * width + dst_x
@@ -756,9 +753,10 @@ class ZertzGame:
         marble_idx, dst_flat, _ = action
         width = self.board.config.width
 
+        from hiivelabs_mcts import algebraic_to_coordinate
         for pos_str in removal_positions:
             # Convert position string to flat index
-            y, x = self.board.str_to_index(pos_str)
+            y, x = algebraic_to_coordinate(pos_str, self.board.config)
             rem_flat = y * width + x
 
             # Lookup score for this specific (marble, dst, removal) tuple

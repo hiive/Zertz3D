@@ -9,6 +9,7 @@ import pytest
 import sys
 from pathlib import Path
 import numpy as np
+from hiivelabs_mcts import algebraic_to_coordinate
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -199,8 +200,8 @@ class TestNotationWorkflow:
         board = game.board
 
         # Use specific placement: place white marble at D4, remove C1
-        d4_idx = board.str_to_index("D4")
-        c1_idx = board.str_to_index("C1")
+        d4_idx = algebraic_to_coordinate("D4", board.config)
+        c1_idx = algebraic_to_coordinate("C1", board.config)
         d4_y, d4_x = d4_idx
         c1_y, c1_x = c1_idx
         d4_flat = d4_y * board.config.width + d4_x
@@ -246,10 +247,10 @@ class TestNotationWorkflow:
         # Isolated region: C1 (1 ring with white marble)
         # Connection: D3 (will be removed to isolate C1)
 
-        d4_idx = board.str_to_index("D4")
-        e4_idx = board.str_to_index("E4")
-        d3_idx = board.str_to_index("D3")
-        c1_idx = board.str_to_index("C1")
+        d4_idx = algebraic_to_coordinate("D4", board.config)
+        e4_idx = algebraic_to_coordinate("E4", board.config)
+        d3_idx = algebraic_to_coordinate("D3", board.config)
+        c1_idx = algebraic_to_coordinate("C1", board.config)
 
         board.state[board.RING_LAYER][d4_idx] = 1
         board.state[board.RING_LAYER][e4_idx] = 1
@@ -300,9 +301,9 @@ class TestNotationWorkflow:
         board.state[board.MARBLE_LAYERS] = 0
 
         # B2 (white) → C3 (gray) → D4 (empty)
-        b2_idx = board.str_to_index("B2")
-        c3_idx = board.str_to_index("C3")
-        d4_idx = board.str_to_index("D4")
+        b2_idx = algebraic_to_coordinate("B2", board.config)
+        c3_idx = algebraic_to_coordinate("C3", board.config)
+        d4_idx = algebraic_to_coordinate("D4", board.config)
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         gray_layer = board.MARBLE_TO_LAYER["g"]
@@ -353,10 +354,10 @@ class TestNotationWorkflow:
 
         # Create chain along same row: B2 (w) → C3 (g) → D4 (empty) → E4 (b) → F4 (empty)
         # Row A1 B2 C3 D4 E4 F4 G4 - all aligned horizontally
-        b2_idx = board.str_to_index("B2")
-        c3_idx = board.str_to_index("C3")
-        d4_idx = board.str_to_index("D4")
-        e4_idx = board.str_to_index("E4")
+        b2_idx = algebraic_to_coordinate("B2", board.config)
+        c3_idx = algebraic_to_coordinate("C3", board.config)
+        d4_idx = algebraic_to_coordinate("D4", board.config)
+        e4_idx = algebraic_to_coordinate("E4", board.config)
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         gray_layer = board.MARBLE_TO_LAYER["g"]

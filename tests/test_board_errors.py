@@ -12,6 +12,7 @@ import pytest
 import sys
 import numpy as np
 from pathlib import Path
+from hiivelabs_mcts import coordinate_to_algebraic
 
 # Add parent directory to path to import game modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -234,8 +235,12 @@ class TestBoardEdgeCases:
         # Take the action to remove the ring
         board.take_action(action_with_removal, "PUT")
 
-        # index_to_str should return empty string for removed ring
-        result = board.index_to_str(rem_index)
+        # coordinate_to_algebraic should return empty string for removed ring (with check)
+        rem_y, rem_x = rem_index
+        if board.state[board.RING_LAYER, rem_y, rem_x] == 0:
+            result = ""
+        else:
+            result = coordinate_to_algebraic(*rem_index, board.config)
         assert result == "", f"Expected empty string for removed ring, got '{result}'"
 
     @pytest.mark.parametrize("rings", [

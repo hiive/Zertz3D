@@ -1,6 +1,7 @@
 import pytest
 import sys
 from pathlib import Path
+from hiivelabs_mcts import coordinate_to_algebraic
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -26,15 +27,6 @@ def test_position_roundtrip_string_and_axial(small_board):
     pos = small_board.position_from_label(label)
     assert small_board.position_from_yx(pos.yx).label == label
     assert small_board.position_from_axial(pos.axial).label == label
-
-
-def test_position_available_after_ring_removed(small_board):
-    pos = small_board.position_from_label("D4")
-    small_board.state[small_board.RING_LAYER, pos.y, pos.x] = 0
-    # index_to_str returns '' for removed rings, but Position retains label
-    assert small_board.index_to_str(pos.yx) == ""
-    new_pos = small_board.position_from_yx(pos.yx)
-    assert new_pos.label == "D4"
 
 
 def test_position_from_axial_roundtrip(small_board):

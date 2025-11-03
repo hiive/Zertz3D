@@ -84,11 +84,12 @@ def visualize_board(rings=37):
     ax.grid(False)
 
     # Collect all ring coordinates
+    from hiivelabs_mcts import coordinate_to_algebraic
     positions = []
     for y in range(W):
         for x in range(W):
             if board.state[board.RING_LAYER, y, x] == 1:
-                label = board.index_to_str((y, x))
+                label = coordinate_to_algebraic(y, x, board.config)
                 q, r = yx_to_axial(y, x, W)
                 cart = axial_to_cart(q, r, size)
                 positions.append((label, (y, x), (q, r), cart))
