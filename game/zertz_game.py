@@ -110,8 +110,8 @@ class ZertzGame:
         elif action_type == "PUT":
             # PUT action: (marble_type, put_position, remove_position)
             # Normalize by removing marble_type (set to 0)
-            _, put_pos, rem_pos = action
-            return ("PUT", (None, put_pos, rem_pos))
+            _, put_y, put_x, rem_y, rem_x = action
+            return ("PUT", (None, put_y, put_x, rem_y, rem_x))
         elif action_type == "CAP":
             # CAP action: (direction, src_y, src_x)
             # Already position-only, no normalization needed
@@ -464,14 +464,12 @@ class ZertzGame:
                 return "", None
             from hiivelabs_mcts import algebraic_to_coordinate
             layer = self.board.MARBLE_TO_LAYER[marble_type] - 1
-            y, x = algebraic_to_coordinate(put_str, self.board.config)
-            put = y * self.board.config.width + x
+            put_y, put_x = algebraic_to_coordinate(put_str, self.board.config)
             if rem_str is not None:
-                y, x = algebraic_to_coordinate(rem_str, self.board.config)
-                rem = y * self.board.config.width + x
+                rem_y, rem_x = algebraic_to_coordinate(rem_str, self.board.config)
             else:
-                rem = self.board.config.width**2
-            action = (layer, put, rem)
+                rem_y, rem_x = (None, None)
+            action = (layer, put_y, put_x, rem_y, rem_x)
         elif action_type == "CAP":
             from hiivelabs_mcts import algebraic_to_coordinate
             if len(args) == 4:
@@ -482,9 +480,7 @@ class ZertzGame:
             dst = algebraic_to_coordinate(dst_str, self.board.config)
 
             # Convert to internal format: (None, src_flat, dst_flat)
-            src_flat = src[0] * self.board.config.width + src[1]
-            dst_flat = dst[0] * self.board.config.width + dst[1]
-            action = (None, src_flat, dst_flat)
+            action = (None, src[0], src[1], dst[0], dst[1])
         else:
             action = None
         return action_type, action
@@ -504,10 +500,9 @@ class ZertzGame:
             from hiivelabs_mcts import coordinate_to_algebraic
             marble_type, put_y, put_x, rem_y, rem_x = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
-            width = self.board.config.width
             put_str = coordinate_to_algebraic(put_y, put_x, self.board.config)
 
-            if (put_y, put_x) == (rem_y, rem_x):
+            if rem_y is None and rem_x is None:
                 rem_str = ""
             else:
                 rem_str = coordinate_to_algebraic(rem_y, rem_x, self.board.config)

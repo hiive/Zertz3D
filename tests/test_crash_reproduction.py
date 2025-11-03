@@ -23,12 +23,10 @@ def test_crash_seed_1760910995_with_high_iterations():
 
     # Player 1 move from crash log: PUT w at E1, remove A4
     width = game.board.config.width
-    e1_yx = algebraic_to_coordinate("E1", game.board.config)
-    a4_yx = algebraic_to_coordinate("A4", game.board.config)
-    e1_flat = e1_yx[0] * width + e1_yx[1]
-    a4_flat = a4_yx[0] * width + a4_yx[1]
+    e1_y, e1_x = algebraic_to_coordinate("E1", game.board.config)
+    a4_y, a4_x = algebraic_to_coordinate("A4", game.board.config)
 
-    game.take_action("PUT", (0, e1_flat, a4_flat))
+    game.take_action("PUT", (0, e1_y, e1_x, a4_y, a4_x))
 
     # Now Player 2's turn with high iterations (like in crash: 2500)
     state = game.get_current_state()

@@ -16,12 +16,12 @@ def test_put_allows_no_removal_when_sentinel_used():
     board.global_state[board.SUPPLY_B] = 0
 
     dest = algebraic_to_coordinate("D4", board.config)
-    put_loc = dest[0] * board.config.width + dest[1]
-    no_removal = board.config.width**2
+    put_loc = (dest[0], dest[1])
+    no_removal = (None, None)
 
     rings_before = int(np.sum(board.state[board.RING_LAYER]))
 
-    game.take_action("PUT", (0, put_loc, no_removal))
+    game.take_action("PUT", (0, *put_loc, *no_removal))
 
     # Marble placed
     white_layer = board.MARBLE_TO_LAYER["w"]
@@ -72,13 +72,13 @@ def test_no_removable_rings_after_placement():
     rings_before = int(np.sum(board.state[board.RING_LAYER]))
 
     # Place marble at center position with no removal (width² sentinel)
-    put_loc = center_pos[0] * board.config.width + center_pos[1]
-    no_removal = board.config.width**2
+    put_loc = (center_pos[0], center_pos[1])
+    no_removal = (None, None)
 
     # Get the action dict that would be generated
-    _, action_dict = game.action_to_str("PUT", (0, put_loc, no_removal))
+    _, action_dict = game.action_to_str("PUT", (0, *put_loc, *no_removal))
 
-    game.take_action("PUT", (0, put_loc, no_removal))
+    game.take_action("PUT", (0, *put_loc, *no_removal))
 
     # Verify marble was placed
     assert board.state[white_layer, center_pos[0], center_pos[1]] == 1, "Marble should be placed"
@@ -132,11 +132,11 @@ def test_board_full_last_move_awards_previous_player():
     board.global_state[board.P2_CAP_SLICE] = 0
     board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
-    put_loc = last_ring[0] * board.config.width + last_ring[1]
-    no_removal = board.config.width**2
+    put_loc = (last_ring[0], last_ring[1])
+    no_removal = (None, None)
 
     # Player 1 makes the final placement (no removable rings remain)
-    game.take_action("PUT", (0, put_loc, no_removal))
+    game.take_action("PUT", (0, *put_loc, *no_removal))
 
     assert np.all(np.sum(board.state[board.BOARD_LAYERS], axis=0) != 1)
     assert game.get_game_end_reason() == "Board completely filled with marbles"

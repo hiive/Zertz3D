@@ -293,9 +293,9 @@ class TestBackwardCompatibility:
         marble_idx, put_y, put_x, rem_y, rem_x = placement_indices[0]
 
         # Execute action
-        put = put_y * game.board.config.width + put_x
-        rem = rem_y * game.board.config.width + rem_x
-        game.take_action("PUT", (marble_idx, put, rem))
+        # put = put_y * game.board.config.width + put_x
+        # rem = rem_y * game.board.config.width + rem_x
+        game.take_action("PUT", (marble_idx, put_y, put_x, rem_y, rem_x))
 
         # Game should still be playable
         assert game.get_game_ended() is None, "Game should still be ongoing"

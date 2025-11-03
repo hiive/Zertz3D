@@ -365,68 +365,29 @@ class ZertzBoard:
         Returns:
             List of captured marbles from isolation (or None if no captures)
         """
+
         # Parse action for validation
         type_index, put_y, put_x, rem_y, rem_x = action
 
-        # Validate placement position before delegating to Rust
-        if np.sum(self.state[self.BOARD_LAYERS, put_y, put_x]) != 1:
-            raise ValueError(
-                f"Invalid placement: position ({put_y}, {put_x}) is not an empty ring"
-            )
-
-        # # Validate marble availability before delegating to Rust
-        # # (Rust would panic instead of raising ValueError)
-        # marble_type = self.LAYER_TO_MARBLE[type_index + 1]
-        # supply_idx = self._get_supply_index(marble_type)
-        # if self.global_state[supply_idx] >= 1:
-        #     # Marble available in supply - OK
-        #     pass
-        # elif np.all(self.global_state[self.SUPPLY_SLICE] == 0):
-        #     # Entire supply pool is empty - can use captured marbles
-        #     captured_idx = self._get_captured_index(marble_type, self.get_cur_player())
-        #     if self.global_state[captured_idx] < 1:
-        #         raise ValueError(
-        #             f"No {marble_type} marbles available in supply or captured by player {self.get_cur_player()}"
-        #         )
-        # else:
-        #     # This marble type is empty but pool has other marbles - cannot use captured marbles yet
-        #     raise ValueError(
-        #         f"No {marble_type} marbles in supply. Cannot use captured marbles until entire pool is empty."
-        #     )
-
-        # Delegate to Rust (which handles marble placement, ring removal,
-        # isolation capture, supply/captured pool management, and player switching)
-        # Returns list of captured marble positions from isolation
-        # Unpack action tuple for Rust function signature
-        # type_index, put_loc, rem_loc = action
-        # put_y, put_x = divmod(put_loc, self.config.width)
         if (put_y, put_x) == (rem_y, rem_x):
             # No removal - Rust uses None for Option<usize>
+            print("[DEBUG] - SHOULDN'T BE USING SENTINELS IN PYTHON")
             rem_y, rem_x = None, None
 
-        captured_positions = apply_placement_action(
-            self.state,
-            self.global_state,
-            type_index,
-            put_y,
-            put_x,
-            rem_y,
-            rem_x,
-            self.config
-        )
+        from hiivelabs_mcts import ZertzAction, apply_action
+        z_action = ZertzAction.placement(self.config, type_index, put_y, put_x, rem_y, rem_x)
 
-        # Convert captured positions to expected format for ActionResult
-        if captured_positions:
+        action_result = apply_action(self.config, self.state, self.global_state, z_action)
+        captured_positions = action_result.isolation_captures()
+
+        if any(captured_positions):
+            # Convert captured positions to expected format for ActionResult
+            # TODO Check if we can eliminate.
             captured_marbles = []
             for marble_layer, y, x in captured_positions:
                 # Convert marble layer to marble type
                 marble_type = self.LAYER_TO_MARBLE[marble_layer]
-                # Convert (y, x) to board position string
-                # Use Rust coordinate_to_algebraic() instead of position_from_yx()
-                # because position_from_yx() only works for positions in the standard
-                # layout collection, and tests may create custom topologies
                 pos = coordinate_to_algebraic(y, x, self.config)
-                # print(f"[DEBUG] Isolation capture: marble_layer={marble_layer}, y={y}, x={x}, pos={pos}, marble_type={marble_type}")
                 captured_marbles.append({"marble": marble_type, "pos": pos})
             return captured_marbles
         return None

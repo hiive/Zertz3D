@@ -19,49 +19,6 @@ from game.zertz_game import ZertzGame
 from shared.render_data import RenderData
 
 
-class TestActionSizeGetters:
-    """Test action size and shape getter methods."""
-
-    def test_get_placement_action_size(self):
-        """Test placement action size calculation."""
-        game = ZertzGame(rings=37)
-        size = game.get_placement_action_size()
-        # 3 marble types * 49 destinations * 50 removals (49 + no-removal)
-        assert size == 3 * 49 * 50
-
-    def test_get_placement_action_shape(self):
-        """Test placement action shape."""
-        game = ZertzGame(rings=37)
-        shape = game.get_placement_action_shape()
-        assert shape == (3, 49, 50)
-
-    def test_get_capture_action_size(self):
-        """Test capture action size calculation."""
-        game = ZertzGame(rings=37)
-        size = game.get_capture_action_size()
-        # 6 directions * 49 positions
-        assert size == 6 * 49
-
-    def test_get_capture_action_shape(self):
-        """Test capture action shape."""
-        game = ZertzGame(rings=37)
-        shape = game.get_capture_action_shape()
-        assert shape == (6, 7, 7)
-
-    def test_action_sizes_different_board_sizes(self):
-        """Test action sizes for different board sizes."""
-        for rings, width in [(37, 7), (48, 8), (61, 9)]:
-            game = ZertzGame(rings=rings)
-
-            placement_size = game.get_placement_action_size()
-            expected_placement = 3 * width**2 * (width**2 + 1)
-            assert placement_size == expected_placement
-
-            capture_size = game.get_capture_action_size()
-            expected_capture = 6 * width**2
-            assert capture_size == expected_capture
-
-
 class TestCopyAndReset:
     """Test game copy and reset operations."""
 

@@ -214,7 +214,7 @@ class TestStateCompleteness:
 
         assert isinstance(placement, np.ndarray)
         assert isinstance(capture, np.ndarray)
-        assert placement.shape == (3, 49, 50)  # 3 x width² x (width² + 1)
+        assert placement.shape == (3, 7, 7, 7, 7)
         assert capture.shape == (6, 7, 7)  # 6 x width x width
 
     def test_get_game_ended_with_cur_state(self):
