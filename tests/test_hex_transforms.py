@@ -845,43 +845,10 @@ class TestCanonicalTransform:
 
 
 class TestTranslationCanonicalization:
-    """Test translation symmetry detection and canonicalization."""
+    """Test translation symmetry detection and canonicalization.
 
-    def test_bounding_box_full_board(self, small_board):
-        """Test that full board has expected bounding box."""
-        bbox = small_board.canonicalizer.get_bounding_box()
-        assert bbox is not None, "Full board should have bounding box"
-
-        min_y, max_y, min_x, max_x = bbox
-        # 37-ring board is 7x7, but corners are empty
-        assert 0 <= min_y < small_board.config.width
-        assert 0 <= max_y < small_board.config.width
-        assert 0 <= min_x < small_board.config.width
-        assert 0 <= max_x < small_board.config.width
-
-    def test_bounding_box_after_ring_removal(self, small_board):
-        """Test bounding box after removing edge rings."""
-        # Remove entire edge rows/columns to actually reduce bounding box
-        for pos in ["A4", "A3", "A2", "A1", "B1", "C1", "D1", "D7", "E6", "F5", "G4", "G3", "G2", "G1"]:
-            y, x = algebraic_to_coordinate(pos, small_board.config)
-            small_board.state[small_board.RING_LAYER, y, x] = 0
-
-        bbox = small_board.canonicalizer.get_bounding_box()
-        assert bbox is not None, "Board with removed edges should have bounding box"
-
-        # Bounding box should be smaller than full board now
-        min_y, max_y, min_x, max_x = bbox
-        # After removing edges, bbox should be reduced
-        assert (max_y - min_y) < (small_board.config.width - 1) or (max_x - min_x) < (small_board.config.width - 1), \
-            f"Expected reduced bounding box, got ({min_y}, {max_y}, {min_x}, {max_x})"
-
-    def test_bounding_box_empty_board(self, small_board):
-        """Test that empty board (no rings) returns None."""
-        # Remove all rings
-        small_board.state[small_board.RING_LAYER] = 0
-
-        bbox = small_board.canonicalizer.get_bounding_box()
-        assert bbox is None, "Empty board should return None for bounding box"
+    Note: Bounding box tests have been moved to Rust (canonicalization_tests.rs).
+    """
 
     def test_translation_identity(self, small_board):
         """Test that translating by (0, 0) returns the same state."""

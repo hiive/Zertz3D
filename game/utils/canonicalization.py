@@ -20,7 +20,7 @@ Python utilities for testing, ML, and convenience.
 
 **Test/Helper Utilities**:
 - `get_all_transformations()`: Enumerate all transforms (test utility)
-- `get_all_translations()`: Enumerate all translations (test utility)
+- `get_all_translations()`: Enumerate all translations (delegates to Rust)
 - `get_all_symmetry_transforms()`: Enumerate symmetries (test utility)
 - `_apply_transform()`: Apply named transform (test/helper)
 - `decanonicalize()`: Inverse canonicalization (test/helper)
@@ -44,7 +44,6 @@ Some Python functions have Rust equivalents that are used internally by Rust's
 canonicalization system:
 - `build_axial_maps()`: Both Python and Rust versions exist
 - `get_bounding_box()`: Rust version (`bounding_box()`) used internally
-- `get_all_translations()`: Rust version (`get_translations()`) used internally
 
 These duplicates are acceptable because:
 1. Python versions are used by test utilities and non-critical paths
@@ -62,6 +61,7 @@ from hiivelabs_mcts import (
     transform_state as rust_transform_state,
     translate_state as rust_translate_state,
     get_bounding_box as rust_get_bounding_box,
+    get_translations as rust_get_translations,
     canonical_key as rust_canonical_key,
     inverse_transform_name as rust_inverse_transform_name,
     TransformFlags,
@@ -187,26 +187,6 @@ class CanonicalizationManager:
 
     # ======================  TRANSLATION CANONICALIZATION  ==================
 
-    def get_bounding_box(self, state=None):
-        """Find bounding box of all remaining rings.
-
-        **RUST DUPLICATE**: This function has a Rust implementation that is used by
-        Rust's canonicalization. This Python version is kept for:
-        - Helper methods (get_all_translations)
-        - Test utilities
-        - Direct use by non-canonicalization code
-
-        Delegates to Rust for performance.
-
-        Returns:
-            tuple: (min_y, max_y, min_x, max_x) or None if no rings exist
-        """
-        if state is None:
-            state = self.board.state
-
-        config = BoardConfig.standard_config(self.board.rings, t=self.board.t)
-        return rust_get_bounding_box(state, config)
-
     def translate_state(self, state, dy, dx):
         """Translate state by (dy, dx) offset.
 
@@ -227,30 +207,16 @@ class CanonicalizationManager:
     def get_all_translations(self, state=None):
         """Generate all valid translation offsets for current board state.
 
+        Delegates to Rust for validation of each translation.
+
         Returns:
             list: List of (name, dy, dx) tuples for valid translations
         """
         if state is None:
             state = self.board.state
 
-        bbox = self.get_bounding_box(state)
-        if bbox is None:
-            return [("T0,0", 0, 0)]  # No rings, identity only
-
-        min_y, max_y, min_x, max_x = bbox
-
-        translations = []
-
-        # Try all possible translations that might keep rings on board
-        # Limit search to reasonable bounds
-        for dy in range(-min_y, self.board.config.width - max_y):
-            for dx in range(-min_x, self.board.config.width - max_x):
-                # Test if this translation is valid
-                translated = self.translate_state(state, dy, dx)
-                if translated is not None:
-                    translations.append((f"T{dy},{dx}", dy, dx))
-
-        return translations
+        config = BoardConfig.standard_config(self.board.rings, t=self.board.t)
+        return rust_get_translations(state, config)
 
     # ======================  TRANSFORMATION ENUMERATION  ==================
 
