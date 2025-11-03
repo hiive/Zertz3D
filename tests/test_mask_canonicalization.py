@@ -267,18 +267,34 @@ class TestCanonicalizePutMask:
 
         assert original_counts == canonical_counts, "Should preserve marble type counts"
 
-    def test_preserves_no_removal_index(self, small_board):
-        """Test that no-removal index is preserved correctly."""
-        put_mask = small_board.get_placement_moves()
+    def test_preserves_no_removal_sentinel(self, small_board):
+        """Test that no-removal sentinel is preserved correctly.
 
-        no_removal_idx = small_board.config.width ** 2
-        original_no_removal = np.sum(put_mask[:, :, no_removal_idx])
+        In the 5D put mask format (3, H, W, H, W), the sentinel for "no removal"
+        is when rem_y == dst_y and rem_x == dst_x. This test verifies that
+        transformation preserves the count of such sentinel entries.
+        """
+        put_mask = small_board.get_placement_moves()
+        width = small_board.config.width
+
+        # Count sentinel entries (where rem_y == dst_y and rem_x == dst_x)
+        original_no_removal = 0
+        for m in range(3):
+            for dst_y in range(width):
+                for dst_x in range(width):
+                    original_no_removal += put_mask[m, dst_y, dst_x, dst_y, dst_x]
 
         canonical, _, _ = small_board.canonicalizer.canonicalize_put_mask(put_mask, "R60")
-        canonical_no_removal = np.sum(canonical[:, :, no_removal_idx])
+
+        # Count sentinel entries in canonical mask
+        canonical_no_removal = 0
+        for m in range(3):
+            for dst_y in range(width):
+                for dst_x in range(width):
+                    canonical_no_removal += canonical[m, dst_y, dst_x, dst_y, dst_x]
 
         assert canonical_no_removal == original_no_removal, (
-            "No-removal index count should be preserved"
+            "No-removal sentinel count should be preserved"
         )
 
     @pytest.mark.parametrize("board_fixture", ["small_board", "medium_board", "large_board"])

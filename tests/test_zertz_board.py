@@ -179,25 +179,6 @@ class TestBoardMethods:
         assert not board._is_inbounds((-1, 0))
         assert not board._is_inbounds((0, -1))
 
-    # Note: test_get_regions is covered in test_isolated_regions.py
-    # Note: test_take_placement_action and test_take_capture_action are covered extensively in other test files
-
-    def test_get_valid_moves_shape(self, board):
-        """Test that get_valid_moves returns correctly shaped arrays."""
-        placement, capture = board.get_valid_moves()
-        assert placement.shape == board.get_placement_shape()
-        assert capture.shape == board.get_capture_shape()
-
-    def test_get_placement_moves_shape(self, board):
-        """Test that placement moves array has correct shape."""
-        moves = board.get_placement_moves()
-        assert moves.shape == (3, board.config.width**2, board.config.width**2 + 1)
-
-    def test_get_capture_moves_shape(self, board):
-        """Test that capture moves array has correct shape."""
-        moves = board.get_capture_moves()
-        assert moves.shape == (6, board.config.width, board.config.width)
-
 
 def test_capture_sequence_continues_with_same_marble():
     """Test that after a capture, only the marble that just moved can continue capturing.

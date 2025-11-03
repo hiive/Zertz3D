@@ -59,17 +59,17 @@ class TestPlacementActionErrors:
         # Action format: (marble_type_idx, put_loc, rem_loc)
         # marble_type_idx: 0=white, 1=gray, 2=black
         # put_loc: flat index = y * width + x
-        put_loc = 3 * board.config.width + 3
-        rem_loc = board.config.width**2  # No removal
+        put_y, put_x = 3, 3
+        rem_y, rem_x = 3, 3  # No removal
 
-        first_action = (0, put_loc, rem_loc)
+        first_action = (0, put_y, put_x, rem_y, rem_x)
         board.take_action(first_action, "PUT")
 
         # Try to place another marble at the same position
         # Need to switch to a valid action for current player
         board._next_player()  # Switch back to player 1
 
-        second_action = (1, put_loc, rem_loc)  # Gray marble at same position
+        second_action = (1, put_y, put_x, rem_y, rem_x)  # Gray marble at same position
 
         with pytest.raises(ValueError, match="Invalid placement: position .* is not an empty ring"):
             board.take_action(second_action, "PUT")
@@ -84,28 +84,33 @@ class TestPlacementActionErrors:
         board = ZertzBoard(rings=rings)
 
         # Find a removable ring and remove it
-        placement, capture = board.get_valid_moves()
+        placement, capture = board.get_valid_actions()
         valid_placements = np.argwhere(placement)
 
         # Find a placement action that includes a ring removal
         action_with_removal = None
         for action in valid_placements:
-            marble_idx, put_loc, rem_loc = action
-            if rem_loc != board.config.width**2:  # Has a removal
+            marble_idx, put_y, put_x, rem_y, rem_x = action
+            if (put_y, put_x) != (rem_y, rem_x):  # Has a removal
                 action_with_removal = tuple(action)
                 break
 
         if action_with_removal is None:
             pytest.skip("No removable rings found on this board configuration")
 
-        marble_idx, put_loc, rem_loc = action_with_removal
-        board.take_action(action_with_removal, "PUT")
+        marble_idx, put_y, put_x, rem_y, rem_x = action_with_removal
+
+        # Convert rem_loc to (y, x)
+        rem_index = rem_y * board.config.width + rem_x
+        put_index = put_y * board.config.width + put_x
+
+        board.take_action((marble_idx, put_index, rem_index), "PUT")
 
         # Switch back to same player
         board._next_player()
 
         # Try to place a marble on the removed ring
-        invalid_action = (0, rem_loc, board.config.width**2)
+        invalid_action = (0, rem_index, rem_index)
 
         with pytest.raises(ValueError, match="Invalid placement: position .* is not an empty ring"):
             board.take_action(invalid_action, "PUT")
@@ -211,32 +216,30 @@ class TestBoardEdgeCases:
         board = ZertzBoard(rings=rings)
 
         # Find a removable ring and remove it
-        placement, capture = board.get_valid_moves()
+        placement, capture = board.get_valid_actions()
         valid_placements = np.argwhere(placement)
 
         # Find a placement action that includes a ring removal
         action_with_removal = None
         for action in valid_placements:
-            marble_idx, put_loc, rem_loc = action
-            if rem_loc != board.config.width**2:  # Has a removal
+            marble_idx, put_y, put_x, rem_y, rem_x = action
+            if (put_y, put_x) != (rem_y, rem_x):  # Has a removal
                 action_with_removal = tuple(action)
                 break
 
         if action_with_removal is None:
             pytest.skip("No removable rings found on this board configuration")
 
-        marble_idx, put_loc, rem_loc = action_with_removal
+        marble_idx, put_y, put_x, rem_y, rem_x = action_with_removal
 
         # Convert rem_loc to (y, x)
-        rem_y = rem_loc // board.config.width
-        rem_x = rem_loc % board.config.width
-        rem_index = (rem_y, rem_x)
+        rem_index = rem_y *board.config.width + rem_x
+        put_index = put_y *board.config.width + put_x
 
         # Take the action to remove the ring
-        board.take_action(action_with_removal, "PUT")
+        board.take_action((marble_idx, put_index, rem_index), "PUT")
 
         # coordinate_to_algebraic should return empty string for removed ring (with check)
-        rem_y, rem_x = rem_index
         if board.state[board.RING_LAYER, rem_y, rem_x] == 0:
             result = ""
         else:
@@ -248,7 +251,7 @@ class TestBoardEdgeCases:
         ZertzBoard.MEDIUM_BOARD_48,
         ZertzBoard.LARGE_BOARD_61
     ])
-    def test_get_valid_moves_with_captured_marbles(self, rings):
+    def test_get_valid_actions_with_captured_marbles(self, rings):
         """Test that placement moves use captured marbles when supply is empty (all board sizes)."""
         board = ZertzBoard(rings=rings)
 
@@ -263,7 +266,7 @@ class TestBoardEdgeCases:
         board.global_state[board.P1_CAP_B] = 0
 
         # Get valid moves
-        placement, capture = board.get_valid_moves()
+        placement, capture = board.get_valid_actions()
 
         # Should have valid placements for white and gray (but not black)
         white_moves = np.any(placement[0])  # White marble type

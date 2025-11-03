@@ -207,28 +207,12 @@ class ZertzGame:
         #   - for capture actions, shape is 6 x width x width
         #     - capture actions only end the current players turn if there are no more chain captures
         if cur_state is None:
-            placement, capture = self.board.get_valid_moves()
+            placement, capture = self.board.get_valid_actions()
         else:
             # Return the valid actions for an arbitrary marble supply, board and player
             temp_game = ZertzGame(clone=self, clone_state=cur_state)
             placement, capture = temp_game.get_valid_actions()
         return placement, capture
-
-    def get_capture_action_size(self):
-        # Return the number of possible capture actions
-        return 6 * self.board.config.width**2
-
-    def get_capture_action_shape(self):
-        # Return the shape of the capture actions as a tuple
-        return self.board.get_capture_shape()
-
-    def get_placement_action_size(self):
-        # Return the number of possible placement actions
-        return 3 * self.board.config.width**2 * (self.board.config.width**2 + 1)
-
-    def get_placement_action_shape(self):
-        # Return the shape of the placement actions as a tuple
-        return self.board.get_placement_shape()
 
     def _is_game_over(self):
         """Return True if game has ended.
@@ -518,16 +502,14 @@ class ZertzGame:
 
         if action_type == "PUT":
             from hiivelabs_mcts import coordinate_to_algebraic
-            marble_type, put, rem = action
+            marble_type, put_y, put_x, rem_y, rem_x = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
             width = self.board.config.width
-            put_y, put_x = divmod(put, width)
             put_str = coordinate_to_algebraic(put_y, put_x, self.board.config)
 
-            if rem == self.board.config.width**2:
+            if (put_y, put_x) == (rem_y, rem_x):
                 rem_str = ""
             else:
-                rem_y, rem_x = divmod(rem, width)
                 rem_str = coordinate_to_algebraic(rem_y, rem_x, self.board.config)
             action_str = "{} {} {} {}".format(
                 action_type, marble_type, put_str, rem_str
@@ -647,19 +629,20 @@ class ZertzGame:
         if action_type != "PUT":
             return []
 
-        marble_idx, dst, rem = action
+        marble_idx, dst_y, dst_x, _, _ = action
         width = self.board.config.width
 
         # Get the removal dimension for this specific (marble, destination) pair
-        removal_mask = placement_array[marble_idx, dst, :]
+        removal_mask = placement_array[marble_idx, dst_y, dst_x, :]
         removable_indices = np.argwhere(removal_mask).flatten()
 
         from hiivelabs_mcts import coordinate_to_algebraic
         removable_positions = []
         for rem_idx in removable_indices:
-            # Skip the "no removal" option (width²) and the destination itself
-            if rem_idx != width**2 and rem_idx != dst:
-                rem_y, rem_x = divmod(rem_idx, width)
+            rem_y, rem_x = divmod(rem_idx, width)
+            # Skip the "no removal" option (destination)
+            if (rem_y, rem_x) != (dst_y, dst_x):
+
                 if self.board.state[self.board.RING_LAYER, rem_y, rem_x]:
                     rem_label = coordinate_to_algebraic(rem_y, rem_x, self.board.config)
                     removable_positions.append(rem_label)

@@ -516,7 +516,7 @@ class RandomZertzPlayer(ZertzPlayer):
         p_actions, c_actions = self.game.get_valid_actions()
 
         c1, c2, c3 = c_actions.nonzero()
-        p1, p2, p3 = p_actions.nonzero()
+        p1, p2, p3, p4, p5 = p_actions.nonzero()
 
         # Determine action type
         if c1.size > 0:
@@ -531,7 +531,7 @@ class RandomZertzPlayer(ZertzPlayer):
         elif p1.size > 0:
             # Only placements available
             ip = np.random.randint(p1.size)
-            return ("PUT", (int(p1[ip]), int(p2[ip]), int(p3[ip])))
+            return ("PUT", (int(p1[ip]), int(p2[ip]), int(p3[ip]), int(p4[ip]), int(p5[ip])))
         else:
             # No valid actions - player must pass
             return ("PASS", None)
@@ -545,7 +545,7 @@ class RandomZertzPlayer(ZertzPlayer):
         p_actions, c_actions = self.game.get_valid_actions()
 
         c1, c2, c3 = c_actions.nonzero()
-        p1, p2, p3 = p_actions.nonzero()
+        p1, p2, p3, p4, p5 = p_actions.nonzero()
 
         action_scores = {}
 
@@ -558,7 +558,7 @@ class RandomZertzPlayer(ZertzPlayer):
         elif p1.size > 0:
             # Placements available
             for i in range(p1.size):
-                action = ("PUT", (int(p1[i]), int(p2[i]), int(p3[i])))
+                action = ("PUT", (int(p1[i]), int(p2[i]), int(p3[i]), int(p4[i]), int(p5[i])))
                 action_scores[action] = 1.0
         else:
             # Must pass

@@ -300,7 +300,7 @@ class TestPartiallyIsolatedRegionProperties:
         small_board._take_placement_action(put_action)
 
         # Get valid moves
-        placement_moves, _ = small_board.get_valid_moves()
+        placement_moves, _ = small_board.get_valid_actions()
 
         # G1 should be a valid placement location
         g1_flat = (lambda pos: pos[0] * small_board.config.width + pos[1])(algebraic_to_coordinate("G1", small_board.config))

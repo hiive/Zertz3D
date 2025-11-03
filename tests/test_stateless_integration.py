@@ -218,12 +218,12 @@ class TestMoveGenerationDelegation:
     These tests verify the EXISTING correct delegation (not new refactoring).
     """
 
-    def test_get_valid_moves_delegation(self, board):
-        """Test get_valid_moves() uses zertz_logic."""
+    def test_get_valid_actions_delegation(self, board):
+        """Test get_valid_actions() uses zertz_logic."""
         config = board.config
 
         # Call stateful method
-        placement_stateful, capture_stateful = board.get_valid_moves()
+        placement_stateful, capture_stateful = board.get_valid_actions()
 
         # Call stateless function directly
         placement_stateless, capture_stateless = \
@@ -290,9 +290,11 @@ class TestBackwardCompatibility:
         placement_indices = np.argwhere(placement)
         assert len(placement_indices) > 0, "Should have valid placements"
 
-        marble_idx, put, rem = placement_indices[0]
+        marble_idx, put_y, put_x, rem_y, rem_x = placement_indices[0]
 
         # Execute action
+        put = put_y * game.board.config.width + put_x
+        rem = rem_y * game.board.config.width + rem_x
         game.take_action("PUT", (marble_idx, put, rem))
 
         # Game should still be playable

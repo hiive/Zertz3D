@@ -38,16 +38,16 @@ def test_transform_action_put_matches_canonicalizer(transform):
     marble_idx = 0
     put_y, put_x = algebraic_to_coordinate("C3", board.config)
     rem_y, rem_x = algebraic_to_coordinate("E5", board.config)
-    action = ("PUT", (marble_idx, put_y * width + put_x, rem_y * width + rem_x))
+    action = ("PUT", (marble_idx, put_y, put_x, rem_y, rem_x))
 
     new_action = transform_action(action[0], action[1], transform, config)
 
-    mask = np.zeros((3, width * width, width * width + 1), dtype=int)
-    mask[marble_idx, put_y * width + put_x, rem_y * width + rem_x] = 1
+    mask = np.zeros((3, width, width, width, width), dtype=int)
+    mask[marble_idx, put_y, put_x, rem_y, rem_x] = 1
     transformed_mask, _, _ = canonicalizer.canonicalize_put_mask(mask, transform)
-    m_idx, new_put_flat, new_rem_flat = np.argwhere(transformed_mask == 1)[0]
+    m_idx, new_put_y, new_put_x, new_rem_y, new_rem_x = np.argwhere(transformed_mask == 1)[0]
 
-    assert new_action == ("PUT", [int(m_idx), int(new_put_flat), int(new_rem_flat)])
+    assert new_action == ("PUT", [int(m_idx), int(new_put_y), int(new_put_x), int(new_rem_y), int(new_rem_x)])
 
 
 @pytest.mark.parametrize(
@@ -86,9 +86,9 @@ def test_transform_action_with_translation():
     config = board.config
 
     width = config.width
-    action_put = ("PUT", (1, 3 * width + 3, 3 * width + 4))
+    action_put = ("PUT", (1, 3, 3, 3, 4))
     translated_put = transform_action(action_put[0], action_put[1], "T-1,1", config)
-    assert translated_put == ("PUT", [1, 2 * width + 4, 2 * width + 5])
+    assert translated_put == ("PUT", [1, 2, 4, 2, 5])
 
     action_cap = ("CAP", (0, 3, 3))
     translated_cap = transform_action(action_cap[0], action_cap[1], "T2,-1", config)

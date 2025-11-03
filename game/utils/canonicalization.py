@@ -681,12 +681,13 @@ class CanonicalizationManager:
         Typically used with the transform returned by canonicalize_state().
 
         Args:
-            put_mask: Put mask array (3, W*W, W*W+1)
+            put_mask: Put mask array (3, H, W, H, W) where indices are:
+                      (marble_type, dst_y, dst_x, rem_y, rem_x)
             transform_name: Transform name from canonicalize_state() (e.g., "R60", "T1,2_MR120")
 
         Returns:
             tuple: (canonical_mask, transform_name, inverse_name)
-                - canonical_mask: The transformed mask
+                - canonical_mask: The transformed mask with shape (3, H, W, H, W)
                 - transform_name: Same as input (for API consistency)
                 - inverse_name: Inverse transform to map back to original
 
@@ -749,11 +750,11 @@ class CanonicalizationManager:
         the original mask orientation.
 
         Args:
-            canonical_mask: The canonical put mask array (3, W*W, W*W+1)
+            canonical_mask: The canonical put mask array (3, H, W, H, W)
             inverse_transform_name: The inverse transform name (e.g., from canonicalize_put_mask)
 
         Returns:
-            Original mask before canonicalization
+            Original mask before canonicalization with shape (3, H, W, H, W)
 
         Examples:
             >>> # Canonicalize and then decanonicalize
@@ -868,23 +869,36 @@ class CanonicalizationManager:
 
     def _transform_put_mask(self, put_mask, rot60_k=0, mirror=False, dy=0, dx=0, mirror_first=False):
         """
-        put_mask shape: (3, W*W, W*W+1). Applies same symmetry to (put, rem) indices.
+        put_mask shape: (3, H, W, H, W). Applies same symmetry to destination and removal positions.
+
+        Transforms both the destination position (H, W) and removal position (H, W) using the
+        same translation and rotation/mirror operations applied to the board state.
+
+        SENTINEL HANDLING:
+        When removal position equals destination position (rem_y == dst_y, rem_x == dst_x),
+        this indicates "no removal". The sentinel is transformed along with the destination:
+        if input has put_mask[m, dst_y, dst_x, dst_y, dst_x] = 1.0, then output will have
+        out[m, dst_y', dst_x', dst_y', dst_x'] = 1.0 (where dst' is the transformed destination).
 
         Applies translation first, then rotation/mirror, matching the state transformation order.
 
         Args:
-            put_mask: Put mask array (3, W*W, W*W+1)
+            put_mask: Put mask array (3, H, W, H, W) where indices are:
+                      (marble_type, dst_y, dst_x, rem_y, rem_x)
             rot60_k: Number of 60° rotations
             mirror: Whether to apply mirror transformation
             dy: Translation offset in y direction
             dx: Translation offset in x direction
             mirror_first: If True, mirror then rotate. If False, rotate then mirror.
+
+        Returns:
+            Transformed put mask with same shape (3, H, W, H, W)
         """
         self.build_axial_maps()
         out = np.zeros_like(put_mask)
 
-        # Build flat-index permutation for valid cells
-        flat_map = {}  # src_flat -> dst_flat
+        # Build coordinate mapping: (y, x) → (y2, x2)
+        coord_map = {}  # (y, x) -> (y2, x2)
         for (y, x) in self.board.positions.yx_to_ax.keys():
             # Skip positions where ring has been removed
             if self.board.state[self.board.RING_LAYER, y, x] == 0:
@@ -923,24 +937,37 @@ class CanonicalizationManager:
                 continue
             y2, x2 = dst
 
-            # Map flat indices: original (y,x) → final (y2,x2)
-            width = self.board.config.width
-            flat_map[y * width + x] = y2 * width + x2
+            # Store coordinate mapping
+            coord_map[(y, x)] = (y2, x2)
 
-        M, P, R = put_mask.shape
-        last = R - 1  # "no ring removed" slot stays put
+        # Transform the 5D put mask
+        M, H, W, _, _ = put_mask.shape
 
         for m in range(M):
-            for p in range(P):
-                p2 = flat_map.get(p)
-                if p2 is None:
-                    continue
-                # all concrete removals
-                for r in range(R - 1):
-                    r2 = flat_map.get(r)
-                    if r2 is not None:
-                        out[m, p2, r2] = put_mask[m, p, r]
-                # "no remove" column
-                out[m, p2, last] = put_mask[m, p, last]
+            for dst_y in range(H):
+                for dst_x in range(W):
+                    # Transform destination position
+                    dst_transformed = coord_map.get((dst_y, dst_x))
+                    if dst_transformed is None:
+                        continue  # Destination not on board or removed
+                    dst_y2, dst_x2 = dst_transformed
+
+                    for rem_y in range(H):
+                        for rem_x in range(W):
+                            if put_mask[m, dst_y, dst_x, rem_y, rem_x] == 0.0:
+                                continue  # No action here
+
+                            # Check if this is the sentinel (no removal)
+                            is_sentinel = (rem_y == dst_y and rem_x == dst_x)
+
+                            if is_sentinel:
+                                # Sentinel: transform to new destination's sentinel
+                                out[m, dst_y2, dst_x2, dst_y2, dst_x2] = put_mask[m, dst_y, dst_x, rem_y, rem_x]
+                            else:
+                                # Regular removal: transform removal position
+                                rem_transformed = coord_map.get((rem_y, rem_x))
+                                if rem_transformed is not None:
+                                    rem_y2, rem_x2 = rem_transformed
+                                    out[m, dst_y2, dst_x2, rem_y2, rem_x2] = put_mask[m, dst_y, dst_x, rem_y, rem_x]
 
         return out

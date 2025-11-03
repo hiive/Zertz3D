@@ -110,10 +110,10 @@ class MCTSZertzPlayer(ZertzPlayer):
             pass
         else:
             # No captures - check placements
-            p1, p2, p3 = placement_mask.nonzero()
+            p1, p2, p3, p4, p5 = placement_mask.nonzero()
             if p1.size == 1:
                 # Exactly one placement - forced move, no decision needed
-                return ("PUT", (int(p1[0]), int(p2[0]), int(p3[0])))
+                return ("PUT", (int(p1[0]), int(p2[0]), int(p3[0]), int(p4[0]), int(p5[0])))
             elif p1.size == 0:
                 # No moves available - must pass
                 return ("PASS", None)

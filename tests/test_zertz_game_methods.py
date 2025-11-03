@@ -190,7 +190,7 @@ class TestPositionConversion:
         assert len(valid_actions) > 0
 
         action = tuple(valid_actions[0])
-        marble_idx, dst, rem = action
+        # marble_idx, dst, rem = action
 
         # Get removal positions for this action
         removals = game.get_removal_positions(placement_array, "PUT", action)

@@ -306,21 +306,6 @@ class TestTransformPutMask:
                     f"{original_count} -> {transformed_count}"
                 )
 
-    def test_no_removal_index_preserved(self, small_board):
-        """The special 'no removal' index (W²) should be handled correctly."""
-        put_mask = small_board.get_placement_moves()
-
-        # Get count of placements with no removal
-        no_removal_idx = small_board.config.width ** 2
-        original_no_removal = np.sum(put_mask[:, :, no_removal_idx])
-
-        # Transform
-        transformed = small_board.canonicalizer._transform_put_mask(put_mask, rot60_k=1, mirror=False)
-        transformed_no_removal = np.sum(transformed[:, :, no_removal_idx])
-
-        assert transformed_no_removal == original_no_removal, (
-            "No-removal index count changed after transformation"
-        )
 
     def test_rotation_moves_placements_correctly(self, small_board):
         """Rotating the mask should move placements to rotated positions."""
@@ -359,7 +344,8 @@ class TestTransformPutMask:
 
     def test_empty_mask_remains_empty(self, small_board):
         """Transforming an empty mask should keep it empty."""
-        put_mask = np.zeros((3, small_board.config.width**2, small_board.config.width**2 + 1), dtype=bool)
+        width = small_board.config.width
+        put_mask = np.zeros((3, width, width, width, width), dtype=bool)
 
         for k in range(6):
             transformed = small_board.canonicalizer._transform_put_mask(put_mask, rot60_k=k, mirror=False)

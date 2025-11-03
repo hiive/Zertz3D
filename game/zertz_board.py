@@ -359,15 +359,14 @@ class ZertzBoard:
         Args:
             action: (type_index, put_loc, rem_loc) tuple
                 - type_index: 0=white, 1=gray, 2=black
-                - put_loc: flat index for placement position
-                - rem_loc: flat index for ring to remove (or width² for no removal)
+                - put_y, put_x: index for placement position
+                - rem_y, rem_x: index for ring to remove (== put_y, put_x for no removal)
 
         Returns:
             List of captured marbles from isolation (or None if no captures)
         """
         # Parse action for validation
-        type_index, put_loc, rem_loc = action
-        put_y, put_x = divmod(put_loc, self.config.width)
+        type_index, put_y, put_x, rem_y, rem_x = action
 
         # Validate placement position before delegating to Rust
         if np.sum(self.state[self.BOARD_LAYERS, put_y, put_x]) != 1:
@@ -375,37 +374,35 @@ class ZertzBoard:
                 f"Invalid placement: position ({put_y}, {put_x}) is not an empty ring"
             )
 
-        # Validate marble availability before delegating to Rust
-        # (Rust would panic instead of raising ValueError)
-        marble_type = self.LAYER_TO_MARBLE[type_index + 1]
-        supply_idx = self._get_supply_index(marble_type)
-        if self.global_state[supply_idx] >= 1:
-            # Marble available in supply - OK
-            pass
-        elif np.all(self.global_state[self.SUPPLY_SLICE] == 0):
-            # Entire supply pool is empty - can use captured marbles
-            captured_idx = self._get_captured_index(marble_type, self.get_cur_player())
-            if self.global_state[captured_idx] < 1:
-                raise ValueError(
-                    f"No {marble_type} marbles available in supply or captured by player {self.get_cur_player()}"
-                )
-        else:
-            # This marble type is empty but pool has other marbles - cannot use captured marbles yet
-            raise ValueError(
-                f"No {marble_type} marbles in supply. Cannot use captured marbles until entire pool is empty."
-            )
+        # # Validate marble availability before delegating to Rust
+        # # (Rust would panic instead of raising ValueError)
+        # marble_type = self.LAYER_TO_MARBLE[type_index + 1]
+        # supply_idx = self._get_supply_index(marble_type)
+        # if self.global_state[supply_idx] >= 1:
+        #     # Marble available in supply - OK
+        #     pass
+        # elif np.all(self.global_state[self.SUPPLY_SLICE] == 0):
+        #     # Entire supply pool is empty - can use captured marbles
+        #     captured_idx = self._get_captured_index(marble_type, self.get_cur_player())
+        #     if self.global_state[captured_idx] < 1:
+        #         raise ValueError(
+        #             f"No {marble_type} marbles available in supply or captured by player {self.get_cur_player()}"
+        #         )
+        # else:
+        #     # This marble type is empty but pool has other marbles - cannot use captured marbles yet
+        #     raise ValueError(
+        #         f"No {marble_type} marbles in supply. Cannot use captured marbles until entire pool is empty."
+        #     )
 
         # Delegate to Rust (which handles marble placement, ring removal,
         # isolation capture, supply/captured pool management, and player switching)
         # Returns list of captured marble positions from isolation
         # Unpack action tuple for Rust function signature
-        type_index, put_loc, rem_loc = action
-        put_y, put_x = divmod(put_loc, self.config.width)
-        if rem_loc == self.config.width**2:
+        # type_index, put_loc, rem_loc = action
+        # put_y, put_x = divmod(put_loc, self.config.width)
+        if (put_y, put_x) == (rem_y, rem_x):
             # No removal - Rust uses None for Option<usize>
             rem_y, rem_x = None, None
-        else:
-            rem_y, rem_x = divmod(rem_loc, self.config.width)
 
         captured_positions = apply_placement_action(
             self.state,
@@ -493,22 +490,12 @@ class ZertzBoard:
         return captured_type
 
 
-    def get_valid_moves(self):
+    def get_valid_actions(self):
         """Return valid placement and capture moves.
 
         Delegates to get_valid_actions() for zero code duplication.
         """
         return get_valid_actions(self.state, self.global_state, self.config)
-
-    #todo check
-    def get_placement_shape(self):
-        # get shape of placement moves as a tuple
-        return 3, self.config.width**2, self.config.width**2 + 1
-
-    #todo check
-    def get_capture_shape(self):
-        # get shape of capture moves as a tuple
-        return 6, self.config.width, self.config.width
 
     def get_placement_moves(self):
         """Return valid placement moves.
