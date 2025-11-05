@@ -112,51 +112,7 @@ class TestStateCompleteness:
         assert state2["spatial"][0, 0, 0] != 99, "Spatial should be a copy"
         assert state2["global"][0] != 99, "Global should be a copy"
 
-    def test_get_next_state_returns_dict(self):
-        """get_next_state should also return dictionary format."""
-        game = ZertzGame(rings=37)
 
-        # Find a valid action
-        placement, capture = game.get_valid_actions()
-        valid_actions = np.argwhere(placement)
-        assert len(valid_actions) > 0, "Should have valid placement actions"
-
-        action = tuple(valid_actions[0])
-        next_state = game.get_next_state(action, "PUT")
-
-        assert isinstance(next_state, dict), "Next state should be a dictionary"
-        assert "spatial" in next_state
-        assert "global" in next_state
-        assert "player" in next_state
-
-    def test_state_changes_after_action(self):
-        """State should reflect changes after action."""
-        game = ZertzGame(rings=37)
-        initial_state = game.get_current_state()
-
-        # Initial supply
-        initial_supply = initial_state["global"][ZertzBoard.SUPPLY_SLICE].copy()
-
-        # Find and take a placement action
-        placement, capture = game.get_valid_actions()
-        valid_actions = np.argwhere(placement)
-        action = tuple(valid_actions[0])
-
-        # Determine which marble type was placed
-        marble_type_idx = action[0]
-
-        next_state = game.get_next_state(action, "PUT")
-
-        # Supply should have decreased
-        new_supply = next_state["global"][ZertzBoard.SUPPLY_SLICE]
-        assert new_supply[marble_type_idx] == initial_supply[marble_type_idx] - 1, (
-            "Supply should decrease by 1 for placed marble"
-        )
-
-        # Player should have switched
-        assert next_state["player"] == -initial_state["player"], (
-            "Player should switch after action"
-        )
 
     def test_different_board_sizes(self):
         """State should work correctly for all board sizes."""
@@ -174,32 +130,6 @@ class TestStateCompleteness:
             assert state["player"] in [1, -1], (
                 f"Player value wrong for {rings}-ring board"
             )
-
-    def test_get_next_state_with_cur_state(self):
-        """Test get_next_state with explicit cur_state parameter."""
-        game = ZertzGame(rings=37)
-
-        # Get initial state
-        initial_state = game.get_current_state()
-        cur_state = np.copy(initial_state["spatial"])
-
-        # Find a valid action
-        placement, capture = game.get_valid_actions()
-        valid_actions = np.argwhere(placement)
-        assert len(valid_actions) > 0
-        action = tuple(valid_actions[0])
-
-        # Get next state using cur_state parameter
-        next_state = game.get_next_state(action, "PUT", cur_state=cur_state)
-
-        assert isinstance(next_state, dict)
-        assert "spatial" in next_state
-        assert "global" in next_state
-        assert "player" in next_state
-
-        # Verify original game state unchanged
-        original_player = game.get_cur_player_value()
-        assert original_player == 1, "Original game should be unchanged"
 
     def test_get_valid_actions_with_cur_state(self):
         """Test get_valid_actions with explicit cur_state parameter."""

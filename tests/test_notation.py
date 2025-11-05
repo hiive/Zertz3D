@@ -9,7 +9,7 @@ import pytest
 import sys
 from pathlib import Path
 import numpy as np
-from hiivelabs_mcts import algebraic_to_coordinate
+import hiivelabs_mcts.zertz as zertz
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -198,20 +198,16 @@ class TestNotationWorkflow:
         """Test complete workflow: action execution → notation generation (all board sizes)."""
         game = ZertzGame(rings=rings)
         board = game.board
-
+        config = board.config
         # Use specific placement: place white marble at D4, remove C1
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        c1_idx = algebraic_to_coordinate("C1", board.config)
-        d4_y, d4_x = d4_idx
-        c1_y, c1_x = c1_idx
-        d4_flat = d4_y * board.config.width + d4_x
-        c1_flat = c1_y * board.config.width + c1_x
-
+        d4_y, d4_x = zertz.algebraic_to_coordinate(config, "D4")
+        c1_y, c1_x = zertz.algebraic_to_coordinate(config, "C1")
         marble_idx = 0  # White marble
-        action = (marble_idx, d4_flat, c1_flat)
 
+        action = zertz.ZertzAction.placement(config, marble_idx, d4_y, d4_x, c1_y, c1_x)
         # Generate action string before execution
-        action_str, action_dict = game.action_to_str("PUT", action)
+        action_tuple = action.to_tuple(config)
+        action_str, action_dict = game.action_to_str(*action_tuple)
 
         # Verify action dict has expected values
         assert action_dict["action"] == "PUT"
@@ -220,7 +216,7 @@ class TestNotationWorkflow:
         assert action_dict["remove"] == "C1"
 
         # Execute action
-        action_result = game.take_action("PUT", action)
+        action_result = game.take_action(action)
 
         # Generate notation with result
         notation = game.action_to_notation(action_dict, action_result)
@@ -247,10 +243,10 @@ class TestNotationWorkflow:
         # Isolated region: C1 (1 ring with white marble)
         # Connection: D3 (will be removed to isolate C1)
 
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        e4_idx = algebraic_to_coordinate("E4", board.config)
-        d3_idx = algebraic_to_coordinate("D3", board.config)
-        c1_idx = algebraic_to_coordinate("C1", board.config)
+        d4_idx = zertz.algebraic_to_coordinate("D4", board.config)
+        e4_idx = zertz.algebraic_to_coordinate("E4", board.config)
+        d3_idx = zertz.algebraic_to_coordinate("D3", board.config)
+        c1_idx = zertz.algebraic_to_coordinate("C1", board.config)
 
         board.state[board.RING_LAYER][d4_idx] = 1
         board.state[board.RING_LAYER][e4_idx] = 1
@@ -268,10 +264,10 @@ class TestNotationWorkflow:
         d3_flat = d3_y * board.config.width + d3_x
 
         action = (0, e4_flat, d3_flat)  # Use white marble
-        action_str, action_dict = game.action_to_str("PUT", action)
+        action_str, action_dict = game.action_to_str(action)
 
         # Execute action
-        action_result = game.take_action("PUT", action)
+        action_result = game.take_action(action)
 
         # Verify isolation occurred
         assert action_result.is_isolation(), "Should have detected isolation"
@@ -301,9 +297,9 @@ class TestNotationWorkflow:
         board.state[board.MARBLE_LAYERS] = 0
 
         # B2 (white) → C3 (gray) → D4 (empty)
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
+        b2_idx = zertz.algebraic_to_coordinate("B2", board.config)
+        c3_idx = zertz.algebraic_to_coordinate("C3", board.config)
+        d4_idx = zertz.algebraic_to_coordinate("D4", board.config)
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         gray_layer = board.MARBLE_TO_LAYER["g"]
@@ -354,10 +350,10 @@ class TestNotationWorkflow:
 
         # Create chain along same row: B2 (w) → C3 (g) → D4 (empty) → E4 (b) → F4 (empty)
         # Row A1 B2 C3 D4 E4 F4 G4 - all aligned horizontally
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        e4_idx = algebraic_to_coordinate("E4", board.config)
+        b2_idx = zertz.algebraic_to_coordinate("B2", board.config)
+        c3_idx = zertz.algebraic_to_coordinate("C3", board.config)
+        d4_idx = zertz.algebraic_to_coordinate("D4", board.config)
+        e4_idx = zertz.algebraic_to_coordinate("E4", board.config)
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         gray_layer = board.MARBLE_TO_LAYER["g"]

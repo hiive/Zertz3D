@@ -61,8 +61,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from game.zertz_game import ZertzGame
-from game.players.mcts_zertz_player import MCTSZertzPlayer
-from game.zertz_player import RandomZertzPlayer
+from game.players import MCTSZertzPlayer, RandomZertzPlayer
 
 
 @dataclass

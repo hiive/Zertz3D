@@ -1,10 +1,10 @@
 import numpy as np
 
-from game.zertz_player import ZertzPlayer
+from game.players.zertz_player import ZertzPlayer
 from game.constants import BLITZ_WIN_CONDITIONS
 from learner.mcts.backend import ensure_rust_backend
-
-import hiivelabs_mcts
+from game.zertz_board import ZertzBoard
+import hiivelabs_mcts.zertz as zertz
 
 
 class MCTSZertzPlayer(ZertzPlayer):
@@ -72,7 +72,7 @@ class MCTSZertzPlayer(ZertzPlayer):
         self.name = f"MCTS {n}"
 
         # Create Rust MCTS searcher
-        self.rust_mcts = hiivelabs_mcts.ZertzMCTS(
+        self.rust_mcts = zertz.ZertzMCTS(
             rings=self.game.initial_rings,
             exploration_constant=exploration_constant,
             widening_constant=widening_constant,
@@ -94,17 +94,19 @@ class MCTSZertzPlayer(ZertzPlayer):
         """
         # Optimization: If only one legal move, return it immediately (no search needed)
         placement_mask, capture_mask = self.game.get_valid_actions()
-
+        config = self.game.board.config
         # Check captures first (they're mandatory)
         c1, c2, c3 = capture_mask.nonzero()
         if c1.size == 1:
             # Exactly one capture - mandatory move, no decision needed
-            direction, y, x = int(c1[0]), int(c2[0]), int(c3[0])
-            from game.zertz_board import ZertzBoard
-            action_data = ZertzBoard.capture_indices_to_action(
-                direction, y, x, self.game.board.config.width, self.game.board.DIRECTIONS
-            )
-            return ("CAP", action_data)
+            direction, src_y, src_x = int(c1[0]), int(c2[0]), int(c3[0])
+            dst_y, dst_x = zertz.get_capture_destination(config, src_y, src_x, direction)
+
+            # action_data = ZertzBoard.capture_indices_to_action(
+            #     direction, src_y, src_x, config.width, self.game.board.DIRECTIONS
+            # )
+            # return ("CAP", action_data)
+            return zertz.ZertzAction.capture(config, src_y, src_x, dst_y, dst_x)
         elif c1.size > 1:
             # Multiple captures available - need MCTS to decide
             pass
@@ -113,12 +115,14 @@ class MCTSZertzPlayer(ZertzPlayer):
             p1, p2, p3, p4, p5 = placement_mask.nonzero()
             if p1.size == 1:
                 # Exactly one placement - forced move, no decision needed
-                return ("PUT", (int(p1[0]), int(p2[0]), int(p3[0]), int(p4[0]), int(p5[0])))
+                # return ("PUT", (int(p1[0]), int(p2[0]), int(p3[0]), int(p4[0]), int(p5[0])))
+                return zertz.ZertzAction.placement(config, int(p1[0]), int(p2[0]), int(p3[0]), int(p4[0]), int(p5[0]))
             elif p1.size == 0:
                 # No moves available - must pass
-                return ("PASS", None)
-            # Multiple placements available - need MCTS to decide
+                # return ("PASS", None)
+                return zertz.ZertzAction.pass_action()
 
+        # Multiple placements available - need MCTS to decide
         # Run MCTS search
         action = self._search()
         return action
@@ -134,8 +138,7 @@ class MCTSZertzPlayer(ZertzPlayer):
 
         # Convert to dictionary with action tuples as keys
         action_scores = {}
-        for action_type, action_data, score in child_stats:
-            action = (action_type, action_data)
+        for action, score in child_stats:
             action_scores[action] = score
 
         return action_scores
@@ -191,14 +194,14 @@ class MCTSZertzPlayer(ZertzPlayer):
 
         # Run search (serial or parallel)
         if self.num_workers > 1:
-            action_type, action_data = self.rust_mcts.search_parallel(
+            action = self.rust_mcts.search_parallel(
                 spatial_state,
                 global_state,
                 # num_threads=self.num_workers,
                 **rust_kwargs,
             )
         else:  # Serial mode
-            action_type, action_data = self.rust_mcts.search(
+            action = self.rust_mcts.search(
                 spatial_state,
                 global_state,
                 **rust_kwargs,
@@ -208,20 +211,5 @@ class MCTSZertzPlayer(ZertzPlayer):
         self._last_root_visits = self.rust_mcts.last_root_visits()
         self._last_root_value = self.rust_mcts.last_root_value()
 
-        # DEBUG: Print search results
-        # print(f"[DEBUG MCTS] Player {self.n} (idx={my_player_index}) search complete:")
-        # print(f"  Root value: {self._last_root_value:.3f} (from current player's perspective)")
-        # print(f"  Root visits: {self._last_root_visits}, Children: {self._last_root_children}")
-        # print(f"  Chosen action: {action_type} {action_data}")
 
-        # Get action scores to find chosen action's score
-        child_stats = self.rust_mcts.last_child_statistics()
-        chosen_score = None
-        for act_type, act_data, score in child_stats:
-            if act_type == action_type and act_data == action_data:
-                chosen_score = score
-                break
-        # if chosen_score is not None:
-        #     print(f"  Chosen action score: {chosen_score:.3f}")
-
-        return (action_type, action_data)
+        return action

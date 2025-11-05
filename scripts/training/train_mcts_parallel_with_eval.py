@@ -38,8 +38,7 @@ import tempfile
 import os
 
 from game.zertz_game import ZertzGame
-from game.players.mcts_zertz_player import MCTSZertzPlayer
-from game.zertz_player import RandomZertzPlayer
+from game.players import MCTSZertzPlayer, RandomZertzPlayer
 from learner.mcts.transposition_table import TranspositionTable
 from learner.mcts.elo_tracker import EloTracker
 

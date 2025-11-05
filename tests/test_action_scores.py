@@ -4,13 +4,27 @@ Verifies that players can return per-action scores that reflect move quality,
 and that the scores are properly normalized to [0.0, 1.0] range.
 """
 
+import hiivelabs_mcts.zertz as zertz
+
 from game.zertz_game import ZertzGame
-from game.zertz_player import RandomZertzPlayer
-from game.players.mcts_zertz_player import MCTSZertzPlayer
+from game.players import MCTSZertzPlayer, RandomZertzPlayer
 
 
 class TestActionScores:
     """Test action scores API across different player types."""
+
+    def test_placement_with_no_removal(self):
+        game = ZertzGame(rings=37)
+        action = zertz.ZertzAction.placement(game.board.config, 0, 3, 4)
+        action_type, action_data = action.to_tuple(game.board.config)
+        assert action_type == 'PUT'
+        assert len(action_data) == 5
+        assert action_data[0] == 0
+        assert action_data[1] == 3
+        assert action_data[2] == 4
+        assert action_data[3] is None
+        assert action_data[4] is None
+
 
     def test_random_player_returns_uniform_scores(self):
         """RandomZertzPlayer should return uniform scores (all 1.0)."""
@@ -70,23 +84,21 @@ class TestActionScores:
         )
 
         # Get action and scores
-        action = player.get_action()
         scores = player.get_last_action_scores()
 
         # Check that all keys are valid action tuples
         for action_key in scores.keys():
-            action_type, action_data = action_key
 
             # Verify action type
+            action_type, action_data = action_key.to_tuple(game.board.config)
             assert action_type in ['PUT', 'CAP', 'PASS']
-
             # Verify action data format
             if action_type == 'PUT':
                 assert action_data is not None
-                assert len(action_data) == 3  # (marble_type, dst_flat, remove_flat)
+                assert len(action_data) == 5  # (marble_type, src_y, src_x, remove_y, remove_x)
             elif action_type == 'CAP':
                 assert action_data is not None
-                assert len(action_data) == 3  # (direction, start_y, start_x)
+                assert len(action_data) == 3  # (src_y, src_x, remove_y, remove_x)
             elif action_type == 'PASS':
                 assert action_data is None
 
@@ -166,7 +178,7 @@ class TestActionScores:
                 assert action in scores
 
             # Apply action to game
-            game.take_action(*action)
+            game.take_action(action)
 
             # Check if game ended
             if game.get_game_ended():

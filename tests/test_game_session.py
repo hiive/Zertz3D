@@ -11,7 +11,9 @@ from game.constants import (
     STANDARD_WIN_CONDITIONS,
     BLITZ_WIN_CONDITIONS,
 )
-from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer, HumanZertzPlayer
+from game.players import HumanZertzPlayer
+from game.players import ReplayZertzPlayer
+from game.players import RandomZertzPlayer
 
 
 class TestGameSession:

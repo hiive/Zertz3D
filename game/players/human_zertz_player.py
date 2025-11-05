@@ -1,62 +1,13 @@
-# import sys
-#
-# sys.path.append('..')
 from __future__ import annotations
 
+import queue
 from typing import Optional, Any
 
-import queue
+import numpy as np
 
 from game.zertz_game import ZertzGame
-import numpy as np
+from game.players.zertz_player import ZertzPlayer
 from shared.constants import MARBLE_TYPES
-
-
-class ZertzPlayer:
-    """Base player with shared state and lifecycle hooks."""
-
-    def __init__(self, game: ZertzGame, n):
-        self.captured = {"b": 0, "g": 0, "w": 0}
-        self.game = game
-        self.n = n
-        self.name = f"Player {n}"
-
-    def get_action(self):
-        raise NotImplementedError
-
-    def get_last_action_scores(self):
-        """Get normalized scores for all legal actions from last search.
-
-        Returns:
-            Dict mapping action tuples to normalized scores [0.0, 1.0]
-        """
-        raise NotImplementedError
-
-    #
-    # Lifecycle hooks
-    #
-    def on_turn_start(
-        self,
-        context: str,
-        placement_mask: Optional[np.ndarray],
-        capture_mask: Optional[np.ndarray],
-    ) -> None:
-        """Inform the player that a new decision context has begun."""
-        return None
-
-    def clear_context(self) -> None:
-        """Signal that the current decision context is complete."""
-        return None
-
-    def handle_selection(self, selection: dict) -> bool:
-        """Handle renderer-driven selection events (default: ignore)."""
-        return False
-
-    def handle_hover(self, selection: Optional[dict]) -> bool:
-        return False
-
-    def add_capture(self, capture):
-        self.captured[capture] += 1
 
 
 class HumanZertzPlayer(ZertzPlayer):
@@ -497,103 +448,3 @@ class HumanZertzPlayer(ZertzPlayer):
 
     def current_context(self) -> Optional[str]:
         return self._current_context
-
-
-class RandomZertzPlayer(ZertzPlayer):
-
-    def __init__(self, game: ZertzGame, n):
-        super().__init__(game, n)
-        self.name = f"Random {n}"
-    def get_action(self):
-        """
-        Select random valid action.
-        - Placement actions: shape (3, width², width² + 1)
-        - Capture actions: shape (6, width, width)
-        Note: Captures are mandatory, so placement mask will be empty if captures exist.
-
-        If no valid actions exist, player passes ('PASS', None).
-        """
-        p_actions, c_actions = self.game.get_valid_actions()
-
-        c1, c2, c3 = c_actions.nonzero()
-        p1, p2, p3, p4, p5 = p_actions.nonzero()
-
-        # Determine action type
-        if c1.size > 0:
-            # Capture available (and therefore mandatory)
-            ip = np.random.randint(c1.size)
-            direction, y, x = int(c1[ip]), int(c2[ip]), int(c3[ip])
-            from game.zertz_board import ZertzBoard
-            action_data = ZertzBoard.capture_indices_to_action(
-                direction, y, x, self.game.board.config.width, self.game.board.DIRECTIONS
-            )
-            return ("CAP", action_data)
-        elif p1.size > 0:
-            # Only placements available
-            ip = np.random.randint(p1.size)
-            return ("PUT", (int(p1[ip]), int(p2[ip]), int(p3[ip]), int(p4[ip]), int(p5[ip])))
-        else:
-            # No valid actions - player must pass
-            return ("PASS", None)
-
-    def get_last_action_scores(self):
-        """Random player treats all moves equally (uniform scores).
-
-        Returns:
-            Dict mapping action tuples to uniform score of 1.0
-        """
-        p_actions, c_actions = self.game.get_valid_actions()
-
-        c1, c2, c3 = c_actions.nonzero()
-        p1, p2, p3, p4, p5 = p_actions.nonzero()
-
-        action_scores = {}
-
-        # Collect all valid actions with uniform score
-        if c1.size > 0:
-            # Captures available
-            for i in range(c1.size):
-                action = ("CAP", (int(c1[i]), int(c2[i]), int(c3[i])))
-                action_scores[action] = 1.0
-        elif p1.size > 0:
-            # Placements available
-            for i in range(p1.size):
-                action = ("PUT", (int(p1[i]), int(p2[i]), int(p3[i]), int(p4[i]), int(p5[i])))
-                action_scores[action] = 1.0
-        else:
-            # Must pass
-            action_scores[("PASS", None)] = 1.0
-
-        return action_scores
-
-
-class ReplayZertzPlayer(ZertzPlayer):
-    """Player that replays moves from a list of action dictionaries."""
-
-    def __init__(self, game: ZertzGame, n, actions):
-        super().__init__(game, n)
-        self.actions = actions
-        self.action_index = 0
-
-    def get_action(self):
-        """Return the next action from the replay list."""
-        if self.action_index >= len(self.actions):
-            raise ValueError(f"No more actions for player {self.n}")
-
-        action_dict = self.actions[self.action_index]
-        self.action_index += 1
-
-        # Convert action_dict to action string format
-        if action_dict["action"] == "PUT":
-            # Check if remove field exists and is not empty
-            if action_dict.get("remove") and action_dict["remove"].strip():
-                action_str = f"PUT {action_dict['marble']} {action_dict['dst']} {action_dict['remove']}"
-            else:
-                action_str = f"PUT {action_dict['marble']} {action_dict['dst']}"
-        elif action_dict["action"] == "CAP":
-            action_str = f"CAP {action_dict['src']} {action_dict['capture']} {action_dict['dst']}"
-        else:
-            raise ValueError(f"Unknown action type: {action_dict['action']}")
-
-        # Use game's str_to_action to convert to internal format
-        return self.game.str_to_action(action_str)

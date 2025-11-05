@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 import sys
 from pathlib import Path
-from hiivelabs_mcts import algebraic_to_coordinate
+import hiivelabs_mcts.zertz as zertz
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))

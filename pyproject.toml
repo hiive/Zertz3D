@@ -37,7 +37,10 @@ build-backend = "maturin"
 manifest-path = "rust/Cargo.toml"
 module-name = "hiivelabs_mcts"
 python-packages = ["cli", "controller", "factory", "game", "learner", "renderer", "shared", "scripts"]
-include = ["models/**/*"]
+include = [
+    "models/**/*",
+    "rust/hiivelabs_mcts/*.pyi",
+]
 
 
 [tool.pytest.ini_options]

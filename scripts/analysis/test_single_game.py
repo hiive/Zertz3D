@@ -15,7 +15,7 @@ if str(project_root) not in sys.path:
 
 import numpy as np
 from game.zertz_game import ZertzGame
-from game.players.mcts_zertz_player import MCTSZertzPlayer
+from game.players import MCTSZertzPlayer
 from learner.mcts.backend import HAS_RUST
 
 # Set random seed for reproducibility

@@ -9,8 +9,9 @@ The crash occurred with:
 
 import pytest
 import numpy as np
+import hiivelabs_mcts.zertz as zertz
 from game.zertz_game import ZertzGame
-from hiivelabs_mcts import algebraic_to_coordinate
+
 
 
 def test_crash_seed_1760910995_with_high_iterations():
@@ -23,17 +24,17 @@ def test_crash_seed_1760910995_with_high_iterations():
 
     # Player 1 move from crash log: PUT w at E1, remove A4
     width = game.board.config.width
-    e1_y, e1_x = algebraic_to_coordinate("E1", game.board.config)
-    a4_y, a4_x = algebraic_to_coordinate("A4", game.board.config)
+    e1_y, e1_x = zertz.algebraic_to_coordinate(game.board.config, "E1")
+    a4_y, a4_x =zertz.algebraic_to_coordinate(game.board.config, "A4")
 
     game.take_action("PUT", (0, e1_y, e1_x, a4_y, a4_x))
 
     # Now Player 2's turn with high iterations (like in crash: 2500)
     state = game.get_current_state()
-    rust_search = hiivelabs_mcts.ZertzMCTS(rings=37, t=1)
+    rust_search = zertz.ZertzMCTS(rings=37, t=1)
 
     # Use parallel mode with high iterations to match crash scenario
-    action_type, action_data = rust_search.search_parallel(
+    best_action = rust_search.search_parallel(
         state['spatial'].astype(np.float32),
         state['global'].astype(np.float32),
         # rings=37,
@@ -42,20 +43,17 @@ def test_crash_seed_1760910995_with_high_iterations():
         # num_threads=16,
         verbose=True
     )
-
+    action_type, action_data = best_action.to_tuple(game.board.config)
     print(f"\nAction returned: {action_type} {action_data}")
 
     # Verify the action is valid
     if action_type == "PUT":
-        marble_type, dst_flat, rem_flat = action_data
+        marble_type, dst_y, dst_x, rem_y, rem_x = action_data
         placement_mask, _ = game.get_valid_actions()
 
         # Check it's in the valid action mask
-        dst_x = dst_flat % width
-        dst_y = dst_flat // width
-
-        assert placement_mask[marble_type, dst_flat, rem_flat] > 0, \
-            f"Invalid placement: marble={marble_type}, dst={dst_flat}, remove={rem_flat}"
+        assert placement_mask[marble_type, dst_y, dst_x, rem_y, rem_x] > 0, \
+            f"Invalid placement: marble={marble_type}, dst={(dst_y, dst_x)}, remove={(rem_y, rem_x)}"
 
         print(f"Destination: ({dst_y}, {dst_x})")
 
@@ -65,8 +63,8 @@ def test_crash_seed_1760910995_with_high_iterations():
 
         # This should not raise ValueError
         try:
-            from hiivelabs_mcts import coordinate_to_algebraic
-            pos_str = coordinate_to_algebraic(dst_y, dst_x, game.board.config)
+            
+            pos_str = zertz.coordinate_to_algebraic(game.board.config, dst_y, dst_x)
             print(f"Position string: {pos_str}")
         except ValueError as e:
             pytest.fail(f"coordinate_to_algebraic failed: {e}, coords=({dst_y}, {dst_x}), flat={dst_flat}")
@@ -96,8 +94,8 @@ def test_position_0_6_validity():
     # Check if it's a valid ring position
     if game.board.state[0, y, x] == 1:
         try:
-            from hiivelabs_mcts import coordinate_to_algebraic
-            pos_str = coordinate_to_algebraic(y, x, game.board.config)
+            
+            pos_str = zertz.coordinate_to_algebraic(game.board.config, y, x)
             print(f"Position ({y}, {x}) = {pos_str}")
         except ValueError as e:
             print(f"Position ({y}, {x}) raises ValueError: {e}")
@@ -105,13 +103,13 @@ def test_position_0_6_validity():
         print(f"Position ({y}, {x}) is not a ring on the board")
 
     # Check what positions are valid rings
-    from hiivelabs_mcts import coordinate_to_algebraic
+
     print("\nValid ring positions on row 0:")
     valid_positions = []
     for x in range(width):
         if game.board.state[0, 0, x] == 1:
             try:
-                pos_str = coordinate_to_algebraic(0, x, game.board.config)
+                pos_str = zertz.coordinate_to_algebraic(game.board.config, 0, x)
                 valid_positions.append(f"(0,{x})={pos_str}")
             except ValueError:
                 valid_positions.append(f"(0,{x})=ERROR")

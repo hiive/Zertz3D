@@ -3,8 +3,7 @@
 import pytest
 import numpy as np
 from game.zertz_game import ZertzGame
-from game.players.mcts_zertz_player import MCTSZertzPlayer
-from game.zertz_player import RandomZertzPlayer
+from game.players import MCTSZertzPlayer, RandomZertzPlayer
 from hiivelabs_mcts import algebraic_to_coordinate
 
 #TODO fill in test stubs

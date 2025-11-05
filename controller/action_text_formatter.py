@@ -4,6 +4,7 @@ Formats valid moves and game state information for display.
 """
 
 import numpy as np
+from hiivelabs_mcts import zertz
 
 from shared.constants import MARBLE_TYPES
 
@@ -64,12 +65,13 @@ class ActionTextFormatter:
 
         if len(capture_positions) > 0:
             lines.append("Capture moves available:")
-            for i, (direction, y, x) in enumerate(
+            for i, (direction, src_y, src_x) in enumerate(
                 capture_positions[:10]
             ):  # Show up to 10
                 try:
-                    _, action_dict = game.action_to_str("CAP", (direction, y, x))
-                    marble = action_dict["marble"]
+                    dst_y, dst_x = zertz.get_capture_destination(game.board.config, src_y, src_x, direction)
+                    _, action_dict = game.action_to_str("CAP", (src_y, src_x, dst_y, dst_x))
+                    marble = zertz.get_marble_type_at(game.board.config, game.board.state, src_y, src_x)
                     src = action_dict["src"]
                     dst = action_dict["dst"]
                     captured = action_dict["capture"]
@@ -78,8 +80,7 @@ class ActionTextFormatter:
                         f"  - CAP {marble} {src} -> {dst} capturing {captured} at {cap_pos}"
                     )
                 except (IndexError, KeyError):
-                    from hiivelabs_mcts import coordinate_to_algebraic
-                    src_label = coordinate_to_algebraic(y, x, game.board.config)
+                    src_label = zertz.coordinate_to_algebraic(game.board.config, src_y, src_x)
                     lines.append(
                         f"  - Jump from {src_label} (direction {direction})"
                     )
@@ -107,21 +108,16 @@ class ActionTextFormatter:
             placements = {}  # {(marble, dst_str): [list of removal positions]}
             removals_set = set()  # Track all possible removals
 
-            for marble_idx, dst, rem in placement_positions:
-                from hiivelabs_mcts import coordinate_to_algebraic
+            for marble_idx, dst_y, dst_x, rem_y, rem_x in placement_positions:
                 marble = MARBLE_TYPES[marble_idx]
-                dst_y = dst // game.board.width
-                dst_x = dst % game.board.width
-                dst_str = coordinate_to_algebraic(dst_y, dst_x, game.board.config)
+                dst_str = zertz.coordinate_to_algebraic(game.board.config, dst_y, dst_x)
 
                 key = (marble, dst_str)
                 if key not in placements:
                     placements[key] = []
 
-                if rem != game.board.width**2:
-                    rem_y = rem // game.board.width
-                    rem_x = rem % game.board.width
-                    rem_str = coordinate_to_algebraic(rem_y, rem_x, game.board.config)
+                if rem_y is not None and rem_x is not None:
+                    rem_str = zertz.coordinate_to_algebraic(game.board.config, rem_y, rem_x)
                     placements[key].append(rem_str)
                     removals_set.add(rem_str)
 

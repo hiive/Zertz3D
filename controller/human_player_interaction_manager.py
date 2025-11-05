@@ -66,7 +66,7 @@ class HumanPlayerInteractionManager:
                 if board.state[board.RING_LAYER, y, x] == 0:
                     return None
                 from hiivelabs_mcts import coordinate_to_algebraic
-                label = coordinate_to_algebraic(y, x, board.config)
+                label = coordinate_to_algebraic(board.config, y, x)
             except (IndexError, ValueError):
                 return None
             return label or None
@@ -201,7 +201,7 @@ class HumanPlayerInteractionManager:
         if label:
             try:
                 from hiivelabs_mcts import algebraic_to_coordinate
-                payload["index"] = algebraic_to_coordinate(label, self.session.game.board.config)
+                payload["index"] = algebraic_to_coordinate(self.session.game.board.config, label)
             except ValueError:
                 payload["index"] = None
 
@@ -229,7 +229,7 @@ class HumanPlayerInteractionManager:
             if label:
                 try:
                     from hiivelabs_mcts import algebraic_to_coordinate
-                    payload["index"] = algebraic_to_coordinate(label, self.session.game.board.config)
+                    payload["index"] = algebraic_to_coordinate(self.session.game.board.config, label)
                 except ValueError:
                     payload["index"] = None
             index = payload.get("index")

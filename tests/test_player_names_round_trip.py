@@ -2,14 +2,10 @@
 
 import tempfile
 import os
-from pathlib import Path
 
 from game.writers import NotationWriter, TranscriptWriter
 from game.loaders.notation_loader import NotationLoader
 from game.loaders.transcript_loader import TranscriptLoader
-from game.zertz_game import ZertzGame
-from game.player_config import PlayerConfig
-from controller.game_session import GameSession
 
 
 def test_notation_player_names_round_trip():

@@ -281,8 +281,8 @@ class TestActionStringConversion:
         assert action is not None
         # Action should be (marble_idx, dst, rem)
         # rem should be width² when no removal specified
-        marble_idx, dst, rem = action
-        assert rem == game.board.config.width**2
+        marble_idx, dst_y, dst_x, rem_y, rem_x = action
+        assert rem_y is None and rem_x is None
 
 
 class TestHasValidMoves:

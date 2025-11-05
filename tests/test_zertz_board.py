@@ -65,31 +65,6 @@ def large_board():
 class TestCoordinateConversion:
     """Test coordinate conversion helper methods."""
 
-    def test_flat_to_2d_conversion(self, board):
-        """Test conversion from flat index to 2D coordinates."""
-        # Test corner positions
-        y, x = divmod(0, board.config.width)
-        assert y == 0 and x == 0
-
-        # Test that conversion is consistent
-        for flat_idx in [0, 5, 10, board.config.width - 1]:
-            y, x = divmod(flat_idx, board.config.width)
-            assert 0 <= y < board.config.width
-            assert 0 <= x < board.config.width
-
-    def test_2d_to_flat_conversion(self, board):
-        """Test conversion from 2D coordinates to flat index."""
-        # Test corner
-        flat = 0 * board.config.width + 0
-        assert flat == 0
-
-        # Test roundtrip conversion
-        for y in range(board.config.width):
-            for x in range(board.config.width):
-                flat = y * board.config.width + x
-                y2, x2 = divmod(flat, board.config.width)
-                assert y == y2 and x == x2
-
     def test_str_to_index_and_back(self, board):
         """Test string to index conversion and back."""
         # Iterate over all positions where rings exist
@@ -98,13 +73,14 @@ class TestCoordinateConversion:
                 # Only test positions that have rings
                 if board.state[board.RING_LAYER, y, x] == 1:
                     # Get the position label
-                    pos_str = coordinate_to_algebraic(*(y, x, board.config))
+                    pos_str = coordinate_to_algebraic(*(board.config, y, x))
                     if pos_str:  # Skip if empty string (removed ring)
                         # Convert to index and back
-                        idx = algebraic_to_coordinate(pos_str, board.config)
-                        result_str = coordinate_to_algebraic(*idx, board.config)
+                        idx = algebraic_to_coordinate(board.config, pos_str)
+                        result_str = coordinate_to_algebraic(board.config, *idx)
                         assert result_str == pos_str, f"Failed roundtrip for {pos_str}: got {result_str} from {idx}"
                         assert idx == (y, x), f"Failed index roundtrip for {pos_str}: expected {(y, x)}, got {idx}"
+
 
 
 # ============================================================================
@@ -200,16 +176,16 @@ def test_capture_sequence_continues_with_same_marble():
 
     # Set up scenario: place marbles for a capture sequence
     # Marble A (white) at C2
-    c2_idx = algebraic_to_coordinate("C2", board.config)
+    c2_idx = algebraic_to_coordinate(board.config, "C2")
     white_layer = board.MARBLE_TO_LAYER["w"]
     board.state[white_layer][c2_idx] = 1
 
     # Marble X (white) at D3 (will be captured)
-    d3_idx = algebraic_to_coordinate("D3", board.config)
+    d3_idx = algebraic_to_coordinate(board.config, "D3")
     board.state[white_layer][d3_idx] = 1
 
     # Marble B (gray) at F2
-    f2_idx = algebraic_to_coordinate("F2", board.config)
+    f2_idx = algebraic_to_coordinate(board.config, "F2")
     gray_layer = board.MARBLE_TO_LAYER["g"]
     board.state[gray_layer][f2_idx] = 1
 
@@ -225,7 +201,7 @@ def test_capture_sequence_continues_with_same_marble():
 
     # Simulate the capture: A moves from C2 to E3, X is removed
     board.state[white_layer][c2_idx] = 0
-    e3_idx = algebraic_to_coordinate("E3", board.config)
+    e3_idx = algebraic_to_coordinate(board.config, "E3")
     board.state[white_layer][e3_idx] = 1
     board.state[white_layer][d3_idx] = 0  # X is captured
 

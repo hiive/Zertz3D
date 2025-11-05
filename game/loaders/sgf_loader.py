@@ -153,8 +153,8 @@ class SGFLoader:
             dst = self._normalize_coordinate(cmd[3], cmd[4])
 
             from hiivelabs_mcts import algebraic_to_coordinate
-            src_idx = algebraic_to_coordinate(src, game.board.config)
-            dst_idx = algebraic_to_coordinate(dst, game.board.config)
+            src_idx = algebraic_to_coordinate(game.board.config, src)
+            dst_idx = algebraic_to_coordinate(game.board.config, dst)
             cap_idx = game.board.get_middle_ring(src_idx, dst_idx)
             cap_label = str(game.board.yx_to_label(cap_idx))
 

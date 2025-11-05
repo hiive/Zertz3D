@@ -3,7 +3,7 @@
 import argparse
 
 from factory import ZertzFactory
-from game.player_config import parse_player_spec, PlayerConfig
+from game.players.player_config import parse_player_spec
 
 
 def main() -> None:

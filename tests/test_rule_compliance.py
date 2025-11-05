@@ -1,5 +1,6 @@
 import numpy as np
-from hiivelabs_mcts import algebraic_to_coordinate
+
+import hiivelabs_mcts.zertz as zertz
 
 from game.zertz_game import ZertzGame
 from game.zertz_board import ZertzBoard
@@ -15,7 +16,7 @@ def test_put_allows_no_removal_when_sentinel_used():
     board.global_state[board.SUPPLY_G] = 0
     board.global_state[board.SUPPLY_B] = 0
 
-    dest = algebraic_to_coordinate("D4", board.config)
+    dest = zertz.algebraic_to_coordinate(board.config, "D4")
     put_loc = (dest[0], dest[1])
     no_removal = (None, None)
 
@@ -59,7 +60,7 @@ def test_no_removable_rings_after_placement():
         board.state[white_layer, y, x] = 1
 
     # Find an open center position
-    center_pos = algebraic_to_coordinate("D4", board.config)
+    center_pos = zertz.algebraic_to_coordinate(board.config, "D4")
     assert board.state[white_layer, center_pos[0], center_pos[1]] == 0, "Center should be open"
 
     # Configure supply

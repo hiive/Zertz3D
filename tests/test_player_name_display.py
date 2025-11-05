@@ -1,6 +1,5 @@
 """Test that player names are displayed correctly in text output."""
 
-import tempfile
 import sys
 from pathlib import Path
 from io import StringIO
@@ -8,7 +7,7 @@ from io import StringIO
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from game.writers import TranscriptWriter
-from game.utils.player_utils import format_player_name
+from game.players.player_utils import format_player_name
 
 
 def test_format_player_name_without_custom_name():

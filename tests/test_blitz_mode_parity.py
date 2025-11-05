@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 from game.zertz_game import ZertzGame
 from game.constants import BLITZ_WIN_CONDITIONS, BLITZ_MARBLES, STANDARD_WIN_CONDITIONS
-from game.players.mcts_zertz_player import MCTSZertzPlayer
+from game.players import MCTSZertzPlayer
 
 
 class TestBlitzModeConstants:

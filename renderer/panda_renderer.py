@@ -45,7 +45,6 @@ from shared.materials_modifiers import (
 
 logger = logging.getLogger(__name__)
 
-
 class PandaRenderer(ShowBase):
     # Rendering constants
     BASE_SIZE_X = 0.8
@@ -569,7 +568,7 @@ class PandaRenderer(ShowBase):
                 # Check if this position exists in the layout mask
                 if layout_mask[i, pa]:
                     # Generate position label using Rust
-                    pos = coordinate_to_algebraic(i, pa, config)
+                    pos = coordinate_to_algebraic(config, i, pa)
 
                     # Pass board_node as parent so rings rotate with the board
                     base_piece = BasePiece(self, parent=self.board_node)
@@ -1534,25 +1533,27 @@ class PandaRenderer(ShowBase):
             capture_destinations: set[str] = set()
             for direction in range(capture_mask.shape[0]):
                 ys, xs = np.where(capture_mask[direction])
-                for y, x in zip(ys, xs):
+                for src_y, src_x in zip(ys, xs):
                     # Check if ring is removed before converting
-                    if board.state[board.RING_LAYER, y, x] == 0:
+                    if board.state[board.RING_LAYER, src_y, src_x] == 0:
                         continue
                     from hiivelabs_mcts import coordinate_to_algebraic
-                    label_src = coordinate_to_algebraic(y, x, board.config)
+                    label_src = coordinate_to_algebraic(board.config, src_y, src_x)
                     capture_sources.add(label_src)
-                    dy, dx = board.DIRECTIONS[direction]
-                    cap_index = (y + dy, x + dx)
-                    dst_index = board.get_jump_destination((y, x), cap_index)
-                    if dst_index is None:
-                        continue
-                    dst_y, dst_x = dst_index
+                    # dy, dx = board.DIRECTIONS[direction]
+                    # cap_index = (y + dy, x + dx)
+                    from hiivelabs_mcts import get_capture_destination
+                    dst_y, dst_x = get_capture_destination(board.config, src_y, src_x, direction)
+                    # dst_index = board.get_jump_destination((y, x), cap_index)
+                    # if dst_index is None:
+                    #     continue
+                    # dst_y, dst_x = dst_index
                     if (
                         0 <= dst_y < width
                         and 0 <= dst_x < width
                         and board.state[board.RING_LAYER, dst_y, dst_x] == 1
                     ):
-                        label_dst = coordinate_to_algebraic(dst_y, dst_x, board.config)
+                        label_dst = coordinate_to_algebraic(board.config, dst_y, dst_x)
                         capture_destinations.add(label_dst)
 
             if capture_sources:
@@ -1574,22 +1575,19 @@ class PandaRenderer(ShowBase):
         removal_rings: set[str] = set()
         valid_colors: set[int] = set()
 
+        from hiivelabs_mcts import coordinate_to_algebraic
         for marble_idx in range(placement_mask.shape[0]):
-            put_indices, rem_indices = np.where(placement_mask[marble_idx])
-            if put_indices.size > 0:
-                valid_colors.add(marble_idx)
-            for put, rem in zip(put_indices, rem_indices):
-                put_y, put_x = divmod(put, width)
+            put_y_set, put_x_set, rem_y_set, rem_x_set = np.where(placement_mask[marble_idx])
+            for putrem in zip(put_y_set, put_x_set, rem_y_set, rem_x_set):
+                put_y, put_x, rem_y, rem_x  = putrem
                 # Check if ring is removed before converting
                 if board.state[board.RING_LAYER, put_y, put_x] != 0:
-                    from hiivelabs_mcts import coordinate_to_algebraic
-                    label_put = coordinate_to_algebraic(put_y, put_x, board.config)
+                    label_put = coordinate_to_algebraic(board.config, put_y, put_x)
                     placement_rings.add(label_put)
-                if rem != width**2:
-                    rem_y, rem_x = divmod(rem, width)
+                if rem_y is not None and rem_x is not None:
                     # Check if ring is removed before converting
                     if board.state[board.RING_LAYER, rem_y, rem_x] != 0:
-                        label_rem = coordinate_to_algebraic(rem_y, rem_x, board.config)
+                        label_rem = coordinate_to_algebraic(board.config, rem_y, rem_x)
                         removal_rings.add(label_rem)
 
         # Show only placement rings (not removal rings) in apply_context_masks

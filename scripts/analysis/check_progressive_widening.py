@@ -17,8 +17,7 @@ if str(project_root) not in sys.path:
 
 import numpy as np
 from game.zertz_game import ZertzGame
-from game.players.mcts_zertz_player import MCTSZertzPlayer
-from game.players.random_zertz_player import RandomZertzPlayer
+from game.players import MCTSZertzPlayer, RandomZertzPlayer
 
 def test_with_progressive_widening(enabled, iterations=1500, games=10, seed=20972):
     """Test MCTS win rate with progressive widening enabled/disabled."""

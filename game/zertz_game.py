@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+import hiivelabs_mcts.zertz as zertz
 
 from .zertz_board import ZertzBoard
 from .action_result import ActionResult
@@ -175,29 +176,6 @@ class ZertzGame:
             "global": np.copy(self.board.global_state),
             "player": self.get_cur_player_value(),
         }
-
-    def get_next_state(self, action, action_type, cur_state=None):
-        """Apply action and return resulting game state.
-
-        Args:
-            action: Index into the action space matrix
-            action_type: 'PUT' for placement or 'CAP' for capture
-            cur_state: Optional spatial state array (L, H, W) to use instead of current state
-
-        Returns:
-            dict: Complete state after action (same format as get_current_state())
-                - 'spatial': (L, H, W) ndarray
-                - 'global': (10,) ndarray
-                - 'player': int (1 or -1)
-        """
-        if cur_state is None:
-            # Use the internal game state to determine the next state
-            self.take_action(action_type, action)  # Records state history
-            return self.get_current_state()
-        else:
-            # Return the next state for an arbitrary spatial state
-            temp_game = ZertzGame(clone=self, clone_state=cur_state)
-            return temp_game.get_next_state(action, action_type)
 
     def get_valid_actions(self, cur_state=None):
         # Returns two filtering matrices that can be used to filter and renormalize the policy
@@ -449,7 +427,6 @@ class ZertzGame:
         # Fallback
         return f"Captured w={w}, g={g}, b={b}"
 
-
     def str_to_action(self, action_str):
         # Translate an action string [i.e. 'PUT w A1 B2' or 'CAP b C4 g C2'] to a tuple/type
         args = action_str.split()
@@ -464,9 +441,9 @@ class ZertzGame:
                 return "", None
             from hiivelabs_mcts import algebraic_to_coordinate
             layer = self.board.MARBLE_TO_LAYER[marble_type] - 1
-            put_y, put_x = algebraic_to_coordinate(put_str, self.board.config)
+            put_y, put_x = algebraic_to_coordinate(self.board.config, put_str)
             if rem_str is not None:
-                rem_y, rem_x = algebraic_to_coordinate(rem_str, self.board.config)
+                rem_y, rem_x = algebraic_to_coordinate(self.board.config, rem_str)
             else:
                 rem_y, rem_x = (None, None)
             action = (layer, put_y, put_x, rem_y, rem_x)
@@ -476,8 +453,8 @@ class ZertzGame:
                 src_str, _b, dst_str = args[1:]
             else:
                 return "", None
-            src = algebraic_to_coordinate(src_str, self.board.config)
-            dst = algebraic_to_coordinate(dst_str, self.board.config)
+            src = algebraic_to_coordinate(self.board.config, src_str)
+            dst = algebraic_to_coordinate(self.board.config, dst_str)
 
             # Convert to internal format: (None, src_flat, dst_flat)
             action = (None, src[0], src[1], dst[0], dst[1])
@@ -500,12 +477,12 @@ class ZertzGame:
             from hiivelabs_mcts import coordinate_to_algebraic
             marble_type, put_y, put_x, rem_y, rem_x = action
             marble_type = self.board.LAYER_TO_MARBLE[marble_type + 1]
-            put_str = coordinate_to_algebraic(put_y, put_x, self.board.config)
+            put_str = coordinate_to_algebraic(self.board.config, put_y, put_x)
 
             if rem_y is None and rem_x is None:
                 rem_str = ""
             else:
-                rem_str = coordinate_to_algebraic(rem_y, rem_x, self.board.config)
+                rem_str = coordinate_to_algebraic(self.board.config, rem_y, rem_x)
             action_str = "{} {} {} {}".format(
                 action_type, marble_type, put_str, rem_str
             ).rstrip()
@@ -518,9 +495,7 @@ class ZertzGame:
 
         elif action_type == "CAP":
             # New format: (None, src_flat, dst_flat)
-            _, src_flat, dst_flat = action
-            src_y, src_x = divmod(src_flat, self.board.config.width)
-            dst_y, dst_x = divmod(dst_flat, self.board.config.width)
+            src_y, src_x,  dst_y, dst_x = action
 
             # Calculate captured marble position (midpoint)
             cap_y = (src_y + dst_y) // 2
@@ -530,9 +505,9 @@ class ZertzGame:
 
             # Use Rust functions for coordinate conversion
             import hiivelabs_mcts
-            src_str = hiivelabs_mcts.coordinate_to_algebraic(src_y, src_x, self.board.config)
-            cap_str = hiivelabs_mcts.coordinate_to_algebraic(cap_y, cap_x, self.board.config)
-            dst_str = hiivelabs_mcts.coordinate_to_algebraic(dst_y, dst_x, self.board.config)
+            src_str = hiivelabs_mcts.coordinate_to_algebraic(self.board.config, src_y, src_x)
+            cap_str = hiivelabs_mcts.coordinate_to_algebraic(self.board.config, cap_y, cap_x)
+            dst_str = hiivelabs_mcts.coordinate_to_algebraic(self.board.config, dst_y, dst_x)
 
             action_str = "{} {} {} {}".format(
                 action_type, src_str, cap_marble, dst_str
@@ -573,12 +548,11 @@ class ZertzGame:
         valid_dests = np.any(placement_array, axis=(0, 2))
         dest_indices = np.argwhere(valid_dests).flatten()
 
-        from hiivelabs_mcts import coordinate_to_algebraic
         placement_positions = []
         for dst_idx in dest_indices:
             dst_y, dst_x = divmod(dst_idx, self.board.config.width)
             if self.board.state[self.board.RING_LAYER, dst_y, dst_x]:
-                pos_label = coordinate_to_algebraic(dst_y, dst_x, self.board.config)
+                pos_label = zertz.coordinate_to_algebraic(self.board.config, dst_y, dst_x)
                 placement_positions.append(pos_label)
 
         return placement_positions
@@ -631,7 +605,6 @@ class ZertzGame:
         removal_mask = placement_array[marble_idx, dst_y, dst_x, :]
         removable_indices = np.argwhere(removal_mask).flatten()
 
-        from hiivelabs_mcts import coordinate_to_algebraic
         removable_positions = []
         for rem_idx in removable_indices:
             rem_y, rem_x = divmod(rem_idx, width)
@@ -639,7 +612,7 @@ class ZertzGame:
             if (rem_y, rem_x) != (dst_y, dst_x):
 
                 if self.board.state[self.board.RING_LAYER, rem_y, rem_x]:
-                    rem_label = coordinate_to_algebraic(rem_y, rem_x, self.board.config)
+                    rem_label = zertz.coordinate_to_algebraic(self.board.config, rem_y, rem_x)
                     removable_positions.append(rem_label)
 
         return removable_positions
@@ -656,23 +629,22 @@ class ZertzGame:
             List of dicts with position and score: [{'pos': 'A1', 'score': 0.8}, ...]
         """
         enriched = []
-        width = self.board.config.width
+        config = self.board.config
 
-        from hiivelabs_mcts import algebraic_to_coordinate
         for pos_str in placement_positions:
             # Convert position string to y, x
-            y, x = algebraic_to_coordinate(pos_str, self.board.config)
-            dst_flat = y * width + x
+            dst_y, dst_x = zertz.algebraic_to_coordinate(self.board.config, pos_str)
 
             # Find the best score for any marble type and removal at this destination
             # Valid actions not explored by MCTS get score 0.0
             best_score = 0.0
             for marble_type in range(3):  # w=0, g=1, b=2
-                for rem_flat in range(width * width + 1):  # All removals + no-removal
-                    if placement_array[marble_type, dst_flat, rem_flat]:
-                        action_key = ('PUT', (marble_type, dst_flat, rem_flat))
-                        score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
-                        best_score = max(best_score, score)
+                for rem_x in range(config.width):  # All removals + no-removal
+                    for rem_y in range(config.width):
+                        if placement_array[marble_type, dst_y, dst_x, rem_y, rem_x]:
+                            action_key = zertz.ZertzAction.placement(config, marble_type, dst_y, dst_x, rem_y, rem_x)
+                            score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
+                            best_score = max(best_score, score)
 
             enriched.append({'pos': pos_str, 'score': best_score})
 
@@ -691,11 +663,10 @@ class ZertzGame:
         enriched = []
         width = self.board.config.width
 
-        from hiivelabs_mcts import algebraic_to_coordinate
         for cap_dict in capture_moves:
             # Reconstruct action tuple from dict (new format: (None, src_flat, dst_flat))
-            src_y, src_x = algebraic_to_coordinate(cap_dict['src'], self.board.config)
-            dst_y, dst_x = algebraic_to_coordinate(cap_dict['dst'], self.board.config)
+            src_y, src_x = zertz.algebraic_to_coordinate(self.board.config, cap_dict['src'])
+            dst_y, dst_x = zertz.algebraic_to_coordinate(self.board.config, cap_dict['dst'])
 
             src_flat = src_y * width + src_x
             dst_flat = dst_y * width + dst_x
@@ -728,17 +699,15 @@ class ZertzGame:
             return []
 
         enriched = []
-        marble_idx, dst_flat, _ = action
-        width = self.board.config.width
+        marble_idx, dst_y, dst_x, _, _ = action
+        config = self.board.config
 
-        from hiivelabs_mcts import algebraic_to_coordinate
         for pos_str in removal_positions:
             # Convert position string to flat index
-            y, x = algebraic_to_coordinate(pos_str, self.board.config)
-            rem_flat = y * width + x
+            rem_y, rem_x = zertz.algebraic_to_coordinate(self.board.config, pos_str)
 
             # Lookup score for this specific (marble, dst, removal) tuple
-            action_key = ('PUT', (marble_idx, dst_flat, rem_flat))
+            action_key = zertz.ZertzAction.placement (config, marble_idx, dst_y, dst_x, rem_y, rem_x)
             score = action_scores.get(action_key, 0.0)  # Unexplored actions get 0.0
 
             enriched.append({'pos': pos_str, 'score': score})
@@ -819,7 +788,7 @@ class ZertzGame:
         reporter(self.board.global_state[self.board.SUPPLY_SLICE])
         reporter("---------------")
 
-    def take_action(self, action_type, action):
+    def take_action(self, action: zertz.ZertzAction):
         """Execute an action and record move for loop detection.
 
         Args:
@@ -830,7 +799,8 @@ class ZertzGame:
             ActionResult: Encapsulates captured marbles
         """
         # Record the move for loop detection
-        self.move_history.append((action_type, action))
+        action_type, action_data = action.to_tuple(self.board.config)
+        self.move_history.append((action_type, action_data))
 
         if action_type == "PASS":
             # Player passes (no valid moves), switch player
@@ -838,5 +808,5 @@ class ZertzGame:
             return ActionResult(captured_marbles=None)
         else:
             # Execute the action
-            captured = self.board.take_action(action, action_type)
+            captured = self.board.take_action(action)
             return ActionResult(captured_marbles=captured)

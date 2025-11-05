@@ -16,9 +16,8 @@ from game.constants import (
     BLITZ_WIN_CONDITIONS,
 )
 from game.zertz_game import ZertzGame
-from game.zertz_player import RandomZertzPlayer, ReplayZertzPlayer, HumanZertzPlayer
-from game.players.mcts_zertz_player import MCTSZertzPlayer
-from game.player_config import PlayerConfig
+from game.players import HumanZertzPlayer, ReplayZertzPlayer, RandomZertzPlayer, MCTSZertzPlayer
+from game.players.player_config import PlayerConfig
 
 
 class GameSession:

@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import TextIO
 
 from game.formatters import NotationFormatter, TranscriptFormatter
-from game.utils.player_utils import format_player_name
+from game.players.player_utils import format_player_name
 
 
 class GameWriter(ABC):

@@ -28,8 +28,8 @@ from hiivelabs_mcts import (
     get_supply_index,
     get_captured_index,
     get_valid_actions,
-    get_placement_moves,
-    get_capture_moves,
+    get_placement_actions,
+    get_capture_actions,
     get_regions,
 )
 
@@ -107,7 +107,7 @@ class TestHelperFunctionDelegation:
 
             # Call stateless function directly
             y, x = pos
-            stateless_neighbors = get_neighbors(y, x, config)
+            stateless_neighbors = get_neighbors(config, y, x)
 
             # They should match exactly
             assert stateful_neighbors == stateless_neighbors, \
@@ -154,7 +154,7 @@ class TestHelperFunctionDelegation:
 
             # Call stateless function directly
             y, x = pos
-            stateless_type = get_marble_type_at(board.state, y, x)
+            stateless_type = get_marble_type_at(config, board.state, y, x)
 
             # They should match
             assert stateful_type == stateless_type == marble_type, \
@@ -176,7 +176,7 @@ class TestHelperFunctionDelegation:
             stateful_idx = board._get_supply_index(marble_type)
 
             # Call stateless function directly
-            stateless_idx = get_supply_index(marble_type)
+            stateless_idx = get_supply_index(config, marble_type)
 
             # They should match
             assert stateful_idx == stateless_idx == expected_idx, \
@@ -200,7 +200,7 @@ class TestHelperFunctionDelegation:
             stateful_idx = board._get_captured_index(marble_type, player)
 
             # Call stateless function directly
-            stateless_idx = get_captured_index(marble_type, player)
+            stateless_idx = get_captured_index(config, player, marble_type)
 
             # They should match
             assert stateful_idx == stateless_idx == expected_idx, \
@@ -228,7 +228,7 @@ class TestMoveGenerationDelegation:
         # Call stateless function directly
         placement_stateless, capture_stateless = \
             get_valid_actions(
-                board.state, board.global_state, config
+                config, board.state, board.global_state
             )
 
         # They should match exactly
@@ -246,8 +246,8 @@ class TestMoveGenerationDelegation:
         placement_stateful = board.get_placement_moves()
 
         # Call stateless function directly
-        placement_stateless = get_placement_moves(
-            board.state, board.global_state, config
+        placement_stateless = get_placement_actions(
+            config, board.state, board.global_state
         )
 
         # They should match
@@ -260,8 +260,8 @@ class TestMoveGenerationDelegation:
         capture_stateful = board.get_capture_moves()
 
         # Call stateless function directly
-        capture_stateless = get_capture_moves(
-            board.state, board.config
+        capture_stateless = get_capture_actions(
+            board.config, board.state
         )
 
         # They should match

@@ -9,8 +9,7 @@ from renderer.panda_renderer import PandaRenderer
 from renderer.text_renderer import TextRenderer
 from renderer.composite_renderer import CompositeRenderer
 from shared.interfaces import IRenderer
-from game.zertz_board import ZertzBoard
-from game.player_config import PlayerConfig
+from game.players.player_config import PlayerConfig
 
 
 class ZertzFactory:

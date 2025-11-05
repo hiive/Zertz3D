@@ -11,8 +11,7 @@ import pytest
 import sys
 from pathlib import Path
 import numpy as np
-from hiivelabs_mcts import algebraic_to_coordinate
-
+import hiivelabs_mcts.zertz as zertz
 # Add parent directory to path to import game modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -67,10 +66,10 @@ class TestWinConditions:
         # C3 (white) → D4 (black) → E5 (empty) → F5 (black) → G5 (empty)
         # After capturing first black: 5+1=6 blacks → WIN!
 
-        c3_idx = algebraic_to_coordinate("C3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        e5_idx = algebraic_to_coordinate("E5", board.config)
-        f5_idx = algebraic_to_coordinate("F5", board.config)
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
+        e5_idx = zertz.algebraic_to_coordinate(board.config, "E5")
+        f5_idx = zertz.algebraic_to_coordinate(board.config, "F5")
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         black_layer = board.MARBLE_TO_LAYER["b"]
@@ -78,7 +77,7 @@ class TestWinConditions:
         board.state[white_layer][c3_idx] = 1
         board.state[black_layer][d4_idx] = 1
         # E5 is empty
-        board.state[black_layer][f5_idx] = 1
+        board.state[black_layer][e5_idx] = 1
 
         # Verify game is not over yet
         assert game.get_game_ended() is None, "Game should not be over before capture"
@@ -134,13 +133,13 @@ class TestWinConditions:
         #   To-isolate: C1-D2-D1 (triangle) connected to main via D3
         # Removing D3 will isolate C1-D2-D1
 
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        d5_idx = algebraic_to_coordinate("D5", board.config)
-        e4_idx = algebraic_to_coordinate("E4", board.config)
-        d3_idx = algebraic_to_coordinate("D3", board.config)  # Connection ring (will be removed)
-        c1_idx = algebraic_to_coordinate("C1", board.config)
-        d2_idx = algebraic_to_coordinate("D2", board.config)
-        d1_idx = algebraic_to_coordinate("D1", board.config)
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
+        d5_idx = zertz.algebraic_to_coordinate(board.config, "D5")
+        e4_idx = zertz.algebraic_to_coordinate(board.config, "E4")
+        d3_idx = zertz.algebraic_to_coordinate(board.config, "D3")  # Connection ring (will be removed)
+        c1_idx = zertz.algebraic_to_coordinate(board.config, "C1")
+        d2_idx = zertz.algebraic_to_coordinate(board.config, "D2")
+        d1_idx = zertz.algebraic_to_coordinate(board.config, "D1")
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         gray_layer = board.MARBLE_TO_LAYER["g"]
@@ -219,9 +218,9 @@ class TestWinConditions:
         # C3 (white) → D4 (gray) → E5 (empty)
         # After capturing gray: 4+1=5 grays → WIN!
 
-        c3_idx = algebraic_to_coordinate("C3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        e5_idx = algebraic_to_coordinate("E5", board.config)
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
+        e5_idx = zertz.algebraic_to_coordinate(board.config, "E5")
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         gray_layer = board.MARBLE_TO_LAYER["g"]
@@ -282,11 +281,11 @@ class TestWinConditions:
         # To-isolate: C1 (single ring with black marble) connected via D3
         # Removing D3 will isolate C1
 
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        d5_idx = algebraic_to_coordinate("D5", board.config)
-        e4_idx = algebraic_to_coordinate("E4", board.config)
-        d3_idx = algebraic_to_coordinate("D3", board.config)  # Connection ring (will be removed)
-        c1_idx = algebraic_to_coordinate("C1", board.config)
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
+        d5_idx = zertz.algebraic_to_coordinate(board.config, "D5")
+        e4_idx = zertz.algebraic_to_coordinate(board.config, "E4")
+        d3_idx = zertz.algebraic_to_coordinate(board.config, "D3")  # Connection ring (will be removed)
+        c1_idx = zertz.algebraic_to_coordinate(board.config, "C1")
 
         black_layer = board.MARBLE_TO_LAYER["b"]
 
@@ -435,9 +434,9 @@ class TestWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
         # Set up a capture scenario: B2 (gray) → C3 (white) → D4 (empty)
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
+        b2_idx = zertz.algebraic_to_coordinate(board.config, "B2")
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
 
         gray_layer = board.MARBLE_TO_LAYER["g"]
         white_layer = board.MARBLE_TO_LAYER["w"]
@@ -495,9 +494,9 @@ class TestWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_2
 
         # Set up a capture scenario: B2 (black) → C3 (white) → D4 (empty)
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
+        b2_idx = zertz.algebraic_to_coordinate(board.config, "B2")
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
 
         black_layer = board.MARBLE_TO_LAYER["b"]
         white_layer = board.MARBLE_TO_LAYER["w"]
@@ -554,9 +553,9 @@ class TestWinConditions:
         # Clear the board and set up a minimal topology with only 3 rings
         board.state[board.RING_LAYER] = 0
 
-        d3_idx = algebraic_to_coordinate("D3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        d5_idx = algebraic_to_coordinate("D5", board.config)
+        d3_idx = zertz.algebraic_to_coordinate(board.config, "D3")
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
+        d5_idx = zertz.algebraic_to_coordinate(board.config, "D5")
 
         board.state[board.RING_LAYER][d3_idx] = 1
         board.state[board.RING_LAYER][d4_idx] = 1
@@ -616,9 +615,9 @@ class TestWinConditions:
         # Clear the board and set up a minimal topology with only 3 rings
         board.state[board.RING_LAYER] = 0
 
-        d3_idx = algebraic_to_coordinate("D3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
-        d5_idx = algebraic_to_coordinate("D5", board.config)
+        d3_idx = zertz.algebraic_to_coordinate(board.config, "D3")
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
+        d5_idx = zertz.algebraic_to_coordinate(board.config, "D5")
 
         board.state[board.RING_LAYER][d3_idx] = 1
         board.state[board.RING_LAYER][d4_idx] = 1
@@ -784,9 +783,9 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
         # Set up capture scenario
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
-        d4_idx = algebraic_to_coordinate("D4", board.config)
+        b2_idx = zertz.algebraic_to_coordinate(board.config, "B2")
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
+        d4_idx = zertz.algebraic_to_coordinate(board.config, "D4")
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         black_layer = board.MARBLE_TO_LAYER["b"]
@@ -839,8 +838,8 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_2
 
         # Set up capture scenario
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
+        b2_idx = zertz.algebraic_to_coordinate(board.config, "B2")
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
 
         gray_layer = board.MARBLE_TO_LAYER["g"]
         white_layer = board.MARBLE_TO_LAYER["w"]
@@ -893,8 +892,8 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_1
 
         # Set up capture scenario
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
+        b2_idx = zertz.algebraic_to_coordinate(board.config, "B2")
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
 
         white_layer = board.MARBLE_TO_LAYER["w"]
         gray_layer = board.MARBLE_TO_LAYER["g"]
@@ -945,8 +944,8 @@ class TestBlitzWinConditions:
         board.global_state[board.CUR_PLAYER] = board.PLAYER_2
 
         # Set up capture scenario
-        b2_idx = algebraic_to_coordinate("B2", board.config)
-        c3_idx = algebraic_to_coordinate("C3", board.config)
+        b2_idx = zertz.algebraic_to_coordinate(board.config, "B2")
+        c3_idx = zertz.algebraic_to_coordinate(board.config, "C3")
 
         gray_layer = board.MARBLE_TO_LAYER["g"]
         black_layer = board.MARBLE_TO_LAYER["b"]

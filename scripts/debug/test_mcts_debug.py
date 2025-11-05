@@ -18,8 +18,7 @@ if str(project_root) not in sys.path:
 
 from game.formatters.transcript_formatter import TranscriptFormatter
 from game.zertz_game import ZertzGame
-from game.players.mcts_zertz_player import MCTSZertzPlayer
-from game.zertz_player import RandomZertzPlayer
+from game.players import MCTSZertzPlayer, RandomZertzPlayer
 
 # Configuration
 NUM_GAMES = 10

@@ -11,8 +11,9 @@ import numpy as np
 from game.zertz_game import PLAYER_1_WIN, PLAYER_2_WIN
 from game.loaders import AutoSelectLoader
 from game.formatters.notation_formatter import NotationFormatter
-from game.player_config import PlayerConfig
-from game.utils.player_utils import format_player_name
+from game.players import MCTSZertzPlayer
+from game.players.player_config import PlayerConfig
+from game.players.player_utils import format_player_name
 from controller.game_logger import GameLogger
 from controller.action_text_formatter import ActionTextFormatter
 from controller.action_processor import ActionProcessor
@@ -180,8 +181,6 @@ class ZertzGameController:
             self.renderer.action_visualization_sequencer.on_mcts_event(event)
 
         # Apply callback to any MCTS players
-        from game.players.mcts_zertz_player import MCTSZertzPlayer
-
         if isinstance(self.session.player1, MCTSZertzPlayer):
             self.session.player1.progress_callback = mcts_callback
 
@@ -297,14 +296,13 @@ class ZertzGameController:
                 and player.pending_actions_empty()
             ):
                 return task.again
-            ax, ay = player.get_action()
+            action = player.get_action()
         except ValueError as e:
             self._report(f"Error getting action: {e}")
             if self.session.is_replay_mode():
                 if self.session.is_partial_replay():
                     # Switch to random play
-                    player = self.session.switch_to_random_play(player)
-                    ax, ay = player.get_action()
+                    action = player.get_action()
                 else:
                     self._report("Replay finished")
                     return task.done
@@ -328,6 +326,7 @@ class ZertzGameController:
             self._display_valid_moves(player)
 
         # Convert action to string
+        ax, ay = action.to_tuple(self.session.game.board.config)
         try:
             _, action_dict = self.session.game.action_to_str(ax, ay)
         except IndexError as e:
